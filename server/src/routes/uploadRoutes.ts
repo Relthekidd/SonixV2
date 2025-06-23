@@ -1,13 +1,15 @@
 import express from 'express';
-import { Request, Response } from 'express';
+import { UploadController } from '@/controllers/uploadController';
+import { authenticate } from '@/middleware/authMiddleware';
+import { uploadAudio, uploadImage, uploadTrackFiles } from '@/middleware/uploadMiddleware';
 
 const router = express.Router();
 
 /**
  * @swagger
- * /upload/track:
+ * /upload/audio:
  *   post:
- *     summary: Upload a new track
+ *     summary: Upload an audio file
  *     tags: [Upload]
  *     security:
  *       - bearerAuth: []
@@ -17,49 +19,50 @@ const router = express.Router();
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - audio
  *             properties:
  *               audio:
  *                 type: string
  *                 format: binary
- *               title:
- *                 type: string
- *               artistId:
- *                 type: string
- *               albumId:
- *                 type: string
+ *                 description: Audio file (MP3, WAV, FLAC)
  *     responses:
  *       201:
- *         description: Track uploaded successfully
+ *         description: Audio file uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     audioUrl:
+ *                       type: string
+ *                     filename:
+ *                       type: string
+ *                     size:
+ *                       type: integer
+ *                     mimetype:
+ *                       type: string
+ *       400:
+ *         description: No audio file provided
  *       401:
  *         description: Unauthorized
+ *       403:
+ *         description: Artist profile required
  */
-router.post('/track', async (req: Request, res: Response) => {
-  try {
-    // TODO: Implement track upload logic with multer
-    res.status(201).json({
-      success: true,
-      message: 'Track uploaded successfully',
-      data: {
-        id: 'new-track-id',
-        title: req.body.title || 'Untitled Track',
-        audioUrl: 'https://example.com/uploaded-track.mp3',
-        uploadedAt: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Track upload failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+router.post('/audio', authenticate, uploadAudio, UploadController.uploadAudio);
 
 /**
  * @swagger
  * /upload/image:
  *   post:
- *     summary: Upload an image (album cover, artist photo, etc.)
+ *     summary: Upload an image file
  *     tags: [Upload]
  *     security:
  *       - bearerAuth: []
@@ -69,37 +72,112 @@ router.post('/track', async (req: Request, res: Response) => {
  *         multipart/form-data:
  *           schema:
  *             type: object
+ *             required:
+ *               - image
  *             properties:
  *               image:
  *                 type: string
  *                 format: binary
- *               type:
- *                 type: string
- *                 enum: [album_cover, artist_photo, playlist_cover]
+ *                 description: Image file (JPEG, PNG)
  *     responses:
  *       201:
  *         description: Image uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     imageUrl:
+ *                       type: string
+ *                     filename:
+ *                       type: string
+ *                     size:
+ *                       type: integer
+ *                     mimetype:
+ *                       type: string
+ *       400:
+ *         description: No image file provided
  *       401:
  *         description: Unauthorized
  */
-router.post('/image', async (req: Request, res: Response) => {
-  try {
-    // TODO: Implement image upload logic with multer and sharp
-    res.status(201).json({
-      success: true,
-      message: 'Image uploaded successfully',
-      data: {
-        imageUrl: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
-        uploadedAt: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Image upload failed',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+router.post('/image', authenticate, uploadImage, UploadController.uploadImage);
+
+/**
+ * @swagger
+ * /upload/track:
+ *   post:
+ *     summary: Upload track files (audio + optional cover)
+ *     tags: [Upload]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - audio
+ *             properties:
+ *               audio:
+ *                 type: string
+ *                 format: binary
+ *                 description: Audio file (MP3, WAV, FLAC)
+ *               cover:
+ *                 type: string
+ *                 format: binary
+ *                 description: Cover image (JPEG, PNG)
+ *     responses:
+ *       201:
+ *         description: Track files uploaded successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 message:
+ *                   type: string
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     audioUrl:
+ *                       type: string
+ *                     coverUrl:
+ *                       type: string
+ *                     audio:
+ *                       type: object
+ *                       properties:
+ *                         filename:
+ *                           type: string
+ *                         size:
+ *                           type: integer
+ *                         mimetype:
+ *                           type: string
+ *                     cover:
+ *                       type: object
+ *                       properties:
+ *                         filename:
+ *                           type: string
+ *                         size:
+ *                           type: integer
+ *                         mimetype:
+ *                           type: string
+ *       400:
+ *         description: No audio file provided
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Artist profile required
+ */
+router.post('/track', authenticate, uploadTrackFiles, UploadController.uploadTrackFiles);
 
 export default router;

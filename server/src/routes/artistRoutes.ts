@@ -1,7 +1,42 @@
 import express from 'express';
-import { Request, Response } from 'express';
+import { ArtistController } from '@/controllers/artistController';
+import { authenticate, authorize } from '@/middleware/authMiddleware';
+import { uploadArtistFiles } from '@/middleware/uploadMiddleware';
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Artist:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *         userId:
+ *           type: string
+ *         stageName:
+ *           type: string
+ *         bio:
+ *           type: string
+ *         avatarUrl:
+ *           type: string
+ *         bannerUrl:
+ *           type: string
+ *         genres:
+ *           type: array
+ *           items:
+ *             type: string
+ *         socialLinks:
+ *           type: object
+ *         isVerified:
+ *           type: boolean
+ *         monthlyListeners:
+ *           type: integer
+ *         totalPlays:
+ *           type: integer
+ */
 
 /**
  * @swagger
@@ -24,34 +59,128 @@ const router = express.Router();
  *       200:
  *         description: Artists retrieved successfully
  */
-router.get('/', async (req: Request, res: Response) => {
-  try {
-    // TODO: Implement get artists logic
-    res.status(200).json({
-      success: true,
-      data: [
-        {
-          id: 'artist-1',
-          name: 'Sample Artist',
-          bio: 'A sample artist for testing',
-          imageUrl: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
-          createdAt: new Date().toISOString()
-        }
-      ],
-      pagination: {
-        page: 1,
-        limit: 20,
-        total: 1
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get artists',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+router.get('/', ArtistController.getAllArtists);
+
+/**
+ * @swagger
+ * /artists/top:
+ *   get:
+ *     summary: Get top artists
+ *     tags: [Artists]
+ *     parameters:
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Top artists retrieved successfully
+ */
+router.get('/top', ArtistController.getTopArtists);
+
+/**
+ * @swagger
+ * /artists/search:
+ *   get:
+ *     summary: Search artists
+ *     tags: [Artists]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Artists search results
+ */
+router.get('/search', ArtistController.searchArtists);
+
+/**
+ * @swagger
+ * /artists/profile:
+ *   post:
+ *     summary: Create artist profile
+ *     tags: [Artists]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - stageName
+ *             properties:
+ *               stageName:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               genres:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               socialLinks:
+ *                 type: object
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *               banner:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       201:
+ *         description: Artist profile created successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.post('/profile', authenticate, uploadArtistFiles, ArtistController.createArtistProfile);
+
+/**
+ * @swagger
+ * /artists/profile:
+ *   put:
+ *     summary: Update artist profile
+ *     tags: [Artists]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               stageName:
+ *                 type: string
+ *               bio:
+ *                 type: string
+ *               genres:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *               socialLinks:
+ *                 type: object
+ *               avatar:
+ *                 type: string
+ *                 format: binary
+ *               banner:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Artist profile updated successfully
+ *       401:
+ *         description: Unauthorized
+ */
+router.put('/profile', authenticate, uploadArtistFiles, ArtistController.updateArtistProfile);
 
 /**
  * @swagger
@@ -71,27 +200,29 @@ router.get('/', async (req: Request, res: Response) => {
  *       404:
  *         description: Artist not found
  */
-router.get('/:id', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    // TODO: Implement get artist by ID logic
-    res.status(200).json({
-      success: true,
-      data: {
-        id,
-        name: 'Sample Artist',
-        bio: 'A sample artist for testing',
-        imageUrl: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
-        createdAt: new Date().toISOString()
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: 'Failed to get artist',
-      error: error instanceof Error ? error.message : 'Unknown error'
-    });
-  }
-});
+router.get('/:id', ArtistController.getArtistById);
+
+/**
+ * @swagger
+ * /artists/{id}/tracks:
+ *   get:
+ *     summary: Get artist tracks
+ *     tags: [Artists]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: published
+ *         schema:
+ *           type: boolean
+ *           default: true
+ *     responses:
+ *       200:
+ *         description: Artist tracks retrieved successfully
+ */
+router.get('/:id/tracks', ArtistController.getArtistTracks);
 
 export default router;
