@@ -18,17 +18,7 @@ import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  Upload, 
-  Music, 
-  Image as ImageIcon, 
-  Play, 
-  Pause, 
-  Plus,
-  X,
-  Check,
-  AlertCircle
-} from 'lucide-react-native';
+import { Upload, Music, Image as ImageIcon, Play, Pause, Plus, X, Check, CircleAlert as AlertCircle } from 'lucide-react-native';
 
 interface UploadFormData {
   title: string;

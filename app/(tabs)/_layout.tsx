@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { Home, Search, Library, User, Upload } from 'lucide-react-native';
+import { Chrome as Home, Search, Library, User, Upload } from 'lucide-react-native';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { View, StyleSheet } from 'react-native';
 
