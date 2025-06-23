@@ -9,7 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { Users, Music, BarChart3, Settings, Shield } from 'lucide-react-native';
+import { Users, Music, ChartBar as BarChart3, Settings, Shield } from 'lucide-react-native';
 
 export default function AdminScreen() {
   const { user } = useAuth();
