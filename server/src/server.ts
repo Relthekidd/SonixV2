@@ -41,7 +41,16 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.NODE_ENV === 'production' 
     ? ['https://your-frontend-domain.com'] 
-    : ['http://localhost:3000', 'http://localhost:19006'],
+    : [
+        'http://localhost:3000', 
+        'http://localhost:19006',
+        'http://192.168.1.100:19006',
+        'http://10.0.0.255:19006',
+        // Add common local network ranges
+        /^http:\/\/192\.168\.\d+\.\d+:19006$/,
+        /^http:\/\/10\.\d+\.\d+\.\d+:19006$/,
+        /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d+\.\d+:19006$/
+      ],
   credentials: true
 }));
 
@@ -167,13 +176,14 @@ const startServer = async () => {
       }
     }, 60 * 60 * 1000); // Update every hour
     
-    server.listen(PORT, () => {
+    server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Sonix API Server running on port ${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
       console.log(`🏥 Health Check: http://localhost:${PORT}/health`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV}`);
       console.log(`🔌 WebSocket: Enabled`);
       console.log(`📊 Analytics: Active`);
+      console.log(`🌐 Server accessible on all network interfaces`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
