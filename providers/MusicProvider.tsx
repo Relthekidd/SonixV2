@@ -1,4 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiService } from '@/services/api';
+import { useAuth } from './AuthProvider';
 
 export interface Track {
   id: string;
@@ -11,6 +13,8 @@ export interface Track {
   isLiked: boolean;
   genre: string;
   releaseDate: string;
+  playCount?: number;
+  likeCount?: number;
 }
 
 export interface Album {
@@ -46,129 +50,116 @@ interface MusicContextType {
   albums: Album[];
   trendingTracks: Track[];
   newReleases: Album[];
+  isLoading: boolean;
+  error: string | null;
   playTrack: (track: Track, queue?: Track[]) => void;
   pauseTrack: () => void;
   nextTrack: () => void;
   previousTrack: () => void;
-  toggleLike: (trackId: string) => void;
-  createPlaylist: (name: string, description: string) => void;
-  addToPlaylist: (playlistId: string, track: Track) => void;
-  removeFromPlaylist: (playlistId: string, trackId: string) => void;
+  toggleLike: (trackId: string) => Promise<void>;
+  createPlaylist: (name: string, description: string) => Promise<void>;
+  addToPlaylist: (playlistId: string, track: Track) => Promise<void>;
+  removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
   searchMusic: (query: string) => Promise<{ tracks: Track[], albums: Album[], playlists: Playlist[] }>;
+  refreshData: () => Promise<void>;
 }
 
 const MusicContext = createContext<MusicContextType | null>(null);
 
-// Mock data
-const mockTracks: Track[] = [
-  {
-    id: '1',
-    title: 'Midnight Dreams',
-    artist: 'Luna Waves',
-    album: 'Ethereal Nights',
-    duration: 240,
-    coverUrl: 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: '',
-    isLiked: true,
-    genre: 'Electronic',
-    releaseDate: '2024-01-15',
-  },
-  {
-    id: '2',
-    title: 'Golden Hour',
-    artist: 'Sunset Collective',
-    album: 'Warm Moments',
-    duration: 195,
-    coverUrl: 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: '',
-    isLiked: false,
-    genre: 'Indie Pop',
-    releaseDate: '2024-02-20',
-  },
-  {
-    id: '3',
-    title: 'City Lights',
-    artist: 'Neon Pulse',
-    album: 'Urban Symphony',
-    duration: 220,
-    coverUrl: 'https://images.pexels.com/photos/1105666/pexels-photo-1105666.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: '',
-    isLiked: true,
-    genre: 'Synthwave',
-    releaseDate: '2024-03-10',
-  },
-  {
-    id: '4',
-    title: 'Ocean Breeze',
-    artist: 'Coastal Harmony',
-    album: 'Tidal Emotions',
-    duration: 280,
-    coverUrl: 'https://images.pexels.com/photos/1032650/pexels-photo-1032650.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: '',
-    isLiked: false,
-    genre: 'Ambient',
-    releaseDate: '2024-01-05',
-  },
-];
-
-const mockAlbums: Album[] = [
-  {
-    id: '1',
-    title: 'Ethereal Nights',
-    artist: 'Luna Waves',
-    coverUrl: 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-    year: '2024',
-    tracks: [mockTracks[0]],
-    genre: 'Electronic',
-  },
-  {
-    id: '2',
-    title: 'Warm Moments',
-    artist: 'Sunset Collective',
-    coverUrl: 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
-    year: '2024',
-    tracks: [mockTracks[1]],
-    genre: 'Indie Pop',
-  },
-];
-
-const mockPlaylists: Playlist[] = [
-  {
-    id: '1',
-    name: 'My Favorites',
-    description: 'Songs I love the most',
-    coverUrl: 'https://images.pexels.com/photos/1649431/pexels-photo-1649431.jpeg?auto=compress&cs=tinysrgb&w=400',
-    tracks: mockTracks.filter(track => track.isLiked),
-    isPublic: false,
-    createdBy: '1',
-    createdAt: '2024-01-01',
-  },
-  {
-    id: '2',
-    name: 'Chill Vibes',
-    description: 'Perfect for relaxing',
-    coverUrl: 'https://images.pexels.com/photos/1587927/pexels-photo-1587927.jpeg?auto=compress&cs=tinysrgb&w=400',
-    tracks: [mockTracks[0], mockTracks[3]],
-    isPublic: true,
-    createdBy: '1',
-    createdAt: '2024-02-01',
-  },
-];
-
 export function MusicProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [queue, setQueue] = useState<Track[]>([]);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Track[]>([]);
-  const [likedSongs, setLikedSongs] = useState<Track[]>(mockTracks.filter(track => track.isLiked));
-  const [playlists, setPlaylists] = useState<Playlist[]>(mockPlaylists);
-  const [albums] = useState<Album[]>(mockAlbums);
-  const [trendingTracks] = useState<Track[]>(mockTracks);
-  const [newReleases] = useState<Album[]>(mockAlbums);
+  const [likedSongs, setLikedSongs] = useState<Track[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
+  const [newReleases, setNewReleases] = useState<Album[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const playTrack = (track: Track, newQueue?: Track[]) => {
+  useEffect(() => {
+    if (user) {
+      loadInitialData();
+    }
+  }, [user]);
+
+  const loadInitialData = async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      const [
+        trendingData,
+        albumsData,
+        playlistsData,
+        likedData,
+      ] = await Promise.all([
+        apiService.getTrendingTracks(20),
+        apiService.getAlbums({ limit: 10 }),
+        user ? apiService.getUserPlaylists() : apiService.getPublicPlaylists({ limit: 10 }),
+        user ? apiService.getLikedTracks() : Promise.resolve([]),
+      ]);
+
+      setTrendingTracks(trendingData.map(transformTrack));
+      setNewReleases(albumsData.map(transformAlbum));
+      setPlaylists(playlistsData.map(transformPlaylist));
+      setLikedSongs(likedData.map(transformTrack));
+      setAlbums(albumsData.map(transformAlbum));
+    } catch (err) {
+      console.error('Error loading initial data:', err);
+      setError('Failed to load music data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshData = async () => {
+    await loadInitialData();
+  };
+
+  // Transform API data to match frontend interface
+  const transformTrack = (apiTrack: any): Track => ({
+    id: apiTrack.id,
+    title: apiTrack.title,
+    artist: apiTrack.artist_name || apiTrack.artist || 'Unknown Artist',
+    album: apiTrack.album || 'Unknown Album',
+    duration: apiTrack.duration,
+    coverUrl: apiTrack.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+    audioUrl: apiTrack.audio_url,
+    isLiked: apiTrack.is_liked || false,
+    genre: Array.isArray(apiTrack.genres) ? apiTrack.genres[0] : apiTrack.genre || 'Unknown',
+    releaseDate: apiTrack.created_at || apiTrack.release_date || new Date().toISOString(),
+    playCount: apiTrack.play_count,
+    likeCount: apiTrack.like_count,
+  });
+
+  const transformAlbum = (apiAlbum: any): Album => ({
+    id: apiAlbum.id,
+    title: apiAlbum.title,
+    artist: apiAlbum.artist_name || apiAlbum.artist || 'Unknown Artist',
+    coverUrl: apiAlbum.cover_url || 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
+    year: apiAlbum.release_date ? new Date(apiAlbum.release_date).getFullYear().toString() : '2024',
+    tracks: apiAlbum.tracks ? apiAlbum.tracks.map(transformTrack) : [],
+    genre: Array.isArray(apiAlbum.genres) ? apiAlbum.genres[0] : apiAlbum.genre || 'Unknown',
+  });
+
+  const transformPlaylist = (apiPlaylist: any): Playlist => ({
+    id: apiPlaylist.id,
+    name: apiPlaylist.name,
+    description: apiPlaylist.description || '',
+    coverUrl: apiPlaylist.cover_url || 'https://images.pexels.com/photos/1649431/pexels-photo-1649431.jpeg?auto=compress&cs=tinysrgb&w=400',
+    tracks: apiPlaylist.tracks ? apiPlaylist.tracks.map(transformTrack) : [],
+    isPublic: apiPlaylist.is_public,
+    createdBy: apiPlaylist.user_id,
+    createdAt: apiPlaylist.created_at,
+  });
+
+  const playTrack = async (track: Track, newQueue?: Track[]) => {
     setCurrentTrack(track);
     setIsPlaying(true);
     setDuration(track.duration);
@@ -182,6 +173,18 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const filtered = prev.filter(t => t.id !== track.id);
       return [track, ...filtered].slice(0, 10);
     });
+
+    // Record play with backend
+    if (user) {
+      try {
+        await apiService.recordPlay(track.id, {
+          deviceType: 'web',
+          completed: false,
+        });
+      } catch (error) {
+        console.error('Error recording play:', error);
+      }
+    }
   };
 
   const pauseTrack = () => {
@@ -204,76 +207,96 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleLike = (trackId: string) => {
-    setLikedSongs(prev => {
-      const track = mockTracks.find(t => t.id === trackId);
-      if (!track) return prev;
+  const toggleLike = async (trackId: string) => {
+    if (!user) return;
+
+    try {
+      const isCurrentlyLiked = likedSongs.some(track => track.id === trackId);
       
-      const isLiked = prev.some(t => t.id === trackId);
-      if (isLiked) {
-        return prev.filter(t => t.id !== trackId);
+      if (isCurrentlyLiked) {
+        await apiService.unlikeTrack(trackId);
+        setLikedSongs(prev => prev.filter(track => track.id !== trackId));
       } else {
-        return [...prev, { ...track, isLiked: true }];
+        await apiService.likeTrack(trackId);
+        // Fetch the track details to add to liked songs
+        const track = await apiService.getTrackById(trackId);
+        setLikedSongs(prev => [...prev, transformTrack(track)]);
       }
-    });
+    } catch (error) {
+      console.error('Error toggling like:', error);
+      setError('Failed to update like status');
+    }
   };
 
-  const createPlaylist = (name: string, description: string) => {
-    const newPlaylist: Playlist = {
-      id: Date.now().toString(),
-      name,
-      description,
-      coverUrl: 'https://images.pexels.com/photos/1649431/pexels-photo-1649431.jpeg?auto=compress&cs=tinysrgb&w=400',
-      tracks: [],
-      isPublic: false,
-      createdBy: '1',
-      createdAt: new Date().toISOString(),
-    };
-    
-    setPlaylists(prev => [...prev, newPlaylist]);
+  const createPlaylist = async (name: string, description: string) => {
+    if (!user) return;
+
+    try {
+      const newPlaylist = await apiService.createPlaylist({
+        name,
+        description,
+        isPublic: false,
+        isCollaborative: false,
+      });
+      
+      setPlaylists(prev => [...prev, transformPlaylist(newPlaylist)]);
+    } catch (error) {
+      console.error('Error creating playlist:', error);
+      setError('Failed to create playlist');
+      throw error;
+    }
   };
 
-  const addToPlaylist = (playlistId: string, track: Track) => {
-    setPlaylists(prev => prev.map(playlist => 
-      playlist.id === playlistId 
-        ? { ...playlist, tracks: [...playlist.tracks, track] }
-        : playlist
-    ));
+  const addToPlaylist = async (playlistId: string, track: Track) => {
+    if (!user) return;
+
+    try {
+      await apiService.addTrackToPlaylist(playlistId, track.id);
+      
+      setPlaylists(prev => prev.map(playlist => 
+        playlist.id === playlistId 
+          ? { ...playlist, tracks: [...playlist.tracks, track] }
+          : playlist
+      ));
+    } catch (error) {
+      console.error('Error adding to playlist:', error);
+      setError('Failed to add track to playlist');
+      throw error;
+    }
   };
 
-  const removeFromPlaylist = (playlistId: string, trackId: string) => {
-    setPlaylists(prev => prev.map(playlist => 
-      playlist.id === playlistId 
-        ? { ...playlist, tracks: playlist.tracks.filter(track => track.id !== trackId) }
-        : playlist
-    ));
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => {
+    if (!user) return;
+
+    try {
+      await apiService.removeTrackFromPlaylist(playlistId, trackId);
+      
+      setPlaylists(prev => prev.map(playlist => 
+        playlist.id === playlistId 
+          ? { ...playlist, tracks: playlist.tracks.filter(track => track.id !== trackId) }
+          : playlist
+      ));
+    } catch (error) {
+      console.error('Error removing from playlist:', error);
+      setError('Failed to remove track from playlist');
+      throw error;
+    }
   };
 
   const searchMusic = async (query: string) => {
-    // Simulate API search
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const filteredTracks = mockTracks.filter(track => 
-      track.title.toLowerCase().includes(query.toLowerCase()) ||
-      track.artist.toLowerCase().includes(query.toLowerCase()) ||
-      track.album.toLowerCase().includes(query.toLowerCase())
-    );
-    
-    const filteredAlbums = mockAlbums.filter(album =>
-      album.title.toLowerCase().includes(query.toLowerCase()) ||
-      album.artist.toLowerCase().includes(query.toLowerCase())
-    );
-    
-    const filteredPlaylists = playlists.filter(playlist =>
-      playlist.name.toLowerCase().includes(query.toLowerCase()) ||
-      playlist.description.toLowerCase().includes(query.toLowerCase())
-    );
-    
-    return {
-      tracks: filteredTracks,
-      albums: filteredAlbums,
-      playlists: filteredPlaylists,
-    };
+    try {
+      const results = await apiService.search(query, 'all', 20);
+      
+      return {
+        tracks: (results.tracks || []).map(transformTrack),
+        albums: (results.albums || []).map(transformAlbum),
+        playlists: (results.playlists || []).map(transformPlaylist),
+      };
+    } catch (error) {
+      console.error('Error searching music:', error);
+      setError('Search failed');
+      return { tracks: [], albums: [], playlists: [] };
+    }
   };
 
   return (
@@ -290,6 +313,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         albums,
         trendingTracks,
         newReleases,
+        isLoading,
+        error,
         playTrack,
         pauseTrack,
         nextTrack,
@@ -299,6 +324,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         addToPlaylist,
         removeFromPlaylist,
         searchMusic,
+        refreshData,
       }}
     >
       {children}

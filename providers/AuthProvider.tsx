@@ -1,4 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { apiService } from '@/services/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface User {
   id: string;
@@ -6,7 +8,7 @@ export interface User {
   displayName: string;
   avatar?: string;
   bio?: string;
-  role: 'admin' | 'listener';
+  role: 'admin' | 'listener' | 'artist';
   isPublic: boolean;
   showFavoriteStats: boolean;
 }
@@ -16,7 +18,7 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  signup: (email: string, password: string, displayName: string) => Promise<void>;
+  signup: (email: string, password: string, displayName: string, role?: 'listener' | 'artist') => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -24,37 +26,70 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const TOKEN_KEY = 'auth_token';
+const USER_KEY = 'user_data';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate checking for existing session
-    setTimeout(() => {
-      setIsLoading(false);
-    }, 1000);
+    loadStoredAuth();
   }, []);
+
+  const loadStoredAuth = async () => {
+    try {
+      const [storedToken, storedUser] = await Promise.all([
+        AsyncStorage.getItem(TOKEN_KEY),
+        AsyncStorage.getItem(USER_KEY),
+      ]);
+
+      if (storedToken && storedUser) {
+        apiService.setAuthToken(storedToken);
+        setUser(JSON.parse(storedUser));
+        
+        // Verify token is still valid
+        try {
+          const currentUser = await apiService.getCurrentUser();
+          setUser(currentUser);
+          await AsyncStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+        } catch (error) {
+          // Token is invalid, clear stored data
+          await clearStoredAuth();
+        }
+      }
+    } catch (error) {
+      console.error('Error loading stored auth:', error);
+      await clearStoredAuth();
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearStoredAuth = async () => {
+    await Promise.all([
+      AsyncStorage.removeItem(TOKEN_KEY),
+      AsyncStorage.removeItem(USER_KEY),
+    ]);
+    apiService.setAuthToken(null);
+    setUser(null);
+  };
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await apiService.login(email, password);
       
-      const mockUser: User = {
-        id: '1',
-        email: email,
-        displayName: 'Music Lover',
-        avatar: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400',
-        bio: 'Passionate about discovering new music',
-        role: email.includes('admin') ? 'admin' : 'listener',
-        isPublic: true,
-        showFavoriteStats: true,
-      };
+      apiService.setAuthToken(response.token);
+      setUser(response.user);
       
-      setUser(mockUser);
+      await Promise.all([
+        AsyncStorage.setItem(TOKEN_KEY, response.token),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(response.user)),
+      ]);
     } catch (error) {
-      throw new Error('Login failed');
+      console.error('Login error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -63,62 +98,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loginWithGoogle = async () => {
     setIsLoading(true);
     try {
-      // Simulate Google OAuth
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+      // TODO: Implement Google OAuth
+      // For now, create a mock Google user
       const mockUser: User = {
-        id: '1',
+        id: 'google-user',
         email: 'user@gmail.com',
         displayName: 'Google User',
-        avatar: 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400',
         role: 'listener',
         isPublic: true,
         showFavoriteStats: true,
       };
       
       setUser(mockUser);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(mockUser));
     } catch (error) {
-      throw new Error('Google login failed');
+      console.error('Google login error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
-  const signup = async (email: string, password: string, displayName: string) => {
+  const signup = async (email: string, password: string, displayName: string, role: 'listener' | 'artist' = 'listener') => {
     setIsLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await apiService.register(email, password, displayName, role);
       
-      const mockUser: User = {
-        id: '1',
-        email: email,
-        displayName: displayName,
-        role: 'listener',
-        isPublic: true,
-        showFavoriteStats: true,
-      };
+      apiService.setAuthToken(response.token);
+      setUser(response.user);
       
-      setUser(mockUser);
+      await Promise.all([
+        AsyncStorage.setItem(TOKEN_KEY, response.token),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(response.user)),
+      ]);
     } catch (error) {
-      throw new Error('Signup failed');
+      console.error('Signup error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
   };
 
   const logout = async () => {
-    setUser(null);
+    await clearStoredAuth();
   };
 
   const updateProfile = async (updates: Partial<User>) => {
     if (user) {
-      setUser({ ...user, ...updates });
+      const updatedUser = { ...user, ...updates };
+      setUser(updatedUser);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
     }
   };
 
   const resetPassword = async (email: string) => {
-    // Simulate password reset
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      await apiService.resetPassword(email);
+    } catch (error) {
+      console.error('Reset password error:', error);
+      throw error;
+    }
   };
 
   return (

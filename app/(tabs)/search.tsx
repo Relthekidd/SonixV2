@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,23 +8,71 @@ import {
   TouchableOpacity,
   Image,
   FlatList,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
+import { apiService } from '@/services/api';
 import { Search, Play, Pause } from 'lucide-react-native';
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any>({ tracks: [], albums: [], playlists: [] });
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  
   const { 
     searchMusic, 
     currentTrack, 
     isPlaying, 
     playTrack, 
     pauseTrack,
-    trendingTracks 
+    trendingTracks,
+    error 
   } = useMusic();
+
+  useEffect(() => {
+    loadTrendingSearches();
+  }, []);
+
+  useEffect(() => {
+    if (query.trim() === '') {
+      setResults({ tracks: [], albums: [], playlists: [] });
+      setSuggestions([]);
+      return;
+    }
+
+    const debounceTimer = setTimeout(() => {
+      loadSuggestions(query);
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
+  }, [query]);
+
+  const loadTrendingSearches = async () => {
+    try {
+      const trending = await apiService.getTrendingSearches(8);
+      setTrendingSearches(trending);
+    } catch (error) {
+      console.error('Error loading trending searches:', error);
+    }
+  };
+
+  const loadSuggestions = async (searchQuery: string) => {
+    if (searchQuery.trim().length < 2) return;
+    
+    setIsLoadingSuggestions(true);
+    try {
+      const suggestionResults = await apiService.getSearchSuggestions(searchQuery, 5);
+      setSuggestions(suggestionResults.map(item => item.title || item.name || item.stage_name));
+    } catch (error) {
+      console.error('Error loading suggestions:', error);
+    } finally {
+      setIsLoadingSuggestions(false);
+    }
+  };
 
   const handleSearch = async (searchQuery: string) => {
     setQuery(searchQuery);
@@ -38,11 +86,20 @@ export default function SearchScreen() {
     try {
       const searchResults = await searchMusic(searchQuery);
       setResults(searchResults);
+      setSuggestions([]);
     } catch (error) {
       console.error('Search error:', error);
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleSuggestionPress = (suggestion: string) => {
+    handleSearch(suggestion);
+  };
+
+  const handleTrendingPress = (trending: string) => {
+    handleSearch(trending);
   };
 
   const handleTrackPress = (track: any) => {
@@ -123,15 +180,60 @@ export default function SearchScreen() {
             placeholder="What do you want to listen to?"
             placeholderTextColor="#64748b"
             value={query}
-            onChangeText={handleSearch}
+            onChangeText={setQuery}
+            onSubmitEditing={() => handleSearch(query)}
             autoCapitalize="none"
           />
+          {isLoadingSuggestions && (
+            <ActivityIndicator size="small" color="#8b5cf6" style={styles.loadingIcon} />
+          )}
         </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {error && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* Search Suggestions */}
+        {suggestions.length > 0 && query.trim() !== '' && (
+          <View style={styles.suggestionsContainer}>
+            {suggestions.map((suggestion, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.suggestionItem}
+                onPress={() => handleSuggestionPress(suggestion)}
+              >
+                <Search color="#94a3b8" size={16} />
+                <Text style={styles.suggestionText}>{suggestion}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         {query === '' ? (
           <>
+            {/* Trending Searches */}
+            {trendingSearches.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Trending Searches</Text>
+                <View style={styles.trendingContainer}>
+                  {trendingSearches.map((trending, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.trendingItem}
+                      onPress={() => handleTrendingPress(trending)}
+                    >
+                      <Text style={styles.trendingText}>{trending}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* Browse by Genre */}
             <Text style={styles.sectionTitle}>Browse by Genre</Text>
             <FlatList
               data={genres}
@@ -142,6 +244,7 @@ export default function SearchScreen() {
               contentContainerStyle={styles.genreGrid}
             />
             
+            {/* Popular Tracks */}
             <Text style={styles.sectionTitle}>Popular Tracks</Text>
             <FlatList
               data={trendingTracks.slice(0, 5)}
@@ -153,37 +256,47 @@ export default function SearchScreen() {
         ) : (
           <>
             {isSearching && (
-              <Text style={styles.loadingText}>Searching...</Text>
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#8b5cf6" />
+                <Text style={styles.loadingText}>Searching...</Text>
+              </View>
             )}
             
-            {results.tracks.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Songs</Text>
-                <FlatList
-                  data={results.tracks}
-                  renderItem={renderTrackItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
+            {!isSearching && (
+              <>
+                {results.tracks.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Songs</Text>
+                    <FlatList
+                      data={results.tracks}
+                      renderItem={renderTrackItem}
+                      keyExtractor={(item) => item.id}
+                      scrollEnabled={false}
+                    />
+                  </View>
+                )}
 
-            {results.albums.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Albums</Text>
-                <FlatList
-                  data={results.albums}
-                  renderItem={renderAlbumItem}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalList}
-                />
-              </View>
-            )}
+                {results.albums.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Albums</Text>
+                    <FlatList
+                      data={results.albums}
+                      renderItem={renderAlbumItem}
+                      keyExtractor={(item) => item.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.horizontalList}
+                    />
+                  </View>
+                )}
 
-            {!isSearching && results.tracks.length === 0 && results.albums.length === 0 && query !== '' && (
-              <Text style={styles.noResults}>No results found for "{query}"</Text>
+                {!isSearching && results.tracks.length === 0 && results.albums.length === 0 && query !== '' && (
+                  <View style={styles.noResultsContainer}>
+                    <Text style={styles.noResults}>No results found for "{query}"</Text>
+                    <Text style={styles.noResultsSubtext}>Try searching for something else</Text>
+                  </View>
+                )}
+              </>
             )}
           </>
         )}
@@ -228,8 +341,49 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#ffffff',
   },
+  loadingIcon: {
+    marginLeft: 8,
+  },
   content: {
     flex: 1,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    textAlign: 'center',
+  },
+  suggestionsContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    marginHorizontal: 24,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  suggestionText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#ffffff',
+    marginLeft: 12,
+  },
+  section: {
+    marginBottom: 32,
   },
   sectionTitle: {
     fontSize: 20,
@@ -238,8 +392,24 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingHorizontal: 24,
   },
-  section: {
-    marginBottom: 32,
+  trendingContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  trendingItem: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  trendingText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#8b5cf6',
   },
   genreGrid: {
     paddingHorizontal: 24,
@@ -324,19 +494,33 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
   },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
   loadingText: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
-    textAlign: 'center',
-    marginTop: 40,
+    marginTop: 12,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
   },
   noResults: {
-    fontSize: 16,
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  noResultsSubtext: {
+    fontSize: 14,
     fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
+    color: '#64748b',
     textAlign: 'center',
-    marginTop: 40,
   },
   bottomPadding: {
     height: 120,
