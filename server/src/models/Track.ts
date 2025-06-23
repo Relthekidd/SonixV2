@@ -1,4 +1,4 @@
-import { db } from '@/database/connection';
+import db from '@/database/connection';
 
 export interface Track {
   id: string;

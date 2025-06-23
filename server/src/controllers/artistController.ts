@@ -57,6 +57,31 @@ export class ArtistController {
     }
   }
 
+  static async getMeArtistProfile(req: AuthRequest, res: Response) {
+    try {
+      const artist = await ArtistModel.findByUserId(req.user.id);
+
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Artist profile not found'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: artist
+      });
+    } catch (error) {
+      console.error('Get my artist profile error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get artist profile',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
   static async createArtistProfile(req: AuthRequest, res: Response) {
     try {
       const { stageName, bio, genres, socialLinks } = req.body;

@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { Home, Search, Library, User } from 'lucide-react-native';
+import { Home, Search, Library, User, Upload } from 'lucide-react-native';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { View, StyleSheet } from 'react-native';
 
@@ -67,6 +67,17 @@ export default function TabLayout() {
             ),
           }}
         />
+        {user.role === 'artist' && (
+          <Tabs.Screen
+            name="artist-dashboard"
+            options={{
+              title: 'Upload',
+              tabBarIcon: ({ size, color }) => (
+                <Upload size={size} color={color} />
+              ),
+            }}
+          />
+        )}
         <Tabs.Screen
           name="profile"
           options={{
@@ -76,17 +87,6 @@ export default function TabLayout() {
             ),
           }}
         />
-        {user.role === 'admin' && (
-          <Tabs.Screen
-            name="admin"
-            options={{
-              title: 'Admin',
-              tabBarIcon: ({ size, color }) => (
-                <User size={size} color={color} />
-              ),
-            }}
-          />
-        )}
       </Tabs>
       <MiniPlayer />
     </View>

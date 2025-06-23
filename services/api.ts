@@ -138,6 +138,10 @@ class ApiService {
     return this.request(`/artists/${id}`);
   }
 
+  async getMyArtistProfile(): Promise<any> {
+    return this.request('/artists/me');
+  }
+
   async getTopArtists(limit = 20): Promise<any[]> {
     return this.request(`/artists/top?limit=${limit}`);
   }

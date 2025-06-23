@@ -63,6 +63,24 @@ router.get('/', ArtistController.getAllArtists);
 
 /**
  * @swagger
+ * /artists/me:
+ *   get:
+ *     summary: Get current user's artist profile
+ *     tags: [Artists]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Artist profile retrieved successfully
+ *       404:
+ *         description: Artist profile not found
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/me', authenticate, ArtistController.getMeArtistProfile);
+
+/**
+ * @swagger
  * /artists/top:
  *   get:
  *     summary: Get top artists
