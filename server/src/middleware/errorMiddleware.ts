@@ -5,7 +5,7 @@ export interface CustomError extends Error {
   status?: number;
 }
 
-export const notFound = (req: Request, res: Response, next: NextFunction) => {
+export const notFound = (req: Request, _res: Response, next: NextFunction) => {
   const error = new Error(`Not Found - ${req.originalUrl}`) as CustomError;
   error.statusCode = 404;
   next(error);
@@ -13,9 +13,9 @@ export const notFound = (req: Request, res: Response, next: NextFunction) => {
 
 export const errorHandler = (
   err: CustomError,
-  req: Request,
+  _req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ) => {
   let statusCode = err.statusCode || err.status || 500;
   let message = err.message || 'Internal Server Error';
