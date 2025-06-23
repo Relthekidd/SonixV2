@@ -41,7 +41,8 @@ export class ArtistModel {
       .insert({
         ...artistData,
         genres: JSON.stringify(artistData.genres || []),
-        social_links: JSON.stringify(artistData.social_links || {})
+        social_links: JSON.stringify(artistData.social_links || {}),
+        is_verified: false // Artists start as unverified
       })
       .returning('*');
     
@@ -96,6 +97,7 @@ export class ArtistModel {
 
   static async getAll(limit = 50, offset = 0): Promise<Artist[]> {
     const artists = await db('artists')
+      .where({ is_verified: true }) // Only show verified artists in public listings
       .orderBy('monthly_listeners', 'desc')
       .limit(limit)
       .offset(offset);
@@ -103,10 +105,45 @@ export class ArtistModel {
     return artists.map(this.parseArtist);
   }
 
+  static async getUnverifiedArtists(): Promise<any[]> {
+    const artists = await db('artists')
+      .join('users', 'artists.user_id', 'users.id')
+      .where('artists.is_verified', false)
+      .select(
+        'artists.*',
+        'users.email',
+        'users.display_name',
+        'users.created_at as user_created_at'
+      )
+      .orderBy('artists.created_at', 'desc');
+    
+    return artists.map(artist => ({
+      ...this.parseArtist(artist),
+      email: artist.email,
+      display_name: artist.display_name,
+      user_created_at: artist.user_created_at
+    }));
+  }
+
+  static async updateVerificationStatus(artistId: string, isVerified: boolean): Promise<Artist | null> {
+    const [artist] = await db('artists')
+      .where({ id: artistId })
+      .update({
+        is_verified: isVerified,
+        updated_at: new Date()
+      })
+      .returning('*');
+    
+    return artist ? this.parseArtist(artist) : null;
+  }
+
   static async search(query: string, limit = 20): Promise<Artist[]> {
     const artists = await db('artists')
-      .whereILike('stage_name', `%${query}%`)
-      .orWhereILike('bio', `%${query}%`)
+      .where({ is_verified: true }) // Only search verified artists
+      .where(function() {
+        this.whereILike('stage_name', `%${query}%`)
+            .orWhereILike('bio', `%${query}%`);
+      })
       .limit(limit);
     
     return artists.map(this.parseArtist);
@@ -114,6 +151,7 @@ export class ArtistModel {
 
   static async getTopArtists(limit = 20): Promise<Artist[]> {
     const artists = await db('artists')
+      .where({ is_verified: true })
       .orderBy('monthly_listeners', 'desc')
       .limit(limit);
     
@@ -122,6 +160,7 @@ export class ArtistModel {
 
   static async getByGenre(genre: string, limit = 20): Promise<Artist[]> {
     const artists = await db('artists')
+      .where({ is_verified: true })
       .whereRaw('genres::jsonb ? ?', [genre])
       .limit(limit);
     

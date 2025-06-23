@@ -42,7 +42,7 @@ const router = express.Router();
  * @swagger
  * /artists:
  *   get:
- *     summary: Get all artists
+ *     summary: Get all verified artists
  *     tags: [Artists]
  *     parameters:
  *       - in: query
@@ -78,6 +78,24 @@ router.get('/', ArtistController.getAllArtists);
  *         description: Unauthorized
  */
 router.get('/me', authenticate, ArtistController.getMeArtistProfile);
+
+/**
+ * @swagger
+ * /artists/pending:
+ *   get:
+ *     summary: Get pending artist applications (Admin only)
+ *     tags: [Artists]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Pending artists retrieved successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ */
+router.get('/pending', authenticate, authorize('admin'), ArtistController.getPendingArtists);
 
 /**
  * @swagger
@@ -124,7 +142,7 @@ router.get('/search', ArtistController.searchArtists);
  * @swagger
  * /artists/profile:
  *   post:
- *     summary: Create artist profile
+ *     summary: Create artist profile (application)
  *     tags: [Artists]
  *     security:
  *       - bearerAuth: []
@@ -155,7 +173,7 @@ router.get('/search', ArtistController.searchArtists);
  *                 format: binary
  *     responses:
  *       201:
- *         description: Artist profile created successfully
+ *         description: Artist application submitted successfully
  *       401:
  *         description: Unauthorized
  */
@@ -219,6 +237,43 @@ router.put('/profile', authenticate, uploadArtistFiles, ArtistController.updateA
  *         description: Artist not found
  */
 router.get('/:id', ArtistController.getArtistById);
+
+/**
+ * @swagger
+ * /artists/{id}/status:
+ *   put:
+ *     summary: Update artist verification status (Admin only)
+ *     tags: [Artists]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - isVerified
+ *             properties:
+ *               isVerified:
+ *                 type: boolean
+ *     responses:
+ *       200:
+ *         description: Artist status updated successfully
+ *       401:
+ *         description: Unauthorized
+ *       403:
+ *         description: Admin access required
+ *       404:
+ *         description: Artist not found
+ */
+router.put('/:id/status', authenticate, authorize('admin'), ArtistController.updateArtistStatus);
 
 /**
  * @swagger

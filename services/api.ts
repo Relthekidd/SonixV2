@@ -158,6 +158,18 @@ class ApiService {
     });
   }
 
+  // Admin - Artist Management
+  async getPendingArtists(): Promise<any[]> {
+    return this.request('/artists/pending');
+  }
+
+  async updateArtistStatus(artistId: string, isVerified: boolean): Promise<any> {
+    return this.request(`/artists/${artistId}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ isVerified }),
+    });
+  }
+
   // Albums
   async getAlbums(params?: { page?: number; limit?: number }): Promise<Album[]> {
     const searchParams = new URLSearchParams();

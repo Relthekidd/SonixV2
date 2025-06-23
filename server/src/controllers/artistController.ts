@@ -107,7 +107,7 @@ export class ArtistController {
 
       res.status(201).json({
         success: true,
-        message: 'Artist profile created successfully',
+        message: 'Artist application submitted successfully. Please wait for admin approval.',
         data: artist
       });
     } catch (error) {
@@ -221,6 +221,61 @@ export class ArtistController {
       res.status(500).json({
         success: false,
         message: 'Failed to search artists',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  static async getPendingArtists(req: AuthRequest, res: Response) {
+    try {
+      const pendingArtists = await ArtistModel.getUnverifiedArtists();
+
+      res.status(200).json({
+        success: true,
+        data: pendingArtists
+      });
+    } catch (error) {
+      console.error('Get pending artists error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get pending artists',
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+    }
+  }
+
+  static async updateArtistStatus(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const { isVerified } = req.body;
+
+      if (typeof isVerified !== 'boolean') {
+        return res.status(400).json({
+          success: false,
+          message: 'isVerified must be a boolean value'
+        });
+      }
+
+      const artist = await ArtistModel.findById(id);
+      if (!artist) {
+        return res.status(404).json({
+          success: false,
+          message: 'Artist not found'
+        });
+      }
+
+      const updatedArtist = await ArtistModel.updateVerificationStatus(id, isVerified);
+
+      res.status(200).json({
+        success: true,
+        message: `Artist ${isVerified ? 'approved' : 'rejected'} successfully`,
+        data: updatedArtist
+      });
+    } catch (error) {
+      console.error('Update artist status error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to update artist status',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
     }

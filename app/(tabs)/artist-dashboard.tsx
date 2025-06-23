@@ -18,7 +18,7 @@ import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { Upload, Music, Image as ImageIcon, Play, Pause, Plus, X, Check, CircleAlert as AlertCircle } from 'lucide-react-native';
+import { Upload, Music, Image as ImageIcon, Play, Pause, Plus, X, Check, AlertCircle, Clock } from 'lucide-react-native';
 
 interface UploadFormData {
   title: string;
@@ -165,6 +165,11 @@ export default function ArtistDashboardScreen() {
       return;
     }
 
+    if (!artistProfile.is_verified) {
+      Alert.alert('Error', 'Your artist profile must be approved before you can upload tracks');
+      return;
+    }
+
     try {
       setIsUploading(true);
 
@@ -200,7 +205,7 @@ export default function ArtistDashboardScreen() {
       // Upload track
       await apiService.createTrack(trackFormData);
 
-      Alert.alert('Success', 'Track uploaded successfully!');
+      Alert.alert('Success', 'Track uploaded successfully and is pending approval!');
       
       // Reset form
       setFormData({
@@ -248,9 +253,17 @@ export default function ArtistDashboardScreen() {
         <Text style={styles.trackTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.trackStatus}>
-          {item.is_published ? 'Published' : 'Draft'} • {item.play_count || 0} plays
-        </Text>
+        <View style={styles.trackStatusContainer}>
+          <Text style={[
+            styles.trackStatus,
+            { color: item.is_published ? '#10b981' : '#f59e0b' }
+          ]}>
+            {item.is_published ? 'Published' : 'Pending Approval'}
+          </Text>
+          <Text style={styles.trackStats}>
+            {item.play_count || 0} plays
+          </Text>
+        </View>
         <Text style={styles.trackGenres}>
           {Array.isArray(item.genres) ? item.genres.join(', ') : 'No genres'}
         </Text>
@@ -299,6 +312,34 @@ export default function ArtistDashboardScreen() {
               <Text style={styles.createProfileText}>Create Artist Profile</Text>
             </LinearGradient>
           </TouchableOpacity>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // Show pending approval message if artist is not verified
+  if (!artistProfile.is_verified) {
+    return (
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
+        <View style={styles.pendingContainer}>
+          <Clock color="#f59e0b" size={64} />
+          <Text style={styles.pendingTitle}>Application Under Review</Text>
+          <Text style={styles.pendingText}>
+            Your artist application is currently being reviewed by our team. You'll be notified once your profile is approved and you can start uploading music.
+          </Text>
+          <View style={styles.pendingDetails}>
+            <Text style={styles.pendingDetailLabel}>Stage Name:</Text>
+            <Text style={styles.pendingDetailValue}>{artistProfile.stage_name}</Text>
+          </View>
+          {artistProfile.bio && (
+            <View style={styles.pendingDetails}>
+              <Text style={styles.pendingDetailLabel}>Bio:</Text>
+              <Text style={styles.pendingDetailValue}>{artistProfile.bio}</Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
     );
@@ -595,6 +636,46 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
   },
+  pendingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+  },
+  pendingTitle: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  pendingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 32,
+  },
+  pendingDetails: {
+    width: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+  },
+  pendingDetailLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#8b5cf6',
+    marginBottom: 4,
+  },
+  pendingDetailValue: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#ffffff',
+    lineHeight: 22,
+  },
   header: {
     paddingHorizontal: 24,
     paddingTop: 60,
@@ -687,11 +768,20 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 4,
   },
+  trackStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   trackStatus: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    marginRight: 8,
+  },
+  trackStats: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
-    marginBottom: 2,
   },
   trackGenres: {
     fontSize: 12,

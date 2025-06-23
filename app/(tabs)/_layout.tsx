@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { Chrome as Home, Search, Library, User, Upload } from 'lucide-react-native';
+import { Chrome as Home, Search, Library, User, Upload, Settings } from 'lucide-react-native';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { View, StyleSheet } from 'react-native';
 
@@ -74,6 +74,17 @@ export default function TabLayout() {
               title: 'Upload',
               tabBarIcon: ({ size, color }) => (
                 <Upload size={size} color={color} />
+              ),
+            }}
+          />
+        )}
+        {user.role === 'admin' && (
+          <Tabs.Screen
+            name="admin"
+            options={{
+              title: 'Admin',
+              tabBarIcon: ({ size, color }) => (
+                <Settings size={size} color={color} />
               ),
             }}
           />
