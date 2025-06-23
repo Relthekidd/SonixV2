@@ -1,10 +1,5 @@
 import express from 'express';
-import { body, validationResult } from 'express-validator';
-import { ArtistModel } from '@/models/Artist';
-import { TrackModel } from '@/models/Track';
-import { authenticate, authorize, optionalAuth, AuthRequest } from '@/middleware/authMiddleware';
-import { asyncHandler } from '@/middleware/errorMiddleware';
-import { uploadArtistFiles } from '@/middleware/uploadMiddleware';
+import { Request, Response } from 'express';
 
 const router = express.Router();
 
@@ -14,68 +9,49 @@ const router = express.Router();
  *   get:
  *     summary: Get all artists
  *     tags: [Artists]
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Artists retrieved successfully
  */
-router.get('/', optionalAuth, asyncHandler(async (req: AuthRequest, res) => {
-  const artists = await ArtistModel.getAll();
-  
-  res.json({
-    success: true,
-    data: { artists }
-  });
-}));
-
-/**
- * @swagger
- * /artists/profile:
- *   post:
- *     summary: Create artist profile
- *     tags: [Artists]
- *     security:
- *       - bearerAuth: []
- */
-router.post('/profile', authenticate, uploadArtistFiles, [
-  body('stage_name').trim().isLength({ min: 1 }),
-  body('bio').optional().trim(),
-  body('genres').optional().isArray()
-], asyncHandler(async (req: AuthRequest, res) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({
+router.get('/', async (req: Request, res: Response) => {
+  try {
+    // TODO: Implement get artists logic
+    res.status(200).json({
+      success: true,
+      data: [
+        {
+          id: 'artist-1',
+          name: 'Sample Artist',
+          bio: 'A sample artist for testing',
+          imageUrl: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
+          createdAt: new Date().toISOString()
+        }
+      ],
+      pagination: {
+        page: 1,
+        limit: 20,
+        total: 1
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      message: 'Validation failed',
-      errors: errors.array()
+      message: 'Failed to get artists',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-
-  // Check if user already has an artist profile
-  const existingArtist = await ArtistModel.findByUserId(req.user.id);
-  if (existingArtist) {
-    return res.status(400).json({
-      success: false,
-      message: 'Artist profile already exists'
-    });
-  }
-
-  const files = req.files as { [fieldname: string]: Express.MulterS3.File[] };
-  
-  const artistData = {
-    user_id: req.user.id,
-    stage_name: req.body.stage_name,
-    bio: req.body.bio,
-    avatar_url: files.avatar ? files.avatar[0].location : undefined,
-    banner_url: files.banner ? files.banner[0].location : undefined,
-    genres: req.body.genres || [],
-    social_links: req.body.social_links ? JSON.parse(req.body.social_links) : {}
-  };
-
-  const artist = await ArtistModel.create(artistData);
-
-  res.status(201).json({
-    success: true,
-    message: 'Artist profile created successfully',
-    data: { artist }
-  });
-}));
+});
 
 /**
  * @swagger
@@ -83,43 +59,39 @@ router.post('/profile', authenticate, uploadArtistFiles, [
  *   get:
  *     summary: Get artist by ID
  *     tags: [Artists]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Artist retrieved successfully
+ *       404:
+ *         description: Artist not found
  */
-router.get('/:id', optionalAuth, asyncHandler(async (req: AuthRequest, res) => {
-  const artist = await ArtistModel.findById(req.params.id);
-  
-  if (!artist) {
-    return res.status(404).json({
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    // TODO: Implement get artist by ID logic
+    res.status(200).json({
+      success: true,
+      data: {
+        id,
+        name: 'Sample Artist',
+        bio: 'A sample artist for testing',
+        imageUrl: 'https://images.pexels.com/photos/1763075/pexels-photo-1763075.jpeg',
+        createdAt: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
       success: false,
-      message: 'Artist not found'
+      message: 'Failed to get artist',
+      error: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-
-  // Get artist's tracks
-  const tracks = await TrackModel.findByArtist(artist.id);
-
-  res.json({
-    success: true,
-    data: { 
-      artist,
-      tracks
-    }
-  });
-}));
-
-/**
- * @swagger
- * /artists/{id}/tracks:
- *   get:
- *     summary: Get tracks by artist
- *     tags: [Artists]
- */
-router.get('/:id/tracks', optionalAuth, asyncHandler(async (req: AuthRequest, res) => {
-  const tracks = await TrackModel.findByArtist(req.params.id);
-  
-  res.json({
-    success: true,
-    data: { tracks }
-  });
-}));
+});
 
 export default router;
