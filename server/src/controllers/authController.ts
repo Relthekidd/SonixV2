@@ -9,7 +9,6 @@ export class AuthController {
     try {
       const { email, password, displayName, firstName, lastName, role } = req.body;
 
-      // Check if user already exists
       const existingUser = await UserModel.findByEmail(email);
       if (existingUser) {
         return res.status(400).json({
@@ -18,7 +17,6 @@ export class AuthController {
         });
       }
 
-      // Create user
       const userData: CreateUserData = {
         email,
         password,
@@ -30,7 +28,6 @@ export class AuthController {
 
       const user = await UserModel.create(userData);
 
-      // Create artist profile if role is artist
       if (role === 'artist') {
         await ArtistModel.create({
           user_id: user.id,
@@ -38,14 +35,16 @@ export class AuthController {
         });
       }
 
-      // Generate JWT token
+      const secret = process.env.JWT_SECRET;
+      const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+      if (!secret) throw new Error('JWT_SECRET not set');
+
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        secret,
+        { expiresIn }
       );
 
-      // Remove password from response
       const { password_hash, ...userResponse } = user;
 
       res.status(201).json({
@@ -63,6 +62,7 @@ export class AuthController {
         message: 'Registration failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
   }
 
@@ -70,7 +70,6 @@ export class AuthController {
     try {
       const { email, password } = req.body;
 
-      // Find user by email
       const user = await UserModel.findByEmail(email);
       if (!user) {
         return res.status(401).json({
@@ -79,7 +78,6 @@ export class AuthController {
         });
       }
 
-      // Verify password
       const isValidPassword = await UserModel.verifyPassword(password, user.password_hash);
       if (!isValidPassword) {
         return res.status(401).json({
@@ -88,17 +86,18 @@ export class AuthController {
         });
       }
 
-      // Update last login
       await UserModel.updateLastLogin(user.id);
 
-      // Generate JWT token
+      const secret = process.env.JWT_SECRET;
+      const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+      if (!secret) throw new Error('JWT_SECRET not set');
+
       const token = jwt.sign(
         { userId: user.id, email: user.email, role: user.role },
-        process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        secret,
+        { expiresIn }
       );
 
-      // Remove password from response
       const { password_hash, ...userResponse } = user;
 
       res.status(200).json({
@@ -116,6 +115,7 @@ export class AuthController {
         message: 'Login failed',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
   }
 
@@ -129,7 +129,6 @@ export class AuthController {
         });
       }
 
-      // Remove password from response
       const { password_hash, ...userResponse } = user;
 
       res.status(200).json({
@@ -143,6 +142,7 @@ export class AuthController {
         message: 'Failed to get user profile',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
   }
 
@@ -150,7 +150,6 @@ export class AuthController {
     try {
       const { currentPassword, newPassword } = req.body;
 
-      // Get current user
       const user = await UserModel.findById(req.user.id);
       if (!user) {
         return res.status(404).json({
@@ -159,7 +158,6 @@ export class AuthController {
         });
       }
 
-      // Verify current password
       const isValidPassword = await UserModel.verifyPassword(currentPassword, user.password_hash);
       if (!isValidPassword) {
         return res.status(400).json({
@@ -168,7 +166,6 @@ export class AuthController {
         });
       }
 
-      // Update password
       await UserModel.changePassword(user.id, newPassword);
 
       res.status(200).json({
@@ -182,16 +179,20 @@ export class AuthController {
         message: 'Failed to change password',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
   }
 
   static async refreshToken(req: AuthRequest, res: Response) {
     try {
-      // Generate new JWT token
+      const secret = process.env.JWT_SECRET;
+      const expiresIn = process.env.JWT_EXPIRES_IN || '7d';
+      if (!secret) throw new Error('JWT_SECRET not set');
+
       const token = jwt.sign(
         { userId: req.user.id, email: req.user.email, role: req.user.role },
-        process.env.JWT_SECRET!,
-        { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+        secret,
+        { expiresIn }
       );
 
       res.status(200).json({
@@ -205,6 +206,7 @@ export class AuthController {
         message: 'Failed to refresh token',
         error: error instanceof Error ? error.message : 'Unknown error'
       });
+      return;
     }
   }
 }
