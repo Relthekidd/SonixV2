@@ -1,8 +1,10 @@
 import knex from 'knex';
 import knexConfig from '../../knexfile';
 
-const environment = process.env.NODE_ENV || 'development';
+type Env = 'development' | 'staging' | 'production';
+const environment = (process.env.NODE_ENV as Env) || 'development';
 const config = knexConfig[environment];
+
 
 if (!config) {
   throw new Error(`No database configuration found for environment: ${environment}`);
