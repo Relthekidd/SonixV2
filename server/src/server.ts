@@ -176,6 +176,8 @@ const startServer = async () => {
       }
     }, 60 * 60 * 1000); // Update every hour
     
+    const PORT = Number(process.env.PORT) || 3000;
+    
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Sonix API Server running on port ${PORT}`);
       console.log(`📚 API Documentation: http://localhost:${PORT}/api-docs`);
