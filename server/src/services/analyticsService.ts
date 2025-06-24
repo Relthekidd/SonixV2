@@ -65,9 +65,9 @@ export class AnalyticsService {
         .count('* as count');
 
       return {
-        totalPlays: parseInt(plays?.total_plays) || 0,
-        totalLikes: parseInt(likes?.total_likes) || 0,
-        newFollowers: parseInt(followers?.new_followers) || 0,
+        totalPlays: parseInt(String(plays?.total_plays ?? '0')),
+totalLikes: parseInt(String(likes?.total_likes ?? '0')),
+newFollowers: parseInt(String(followers?.new_followers ?? '0')),
         topTracks,
         demographics,
         timeframe
@@ -126,10 +126,10 @@ export class AnalyticsService {
         .orderBy('date', 'desc');
 
       return {
-        newUsers: parseInt(users?.new_users) || 0,
-        newTracks: parseInt(tracks?.new_tracks) || 0,
-        totalPlays: parseInt(plays?.total_plays) || 0,
-        totalDuration: parseInt(uploads?.total_duration) || 0,
+        newUsers: parseInt(String(users?.new_users ?? '0')),
+newTracks: parseInt(String(tracks?.new_tracks ?? '0')),
+totalPlays: parseInt(String(plays?.total_plays ?? '0')),
+totalDuration: parseInt(String(uploads?.total_duration ?? '0')),
         topGenres,
         dailyActivity,
         timeframe
