@@ -34,6 +34,35 @@ class ApiService {
     this.onUnauthorizedCallback = callback;
   }
 
+  private getErrorMessage(error: any, response?: Response): string {
+    // Handle AWS-specific errors
+    if (error.message?.includes('AWS Access Key Id') || error.message?.includes('does not exist in our records')) {
+      return 'Server configuration error: Invalid AWS credentials. Please contact support.';
+    }
+    
+    if (error.message?.includes('AWS')) {
+      return 'Server storage error: AWS service unavailable. Please try again later or contact support.';
+    }
+
+    // Handle network errors
+    if (error.message?.includes('Network request failed')) {
+      return `Cannot connect to server at ${this.baseURL}. Please check your network connection and ensure the backend server is running.`;
+    }
+
+    // Handle HTTP errors
+    if (response) {
+      if (response.status === 404) {
+        return `API endpoint not found: ${response.url}. Please check if your backend server is running and the URL is correct.`;
+      }
+      
+      if (response.status >= 500) {
+        return 'Server error occurred. Please try again later or contact support.';
+      }
+    }
+
+    return error.message || 'An unexpected error occurred';
+  }
+
   async request<T>(
     endpoint: string,
     options: RequestInit = {},
@@ -86,10 +115,7 @@ class ApiService {
             errorMessage = errorData.error;
           }
         } catch {
-          // If we can't parse JSON, check if it's a 404 with helpful message
-          if (response.status === 404) {
-            errorMessage = `API endpoint not found: ${url}. Please check if your backend server is running and the URL is correct.`;
-          }
+          // If we can't parse JSON, use default error message
         }
 
         // Handle 401 Unauthorized responses, but skip auto-logout for uploads if specified
@@ -107,7 +133,10 @@ class ApiService {
         }
         
         console.error('❌ API Error:', errorMessage);
-        throw new Error(errorMessage);
+        
+        // Create error with improved message
+        const error = new Error(this.getErrorMessage({ message: errorMessage }, response));
+        throw error;
       }
 
       const data = await response.json();
@@ -120,12 +149,9 @@ class ApiService {
         endpoint
       });
       
-      // Provide more helpful error messages
-      if (error.message.includes('Network request failed')) {
-        throw new Error(`Cannot connect to server at ${this.baseURL}. Please check your network connection and ensure the backend server is running.`);
-      }
-      
-      throw error;
+      // Use improved error message
+      const improvedError = new Error(this.getErrorMessage(error));
+      throw improvedError;
     }
   }
 
