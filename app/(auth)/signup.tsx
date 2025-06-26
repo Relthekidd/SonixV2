@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Mail, Lock, User, FileText } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, User, FileText, AlertCircle } from 'lucide-react-native';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -81,11 +81,17 @@ export default function SignupScreen() {
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during signup';
       setError(errorMessage);
       
-      // Also show an alert for critical errors
-      if (errorMessage.includes('connect') || errorMessage.includes('network') || errorMessage.includes('server')) {
+      // Show specific alerts for certain types of errors
+      if (errorMessage.includes('Server error') || errorMessage.includes('Service temporarily unavailable')) {
+        Alert.alert(
+          'Server Issue', 
+          'The server is currently experiencing issues. Please try again in a few minutes.',
+          [{ text: 'OK' }]
+        );
+      } else if (errorMessage.includes('Cannot connect') || errorMessage.includes('Network Error')) {
         Alert.alert(
           'Connection Error', 
-          errorMessage + '\n\nPlease check:\n• Your internet connection\n• That the backend server is running\n• The API URL configuration',
+          'Unable to connect to the server. Please check your internet connection and try again.',
           [{ text: 'OK' }]
         );
       }
@@ -115,6 +121,7 @@ export default function SignupScreen() {
             {/* Error Display */}
             {error && (
               <View style={styles.errorContainer}>
+                <AlertCircle color="#ef4444" size={16} style={styles.errorIcon} />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -338,6 +345,8 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(239, 68, 68, 0.1)',
     borderRadius: 8,
     padding: 12,
@@ -345,11 +354,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.3)',
   },
+  errorIcon: {
+    marginRight: 8,
+  },
   errorText: {
+    flex: 1,
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#ef4444',
-    textAlign: 'center',
     lineHeight: 20,
   },
   roleSection: {

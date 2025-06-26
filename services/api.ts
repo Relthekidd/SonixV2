@@ -40,7 +40,7 @@ class ApiService {
     const config: RequestInit = {
       ...options,
       headers,
-      timeout: 10000, // 10 second timeout
+      timeout: 15000, // Increased timeout to 15 seconds
     };
 
     // Enhanced logging for debugging
@@ -55,7 +55,7 @@ class ApiService {
     try {
       // Test network connectivity first
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
       
       const response = await fetch(url, {
         ...config,
@@ -80,7 +80,17 @@ class ApiService {
           const contentType = response.headers.get('content-type');
           if (contentType && contentType.includes('application/json')) {
             errorData = await response.json();
-            errorMessage = errorData.message || errorData.error || errorData.details || errorMessage;
+            
+            // Extract meaningful error message from various possible response formats
+            if (errorData.message) {
+              errorMessage = errorData.message;
+            } else if (errorData.error) {
+              errorMessage = errorData.error;
+            } else if (errorData.details) {
+              errorMessage = errorData.details;
+            } else if (errorData.errors && Array.isArray(errorData.errors)) {
+              errorMessage = errorData.errors.join(', ');
+            }
             
             // Log detailed error information
             console.error('❌ API Error Details:', {
@@ -107,12 +117,51 @@ class ApiService {
           console.error('❌ Error parsing error response:', parseError);
         }
 
-        // Create a more descriptive error
-        const error = new Error(errorMessage);
+        // Provide more specific error messages based on status codes
+        let userFriendlyMessage = errorMessage;
+        
+        switch (response.status) {
+          case 400:
+            userFriendlyMessage = errorMessage || 'Invalid request. Please check your input and try again.';
+            break;
+          case 401:
+            userFriendlyMessage = 'Authentication failed. Please check your credentials.';
+            break;
+          case 403:
+            userFriendlyMessage = 'Access denied. You do not have permission to perform this action.';
+            break;
+          case 404:
+            userFriendlyMessage = 'The requested resource was not found.';
+            break;
+          case 409:
+            userFriendlyMessage = errorMessage || 'Conflict: This resource already exists.';
+            break;
+          case 422:
+            userFriendlyMessage = errorMessage || 'Validation failed. Please check your input.';
+            break;
+          case 429:
+            userFriendlyMessage = 'Too many requests. Please wait a moment and try again.';
+            break;
+          case 500:
+            userFriendlyMessage = 'Server error occurred. Please try again later or contact support if the problem persists.';
+            break;
+          case 502:
+            userFriendlyMessage = 'Service temporarily unavailable. Please try again in a few moments.';
+            break;
+          case 503:
+            userFriendlyMessage = 'Service is currently under maintenance. Please try again later.';
+            break;
+          default:
+            userFriendlyMessage = errorMessage || `An error occurred (${response.status}). Please try again.`;
+        }
+
+        // Create a more descriptive error with additional context
+        const error = new Error(userFriendlyMessage);
         (error as any).status = response.status;
         (error as any).data = errorData;
         (error as any).url = url;
         (error as any).endpoint = endpoint;
+        (error as any).originalMessage = errorMessage;
         throw error;
       }
 
@@ -128,13 +177,13 @@ class ApiService {
       // Enhanced error logging with network diagnostics
       if (error.name === 'AbortError') {
         console.error('🚨 Request Timeout:', {
-          message: 'Request timed out after 10 seconds',
+          message: 'Request timed out after 15 seconds',
           url,
           endpoint,
           baseURL: baseUrl,
           timestamp: new Date().toISOString()
         });
-        throw new Error(`Request timeout: Unable to connect to ${baseUrl}. Please check if the server is running and accessible.`);
+        throw new Error(`Request timeout: Unable to connect to ${baseUrl}. The server may be slow or unreachable.`);
       }
       
       if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
@@ -152,7 +201,7 @@ class ApiService {
           ],
           timestamp: new Date().toISOString()
         });
-        throw new Error(`Network Error: Cannot connect to ${baseUrl}. Please verify the server is running and the API URL is correct.`);
+        throw new Error(`Network Error: Cannot connect to ${baseUrl}. Please check your internet connection and try again.`);
       }
 
       console.error('🚨 API Request Error:', {
@@ -165,11 +214,13 @@ class ApiService {
         timestamp: new Date().toISOString()
       });
       
-      // Re-throw with additional context
-      if (error instanceof Error) {
-        throw new Error(`API Error (${endpoint}): ${error.message}`);
+      // Re-throw the error without additional wrapping if it already has context
+      if ((error as any).status || (error as any).endpoint) {
+        throw error;
       }
-      throw error;
+      
+      // Only wrap if it's a generic error
+      throw new Error(`Connection failed: ${(error as Error).message}`);
     }
   }
 
@@ -228,7 +279,7 @@ class ApiService {
       console.log('✅ Server is reachable, proceeding with registration');
     } catch (healthError) {
       console.error('❌ Server health check failed:', healthError);
-      throw new Error(`Cannot connect to server at ${this.rootURL}. Please check if the backend server is running and accessible.`);
+      throw new Error(`Cannot connect to server. Please check your internet connection and try again later.`);
     }
 
     return this.request('/auth/register', {

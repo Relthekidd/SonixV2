@@ -167,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: (error as any).data,
         url: (error as any).url,
         endpoint: (error as any).endpoint,
+        originalMessage: (error as any).originalMessage,
         timestamp: new Date().toISOString()
       });
       
@@ -176,7 +177,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
         
-        if (errorMessage.includes('network') || errorMessage.includes('connect')) {
+        // Check if the error already has a user-friendly message from the API service
+        if ((error as any).status) {
+          // This error came from the API service and already has a user-friendly message
+          userFriendlyMessage = error.message;
+        } else if (errorMessage.includes('network') || errorMessage.includes('connect')) {
           userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
         } else if (errorMessage.includes('timeout')) {
           userFriendlyMessage = 'Request timed out. Please check your connection and try again.';
