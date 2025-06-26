@@ -270,25 +270,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
 
+      // Prepare user metadata - DO NOT include any timestamp fields
+      const userMetadata = {
+        display_name: displayName.trim(),
+        displayName: displayName.trim(), // Include both for compatibility
+        role,
+        first_name: additionalData?.firstName?.trim() || '',
+        firstName: additionalData?.firstName?.trim() || '', // Include both for compatibility
+        last_name: additionalData?.lastName?.trim() || '',
+        lastName: additionalData?.lastName?.trim() || '', // Include both for compatibility
+        bio: additionalData?.bio?.trim() || '',
+        is_private: additionalData?.isPrivate || false,
+        isPrivate: additionalData?.isPrivate || false, // Include both for compatibility
+        profile_picture_url: additionalData?.profilePictureUrl || '',
+        profilePictureUrl: additionalData?.profilePictureUrl || '', // Include both for compatibility
+      };
+
+      console.log('📝 User metadata payload:', userMetadata);
+
       // Sign up with Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          data: {
-            display_name: displayName.trim(),
-            displayName: displayName.trim(), // Include both for compatibility
-            role,
-            first_name: additionalData?.firstName?.trim() || '',
-            firstName: additionalData?.firstName?.trim() || '', // Include both for compatibility
-            last_name: additionalData?.lastName?.trim() || '',
-            lastName: additionalData?.lastName?.trim() || '', // Include both for compatibility
-            bio: additionalData?.bio?.trim() || '',
-            is_private: additionalData?.isPrivate || false,
-            isPrivate: additionalData?.isPrivate || false, // Include both for compatibility
-            profile_picture_url: additionalData?.profilePictureUrl || '',
-            profilePictureUrl: additionalData?.profilePictureUrl || '', // Include both for compatibility
-          },
+          data: userMetadata,
         },
       });
 
