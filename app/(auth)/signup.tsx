@@ -102,7 +102,7 @@ export default function SignupScreen() {
       
       setSuccess('Account created successfully! Welcome to Sonix!');
       
-      // Small delay to show success message
+      // Redirect after a short delay to show success message
       setTimeout(() => {
         if (selectedRole === 'artist') {
           Alert.alert(
@@ -113,7 +113,7 @@ export default function SignupScreen() {
         } else {
           router.replace('/(tabs)');
         }
-      }, 1500);
+      }, 1000); // Reduced delay for better UX
       
     } catch (error) {
       console.error('❌ Signup failed in UI:', error);

@@ -263,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If user is immediately confirmed and we have a session, the auth state change will handle profile loading
       if (data.session) {
         console.log('✅ User immediately confirmed with session');
+        // The auth state change listener will call loadUserProfile
       }
 
     } catch (error: any) {

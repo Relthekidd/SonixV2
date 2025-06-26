@@ -15,6 +15,7 @@ export default function TabLayout() {
     }
   }, [user, isLoading]);
 
+  // Show loading or redirect if no user
   if (isLoading || !user) {
     return null;
   }
