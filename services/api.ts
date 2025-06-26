@@ -99,8 +99,8 @@ class ApiService {
           throw new Error('Session expired. Please log in again.');
         }
 
-        // Check for "Invalid token" message regardless of status code or skipAutoLogout flag
-        if (errorMessage.toLowerCase().includes('invalid token') && this.onUnauthorizedCallback) {
+        // Check for "Invalid token" message, but respect skipAutoLogout flag
+        if (errorMessage.toLowerCase().includes('invalid token') && !skipAutoLogout && this.onUnauthorizedCallback) {
           console.log('🔒 Invalid token detected in error message, triggering logout');
           this.onUnauthorizedCallback();
           throw new Error('Session expired. Please log in again.');
