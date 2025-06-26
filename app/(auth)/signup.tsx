@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Eye, EyeOff, Mail, Lock, User, FileText, CircleAlert as AlertCircle, Camera } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, User, FileText, CircleAlert as AlertCircle, Camera, CheckCircle } from 'lucide-react-native';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -32,6 +32,7 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const { signup } = useAuth();
 
   const pickProfilePicture = async () => {
@@ -53,8 +54,9 @@ export default function SignupScreen() {
   };
 
   const handleSignup = async () => {
-    // Clear any previous errors
+    // Clear any previous messages
     setError(null);
+    setSuccess(null);
 
     // Client-side validation
     if (!email?.trim() || !password || !confirmPassword || !displayName?.trim()) {
@@ -98,34 +100,26 @@ export default function SignupScreen() {
       
       console.log('✅ Signup completed successfully');
       
-      if (selectedRole === 'artist') {
-        Alert.alert(
-          'Application Submitted', 
-          'Your artist application has been submitted and is pending admin approval. You will be notified once your application is reviewed.',
-          [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-        );
-      } else {
-        router.replace('/(tabs)');
-      }
+      setSuccess('Account created successfully! Welcome to Sonix!');
+      
+      // Small delay to show success message
+      setTimeout(() => {
+        if (selectedRole === 'artist') {
+          Alert.alert(
+            'Application Submitted', 
+            'Your artist application has been submitted and is pending admin approval. You will be notified once your application is reviewed.',
+            [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
+          );
+        } else {
+          router.replace('/(tabs)');
+        }
+      }, 1500);
+      
     } catch (error) {
       console.error('❌ Signup failed in UI:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during signup';
       setError(errorMessage);
-      
-      if (errorMessage.includes('Server error') || errorMessage.includes('Service temporarily unavailable')) {
-        Alert.alert(
-          'Server Issue', 
-          'The server is currently experiencing issues. Please try again in a few minutes.',
-          [{ text: 'OK' }]
-        );
-      } else if (errorMessage.includes('Cannot connect') || errorMessage.includes('Network Error')) {
-        Alert.alert(
-          'Connection Error', 
-          'Unable to connect to the server. Please check your internet connection and try again.',
-          [{ text: 'OK' }]
-        );
-      }
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +142,14 @@ export default function SignupScreen() {
           <View style={styles.content}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join the Sonix community</Text>
+
+            {/* Success Message */}
+            {success && (
+              <View style={styles.successContainer}>
+                <CheckCircle color="#10b981" size={16} style={styles.successIcon} />
+                <Text style={styles.successText}>{success}</Text>
+              </View>
+            )}
 
             {/* Error Display */}
             {error && (
@@ -369,20 +371,22 @@ export default function SignupScreen() {
               )}
 
               <TouchableOpacity
-                style={[styles.signupButton, isLoading && styles.signupButtonDisabled]}
+                style={[styles.signupButton, (isLoading || success) && styles.signupButtonDisabled]}
                 onPress={handleSignup}
-                disabled={isLoading}
+                disabled={isLoading || !!success}
               >
                 <LinearGradient
-                  colors={isLoading ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
+                  colors={isLoading || success ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.signupButtonText}>
                     {isLoading 
                       ? 'Creating Account...' 
-                      : selectedRole === 'artist' 
-                        ? 'Submit Application' 
-                        : 'Create Account'
+                      : success
+                        ? 'Account Created!'
+                        : selectedRole === 'artist' 
+                          ? 'Submit Application' 
+                          : 'Create Account'
                     }
                   </Text>
                 </LinearGradient>
@@ -437,6 +441,26 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginBottom: 32,
+  },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  successIcon: {
+    marginRight: 8,
+  },
+  successText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#10b981',
+    lineHeight: 20,
   },
   errorContainer: {
     flexDirection: 'row',

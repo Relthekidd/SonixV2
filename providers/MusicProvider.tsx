@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiService } from '@/services/api';
+import { supabase } from '@/services/supabase';
 import { useAuth } from './AuthProvider';
 
 export interface Track {
@@ -112,26 +112,57 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     setError(null);
     
     try {
-      const [
-        trendingData,
-        albumsData,
-        singlesData,
-        playlistsData,
-        likedData,
-      ] = await Promise.all([
-        apiService.getTrendingTracks(20),
-        apiService.getAlbums({ limit: 10 }),
-        apiService.getSingles({ limit: 10 }),
-        user ? apiService.getUserPlaylists() : apiService.getPublicPlaylists({ limit: 10 }),
-        user ? apiService.getLikedTracks() : Promise.resolve([]),
-      ]);
+      // Load mock data for now - replace with actual Supabase queries
+      const mockTracks: Track[] = [
+        {
+          id: '1',
+          title: 'Midnight Dreams',
+          artist: 'Luna Eclipse',
+          album: 'Nocturnal Vibes',
+          duration: 245,
+          coverUrl: 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+          audioUrl: 'https://example.com/audio1.mp3',
+          isLiked: false,
+          genre: 'Electronic',
+          releaseDate: '2024-01-15',
+          playCount: 15420,
+          likeCount: 892,
+        },
+        {
+          id: '2',
+          title: 'Ocean Waves',
+          artist: 'Coastal Sounds',
+          album: 'Serenity',
+          duration: 198,
+          coverUrl: 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
+          audioUrl: 'https://example.com/audio2.mp3',
+          isLiked: true,
+          genre: 'Ambient',
+          releaseDate: '2024-02-10',
+          playCount: 8765,
+          likeCount: 543,
+        },
+      ];
 
-      setTrendingTracks(trendingData.map(transformTrack));
-      setAlbums(albumsData.map(transformAlbum));
-      setSingles(singlesData.map(transformSingle));
-      setNewReleases(albumsData.map(transformAlbum));
-      setPlaylists(playlistsData.map(transformPlaylist));
-      setLikedSongs(likedData.map(transformTrack));
+      const mockAlbums: Album[] = [
+        {
+          id: '1',
+          title: 'Nocturnal Vibes',
+          artist: 'Luna Eclipse',
+          coverUrl: 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+          year: '2024',
+          tracks: [mockTracks[0]],
+          genre: 'Electronic',
+          description: 'A journey through the night with electronic beats and ambient sounds.',
+          releaseDate: '2024-01-15',
+          genres: ['Electronic', 'Ambient'],
+        },
+      ];
+
+      setTrendingTracks(mockTracks);
+      setAlbums(mockAlbums);
+      setNewReleases(mockAlbums);
+      setLikedSongs(mockTracks.filter(track => track.isLiked));
     } catch (err) {
       console.error('Error loading initial data:', err);
       setError('Failed to load music data');
@@ -143,60 +174,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const refreshData = async () => {
     await loadInitialData();
   };
-
-  // Transform API data to match frontend interface
-  const transformTrack = (apiTrack: any): Track => ({
-    id: apiTrack.id,
-    title: apiTrack.title,
-    artist: apiTrack.artist_name || apiTrack.artist || 'Unknown Artist',
-    album: apiTrack.album || 'Unknown Album',
-    duration: apiTrack.duration || 180,
-    coverUrl: apiTrack.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: apiTrack.audio_url,
-    isLiked: apiTrack.is_liked || false,
-    genre: Array.isArray(apiTrack.genres) ? apiTrack.genres[0] : apiTrack.genre || 'Unknown',
-    releaseDate: apiTrack.created_at || apiTrack.release_date || new Date().toISOString(),
-    playCount: apiTrack.play_count,
-    likeCount: apiTrack.like_count,
-    trackNumber: apiTrack.track_number,
-    lyrics: apiTrack.lyrics,
-  });
-
-  const transformAlbum = (apiAlbum: any): Album => ({
-    id: apiAlbum.id,
-    title: apiAlbum.title,
-    artist: apiAlbum.artist_name || apiAlbum.artist || 'Unknown Artist',
-    coverUrl: apiAlbum.cover_url || 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
-    year: apiAlbum.release_date ? new Date(apiAlbum.release_date).getFullYear().toString() : '2024',
-    tracks: apiAlbum.tracks ? apiAlbum.tracks.map(transformTrack) : [],
-    genre: Array.isArray(apiAlbum.genres) ? apiAlbum.genres[0] : apiAlbum.genre || 'Unknown',
-    description: apiAlbum.description,
-    releaseDate: apiAlbum.release_date,
-    genres: apiAlbum.genres,
-  });
-
-  const transformSingle = (apiSingle: any): Single => ({
-    id: apiSingle.id,
-    title: apiSingle.title,
-    artist: apiSingle.artist_name || apiSingle.artist || 'Unknown Artist',
-    coverUrl: apiSingle.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-    track: transformTrack(apiSingle),
-    genre: Array.isArray(apiSingle.genres) ? apiSingle.genres[0] : apiSingle.genre || 'Unknown',
-    description: apiSingle.description,
-    releaseDate: apiSingle.release_date,
-    genres: apiSingle.genres,
-  });
-
-  const transformPlaylist = (apiPlaylist: any): Playlist => ({
-    id: apiPlaylist.id,
-    name: apiPlaylist.name,
-    description: apiPlaylist.description || '',
-    coverUrl: apiPlaylist.cover_url || 'https://images.pexels.com/photos/1649431/pexels-photo-1649431.jpeg?auto=compress&cs=tinysrgb&w=400',
-    tracks: apiPlaylist.tracks ? apiPlaylist.tracks.map(transformTrack) : [],
-    isPublic: apiPlaylist.is_public,
-    createdBy: apiPlaylist.user_id,
-    createdAt: apiPlaylist.created_at,
-  });
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     setCurrentTrack(track);
@@ -213,13 +190,18 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       return [track, ...filtered].slice(0, 10);
     });
 
-    // Record play with backend
+    // Record play with Supabase if user is logged in
     if (user) {
       try {
-        await apiService.recordPlay(track.id, {
-          deviceType: 'web',
-          completed: false,
-        });
+        await supabase
+          .from('song_plays')
+          .insert({
+            user_id: user.id,
+            track_id: track.id,
+            play_duration: 0,
+            completed: false,
+            device_type: 'web',
+          });
       } catch (error) {
         console.error('Error recording play:', error);
       }
@@ -253,13 +235,29 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const isCurrentlyLiked = likedSongs.some(track => track.id === trackId);
       
       if (isCurrentlyLiked) {
-        await apiService.unlikeTrack(trackId);
+        // Unlike track - remove from liked songs
         setLikedSongs(prev => prev.filter(track => track.id !== trackId));
+        
+        // Remove from database
+        await supabase
+          .from('user_likes')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('track_id', trackId);
       } else {
-        await apiService.likeTrack(trackId);
-        // Fetch the track details to add to liked songs
-        const track = await apiService.getTrackById(trackId);
-        setLikedSongs(prev => [...prev, transformTrack(track)]);
+        // Like track - add to liked songs
+        const track = trendingTracks.find(t => t.id === trackId);
+        if (track) {
+          setLikedSongs(prev => [...prev, { ...track, isLiked: true }]);
+          
+          // Add to database
+          await supabase
+            .from('user_likes')
+            .insert({
+              user_id: user.id,
+              track_id: trackId,
+            });
+        }
       }
     } catch (error) {
       console.error('Error toggling like:', error);
@@ -271,14 +269,31 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      const newPlaylist = await apiService.createPlaylist({
-        name,
-        description,
-        isPublic: false,
-        isCollaborative: false,
-      });
+      const { data, error } = await supabase
+        .from('playlists')
+        .insert({
+          user_id: user.id,
+          title: name,
+          description,
+          is_public: false,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      const newPlaylist: Playlist = {
+        id: data.id,
+        name: data.title,
+        description: data.description || '',
+        coverUrl: 'https://images.pexels.com/photos/1649431/pexels-photo-1649431.jpeg?auto=compress&cs=tinysrgb&w=400',
+        tracks: [],
+        isPublic: data.is_public,
+        createdBy: data.user_id,
+        createdAt: data.created_at,
+      };
       
-      setPlaylists(prev => [...prev, transformPlaylist(newPlaylist)]);
+      setPlaylists(prev => [...prev, newPlaylist]);
     } catch (error) {
       console.error('Error creating playlist:', error);
       setError('Failed to create playlist');
@@ -290,7 +305,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      await apiService.addTrackToPlaylist(playlistId, track.id);
+      await supabase
+        .from('playlist_tracks')
+        .insert({
+          playlist_id: playlistId,
+          track_id: track.id,
+          position: 0, // You might want to calculate the actual position
+        });
       
       setPlaylists(prev => prev.map(playlist => 
         playlist.id === playlistId 
@@ -308,7 +329,11 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     try {
-      await apiService.removeTrackFromPlaylist(playlistId, trackId);
+      await supabase
+        .from('playlist_tracks')
+        .delete()
+        .eq('playlist_id', playlistId)
+        .eq('track_id', trackId);
       
       setPlaylists(prev => prev.map(playlist => 
         playlist.id === playlistId 
@@ -324,13 +349,22 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   const searchMusic = async (query: string) => {
     try {
-      const results = await apiService.search(query, 'all', 20);
+      // Mock search for now - replace with actual Supabase queries
+      const filteredTracks = trendingTracks.filter(track =>
+        track.title.toLowerCase().includes(query.toLowerCase()) ||
+        track.artist.toLowerCase().includes(query.toLowerCase())
+      );
+      
+      const filteredAlbums = albums.filter(album =>
+        album.title.toLowerCase().includes(query.toLowerCase()) ||
+        album.artist.toLowerCase().includes(query.toLowerCase())
+      );
       
       return {
-        tracks: (results.tracks || []).map(transformTrack),
-        albums: (results.albums || []).map(transformAlbum),
-        playlists: (results.playlists || []).map(transformPlaylist),
-        singles: (results.singles || []).map(transformSingle),
+        tracks: filteredTracks,
+        albums: filteredAlbums,
+        playlists: [],
+        singles: [],
       };
     } catch (error) {
       console.error('Error searching music:', error);

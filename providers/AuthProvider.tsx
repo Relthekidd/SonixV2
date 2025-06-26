@@ -1,6 +1,18 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { apiService } from '@/services/api';
+import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: AsyncStorage,
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: false,
+  },
+});
 
 export interface User {
   id: string;
@@ -25,156 +37,133 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
+  session: any;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
   signup: (email: string, password: string, displayName: string, role?: 'listener' | 'artist', additionalData?: any) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
-  followUser: (userId: string) => Promise<void>;
-  unfollowUser: (userId: string) => Promise<void>;
-  sendFollowRequest: (userId: string) => Promise<void>;
-  respondToFollowRequest: (requestId: string, accept: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const TOKEN_KEY = 'auth_token';
-const USER_KEY = 'user_data';
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadStoredAuth();
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        loadUserProfile(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session?.user?.id);
+      
+      setSession(session);
+      
+      if (session?.user) {
+        await loadUserProfile(session.user.id);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const loadStoredAuth = async () => {
+  const loadUserProfile = async (userId: string) => {
     try {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem(TOKEN_KEY),
-        AsyncStorage.getItem(USER_KEY),
-      ]);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
-      if (storedToken && storedUser) {
-        apiService.setAuthToken(storedToken);
-        setUser(JSON.parse(storedUser));
+      if (error) {
+        console.error('Error loading user profile:', error);
+        throw error;
+      }
+
+      if (data) {
+        const transformedUser: User = {
+          id: data.id,
+          email: data.email,
+          displayName: data.display_name,
+          firstName: data.first_name,
+          lastName: data.last_name,
+          profilePictureUrl: data.profile_picture_url,
+          bio: data.bio,
+          role: data.role,
+          isPrivate: data.is_private || false,
+          showFavoriteStats: data.show_favorite_stats || true,
+          topArtists: data.top_artists || [],
+          topTracks: data.top_tracks || [],
+          showcaseStatus: data.showcase_status,
+          showcaseNowPlaying: data.showcase_now_playing,
+          createdAt: data.created_at,
+        };
         
-        // Verify token is still valid and get updated user data
-        try {
-          const currentUser = await apiService.getCurrentUser();
-          const transformedUser = transformUserData(currentUser);
-          setUser(transformedUser);
-          await AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser));
-        } catch (error) {
-          // Token is invalid, clear stored data
-          await clearStoredAuth();
-        }
+        setUser(transformedUser);
       }
     } catch (error) {
-      console.error('Error loading stored auth:', error);
-      await clearStoredAuth();
+      console.error('Error in loadUserProfile:', error);
     } finally {
       setIsLoading(false);
     }
   };
-
-  const clearStoredAuth = async () => {
-    await Promise.all([
-      AsyncStorage.removeItem(TOKEN_KEY),
-      AsyncStorage.removeItem(USER_KEY),
-    ]);
-    apiService.setAuthToken(null);
-    setUser(null);
-  };
-
-  const transformUserData = (apiUser: any): User => ({
-    id: apiUser.id,
-    email: apiUser.email,
-    displayName: apiUser.display_name || apiUser.displayName,
-    firstName: apiUser.first_name,
-    lastName: apiUser.last_name,
-    avatar: apiUser.profile_picture_url || apiUser.avatar,
-    profilePictureUrl: apiUser.profile_picture_url,
-    bio: apiUser.bio,
-    role: apiUser.role || 'listener',
-    isPrivate: apiUser.is_private || false,
-    showFavoriteStats: apiUser.show_favorite_stats || true,
-    topArtists: apiUser.top_artists || [],
-    topTracks: apiUser.top_tracks || [],
-    showcaseStatus: apiUser.showcase_status,
-    showcaseNowPlaying: apiUser.showcase_now_playing,
-    followerCount: apiUser.follower_count || 0,
-    followingCount: apiUser.following_count || 0,
-    createdAt: apiUser.created_at,
-  });
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
-      const response = await apiService.login(email, password);
-      
-      apiService.setAuthToken(response.token);
-      const transformedUser = transformUserData(response.user);
-      setUser(transformedUser);
-      
-      await Promise.all([
-        AsyncStorage.setItem(TOKEN_KEY, response.token),
-        AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser)),
-      ]);
-    } catch (error) {
-      console.error('Login error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
 
-  const loginWithGoogle = async () => {
-    setIsLoading(true);
-    try {
-      // TODO: Implement Google OAuth
-      // For now, create a mock Google user
-      const mockUser: User = {
-        id: 'google-user',
-        email: 'user@gmail.com',
-        displayName: 'Google User',
-        role: 'listener',
-        isPrivate: false,
-        showFavoriteStats: true,
-      };
-      
-      setUser(mockUser);
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(mockUser));
-    } catch (error) {
-      console.error('Google login error:', error);
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      if (data.user) {
+        await loadUserProfile(data.user.id);
+      }
+    } catch (error: any) {
+      console.error('Login error:', error);
+      throw new Error(error.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   const signup = async (
-    email: string, 
-    password: string, 
-    displayName: string, 
+    email: string,
+    password: string,
+    displayName: string,
     role: 'listener' | 'artist' = 'listener',
     additionalData?: any
   ) => {
     setIsLoading(true);
     try {
-      console.log('🔐 Starting signup process:', {
+      console.log('🔐 Starting Supabase signup process:', {
         email,
         displayName,
         role,
-        passwordLength: password.length,
-        additionalData,
         timestamp: new Date().toISOString()
       });
 
-      // Validate inputs before making API call
+      // Validate inputs
       if (!email?.trim()) {
         throw new Error('Email is required');
       }
@@ -191,53 +180,64 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
 
-      const signupData = {
+      // Sign up with Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        displayName: displayName.trim(),
-        role,
-        ...additionalData
-      };
-
-      const response = await apiService.register(signupData);
-      
-      console.log('✅ Signup successful, storing auth data');
-      
-      apiService.setAuthToken(response.token);
-      const transformedUser = transformUserData(response.user);
-      setUser(transformedUser);
-      
-      await Promise.all([
-        AsyncStorage.setItem(TOKEN_KEY, response.token),
-        AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser)),
-      ]);
-    } catch (error) {
-      console.error('❌ Signup error details:', {
-        message: (error as Error).message,
-        name: (error as Error).name,
-        stack: (error as Error).stack,
-        timestamp: new Date().toISOString()
+        options: {
+          data: {
+            display_name: displayName.trim(),
+            role,
+            first_name: additionalData?.firstName?.trim() || '',
+            last_name: additionalData?.lastName?.trim() || '',
+            bio: additionalData?.bio?.trim() || '',
+            is_private: additionalData?.isPrivate || false,
+            profile_picture_url: additionalData?.profilePictureUrl || '',
+          },
+        },
       });
+
+      if (error) {
+        console.error('Supabase signup error:', error);
+        throw error;
+      }
+
+      if (!data.user) {
+        throw new Error('Signup failed - no user returned');
+      }
+
+      console.log('✅ Supabase signup successful:', data.user.id);
+
+      // If user is immediately confirmed, load their profile
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log('📧 Email confirmation required');
+        // For development, we might want to auto-confirm
+        // In production, user will need to confirm email
+      }
+
+      // The trigger will automatically create the user profile
+      // Load the profile if user is confirmed
+      if (data.user && data.session) {
+        await loadUserProfile(data.user.id);
+      }
+
+    } catch (error: any) {
+      console.error('❌ Signup error:', error);
       
-      // Provide more user-friendly error messages
       let userFriendlyMessage = 'Registration failed. Please try again.';
       
-      if (error instanceof Error) {
+      if (error.message) {
         const errorMessage = error.message.toLowerCase();
         
-        if ((error as any).status) {
-          userFriendlyMessage = error.message;
-        } else if (errorMessage.includes('network') || errorMessage.includes('connect')) {
-          userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
-        } else if (errorMessage.includes('timeout')) {
-          userFriendlyMessage = 'Request timed out. Please check your connection and try again.';
-        } else if (errorMessage.includes('email') && errorMessage.includes('exist')) {
+        if (errorMessage.includes('email') && errorMessage.includes('already')) {
           userFriendlyMessage = 'An account with this email already exists. Please use a different email or try logging in.';
         } else if (errorMessage.includes('password')) {
           userFriendlyMessage = 'Password does not meet requirements. Please ensure it is at least 6 characters long.';
-        } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
-          userFriendlyMessage = 'Please check your information and try again. Make sure all fields are filled correctly.';
-        } else if (error.message && !error.message.includes('API Error')) {
+        } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
+          userFriendlyMessage = 'Please enter a valid email address.';
+        } else if (errorMessage.includes('weak password')) {
+          userFriendlyMessage = 'Password is too weak. Please choose a stronger password.';
+        } else {
           userFriendlyMessage = error.message;
         }
       }
@@ -249,17 +249,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await clearStoredAuth();
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        throw error;
+      }
+      setUser(null);
+      setSession(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateProfile = async (updates: Partial<User>) => {
     if (!user) return;
 
     try {
-      const updatedUserData = await apiService.updateUserProfile(updates);
-      const transformedUser = transformUserData({ ...user, ...updatedUserData });
-      setUser(transformedUser);
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser));
+      const updateData: any = {};
+      
+      if (updates.displayName !== undefined) updateData.display_name = updates.displayName;
+      if (updates.firstName !== undefined) updateData.first_name = updates.firstName;
+      if (updates.lastName !== undefined) updateData.last_name = updates.lastName;
+      if (updates.bio !== undefined) updateData.bio = updates.bio;
+      if (updates.profilePictureUrl !== undefined) updateData.profile_picture_url = updates.profilePictureUrl;
+      if (updates.isPrivate !== undefined) updateData.is_private = updates.isPrivate;
+      if (updates.showFavoriteStats !== undefined) updateData.show_favorite_stats = updates.showFavoriteStats;
+      if (updates.showcaseStatus !== undefined) updateData.showcase_status = updates.showcaseStatus;
+      if (updates.showcaseNowPlaying !== undefined) updateData.showcase_now_playing = updates.showcaseNowPlaying;
+
+      const { data, error } = await supabase
+        .from('users')
+        .update(updateData)
+        .eq('id', user.id)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local user state
+      setUser(prev => prev ? { ...prev, ...updates } : null);
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
@@ -268,60 +302,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
-      await apiService.resetPassword(email);
-    } catch (error) {
-      console.error('Reset password error:', error);
-      throw error;
-    }
-  };
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
 
-  const followUser = async (userId: string) => {
-    if (!user) return;
-
-    try {
-      await apiService.followUser(userId);
-      // Update local user data
-      setUser(prev => prev ? { ...prev, followingCount: (prev.followingCount || 0) + 1 } : null);
-    } catch (error) {
-      console.error('Error following user:', error);
-      throw error;
-    }
-  };
-
-  const unfollowUser = async (userId: string) => {
-    if (!user) return;
-
-    try {
-      await apiService.unfollowUser(userId);
-      // Update local user data
-      setUser(prev => prev ? { ...prev, followingCount: Math.max((prev.followingCount || 0) - 1, 0) } : null);
-    } catch (error) {
-      console.error('Error unfollowing user:', error);
-      throw error;
-    }
-  };
-
-  const sendFollowRequest = async (userId: string) => {
-    if (!user) return;
-
-    try {
-      await apiService.sendFollowRequest(userId);
-    } catch (error) {
-      console.error('Error sending follow request:', error);
-      throw error;
-    }
-  };
-
-  const respondToFollowRequest = async (requestId: string, accept: boolean) => {
-    if (!user) return;
-
-    try {
-      await apiService.respondToFollowRequest(requestId, accept);
-      if (accept) {
-        setUser(prev => prev ? { ...prev, followerCount: (prev.followerCount || 0) + 1 } : null);
+      if (error) {
+        throw error;
       }
     } catch (error) {
-      console.error('Error responding to follow request:', error);
+      console.error('Reset password error:', error);
       throw error;
     }
   };
@@ -330,17 +319,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        session,
         isLoading,
         login,
-        loginWithGoogle,
         signup,
         logout,
         updateProfile,
         resetPassword,
-        followUser,
-        unfollowUser,
-        sendFollowRequest,
-        respondToFollowRequest,
       }}
     >
       {children}

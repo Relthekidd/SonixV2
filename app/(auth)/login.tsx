@@ -12,39 +12,38 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, CircleAlert as AlertCircle, CheckCircle } from 'lucide-react-native';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const { login, loginWithGoogle } = useAuth();
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  const { login } = useAuth();
 
   const handleLogin = async () => {
+    setError(null);
+    setSuccess(null);
+
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      setError('Please fill in all fields');
       return;
     }
 
     setIsLoading(true);
     try {
       await login(email, password);
-      router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Login Failed', 'Invalid email or password');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      await loginWithGoogle();
-      router.replace('/(tabs)');
-    } catch (error) {
-      Alert.alert('Login Failed', 'Google login failed');
+      setSuccess('Login successful! Welcome back!');
+      
+      // Small delay to show success message
+      setTimeout(() => {
+        router.replace('/(tabs)');
+      }, 1000);
+    } catch (error: any) {
+      console.error('Login error:', error);
+      setError(error.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -63,6 +62,22 @@ export default function LoginScreen() {
           <Text style={styles.title}>Welcome Back</Text>
           <Text style={styles.subtitle}>Sign in to continue listening</Text>
 
+          {/* Success Message */}
+          {success && (
+            <View style={styles.successContainer}>
+              <CheckCircle color="#10b981" size={16} style={styles.successIcon} />
+              <Text style={styles.successText}>{success}</Text>
+            </View>
+          )}
+
+          {/* Error Display */}
+          {error && (
+            <View style={styles.errorContainer}>
+              <AlertCircle color="#ef4444" size={16} style={styles.errorIcon} />
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
+
           <View style={styles.form}>
             <View style={styles.inputContainer}>
               <Mail color="#8b5cf6" size={20} style={styles.inputIcon} />
@@ -75,6 +90,7 @@ export default function LoginScreen() {
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoComplete="email"
+                editable={!isLoading}
               />
             </View>
 
@@ -88,10 +104,12 @@ export default function LoginScreen() {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
                 autoComplete="password"
+                editable={!isLoading}
               />
               <TouchableOpacity
                 onPress={() => setShowPassword(!showPassword)}
                 style={styles.eyeIcon}
+                disabled={isLoading}
               >
                 {showPassword ? (
                   <EyeOff color="#64748b" size={20} />
@@ -103,43 +121,37 @@ export default function LoginScreen() {
 
             <TouchableOpacity
               onPress={() => router.push('/(auth)/forgot-password')}
+              disabled={isLoading}
             >
-              <Text style={styles.forgotPassword}>Forgot Password?</Text>
+              <Text style={[styles.forgotPassword, isLoading && styles.disabledText]}>
+                Forgot Password?
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.loginButton}
+              style={[styles.loginButton, (isLoading || success) && styles.loginButtonDisabled]}
               onPress={handleLogin}
-              disabled={isLoading}
+              disabled={isLoading || !!success}
             >
               <LinearGradient
-                colors={['#8b5cf6', '#a855f7', '#c084fc']}
+                colors={isLoading || success ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
                 style={styles.buttonGradient}
               >
                 <Text style={styles.loginButtonText}>
-                  {isLoading ? 'Signing In...' : 'Sign In'}
+                  {isLoading ? 'Signing In...' : success ? 'Success!' : 'Sign In'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
 
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleLogin}
-              disabled={isLoading}
-            >
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </TouchableOpacity>
-
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => router.push('/(auth)/signup')}>
-                <Text style={styles.signupLink}>Sign Up</Text>
+              <TouchableOpacity 
+                onPress={() => router.push('/(auth)/signup')}
+                disabled={isLoading}
+              >
+                <Text style={[styles.signupLink, isLoading && styles.disabledText]}>
+                  Sign Up
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -175,6 +187,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 32,
   },
+  successContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  successIcon: {
+    marginRight: 8,
+  },
+  successText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#10b981',
+    lineHeight: 20,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ef4444',
+    lineHeight: 20,
+  },
   form: {
     gap: 16,
   },
@@ -206,45 +258,22 @@ const styles = StyleSheet.create({
     color: '#8b5cf6',
     textAlign: 'right',
   },
+  disabledText: {
+    opacity: 0.5,
+  },
   loginButton: {
     marginTop: 8,
     borderRadius: 12,
     overflow: 'hidden',
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   buttonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
   },
   loginButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  dividerText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginHorizontal: 16,
-  },
-  googleButton: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  googleButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
