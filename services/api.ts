@@ -285,26 +285,24 @@ class ApiService {
     }, true); // skipAutoLogout = true
   }
 
-  // Singles
+  // Singles - Use tracks endpoint as fallback since singles endpoint doesn't exist
   async getSingles(params?: { page?: number; limit?: number }): Promise<any[]> {
-    const searchParams = new URLSearchParams();
-    if (params?.page) searchParams.append('page', params.page.toString());
-    if (params?.limit) searchParams.append('limit', params.limit.toString());
-    
-    const query = searchParams.toString();
-    return this.request(`/singles${query ? `?${query}` : ''}`);
+    console.log('⚠️ Singles endpoint not available, using tracks endpoint as fallback');
+    // Filter tracks that are singles (not part of albums)
+    const tracks = await this.getTracks(params);
+    return tracks.filter((track: any) => !track.album_id);
   }
 
   async getSingleById(id: string): Promise<any> {
-    return this.request(`/singles/${id}`);
+    console.log('⚠️ Singles endpoint not available, using tracks endpoint as fallback');
+    return this.getTrackById(id);
   }
 
   async createSingle(singleData: FormData): Promise<any> {
-    // Skip auto-logout for single uploads
-    return this.request('/singles', {
-      method: 'POST',
-      body: singleData,
-    }, true); // skipAutoLogout = true
+    console.log('⚠️ Singles endpoint not available, using tracks endpoint as fallback');
+    // Mark as single by ensuring no album_id is set
+    singleData.append('is_single', 'true');
+    return this.createTrack(singleData);
   }
 
   // Playlists
@@ -424,13 +422,22 @@ class ApiService {
 
   // Get recently uploaded content
   async getRecentUploads(): Promise<{ singles: any[], albums: any[], tracks: any[] }> {
-    const [singles, albums, tracks] = await Promise.all([
-      this.getSingles({ limit: 10 }),
-      this.getAlbums({ limit: 10 }),
-      this.getTracks({ limit: 10 })
-    ]);
+    try {
+      const [albums, tracks] = await Promise.all([
+        this.getAlbums({ limit: 10 }),
+        this.getTracks({ limit: 10 })
+      ]);
 
-    return { singles, albums, tracks };
+      // Separate singles from tracks (singles are tracks without album_id)
+      const singles = tracks.filter((track: any) => !track.album_id);
+      const albumTracks = tracks.filter((track: any) => track.album_id);
+
+      return { singles, albums, tracks: albumTracks };
+    } catch (error) {
+      console.error('Error fetching recent uploads:', error);
+      // Return empty arrays as fallback
+      return { singles: [], albums: [], tracks: [] };
+    }
   }
 }
 
