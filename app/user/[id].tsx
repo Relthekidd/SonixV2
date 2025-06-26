@@ -15,20 +15,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { 
-  ArrowLeft, 
-  Settings, 
-  UserPlus, 
-  UserMinus, 
-  Lock, 
-  Music, 
-  Play, 
-  Pause,
-  Heart,
-  Users,
-  Calendar,
-  Edit3
-} from 'lucide-react-native';
+import { ArrowLeft, Settings, UserPlus, UserMinus, Lock, Music, Play, Pause, Heart, Users, Calendar, CreditCard as Edit3 } from 'lucide-react-native';
 
 interface UserProfile {
   id: string;
