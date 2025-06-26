@@ -2,14 +2,18 @@ import { User } from '@/providers/AuthProvider';
 import { Track, Album, Playlist } from '@/providers/MusicProvider';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://sonix-backend-production.up.railway.app/api/v1';
+const ROOT_API_URL_DERIVED = API_BASE_URL.replace('/api/v1', '');
 
 class ApiService {
   private baseURL: string;
+  private rootURL: string;
   private token: string | null = null;
 
   constructor() {
     this.baseURL = API_BASE_URL;
+    this.rootURL = ROOT_API_URL_DERIVED;
     console.log('🔧 ApiService initialized with baseURL:', this.baseURL);
+    console.log('🔧 ApiService initialized with rootURL:', this.rootURL);
   }
 
   setAuthToken(token: string | null) {
@@ -18,9 +22,11 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    baseOverride?: string
   ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
+    const baseUrl = baseOverride || this.baseURL;
+    const url = `${baseUrl}${endpoint}`;
     
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -125,10 +131,10 @@ class ApiService {
           message: 'Request timed out after 10 seconds',
           url,
           endpoint,
-          baseURL: this.baseURL,
+          baseURL: baseUrl,
           timestamp: new Date().toISOString()
         });
-        throw new Error(`Request timeout: Unable to connect to ${this.baseURL}. Please check if the server is running and accessible.`);
+        throw new Error(`Request timeout: Unable to connect to ${baseUrl}. Please check if the server is running and accessible.`);
       }
       
       if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
@@ -136,7 +142,7 @@ class ApiService {
           message: 'Network request failed - server may be unreachable',
           url,
           endpoint,
-          baseURL: this.baseURL,
+          baseURL: baseUrl,
           possibleCauses: [
             'Backend server is not running',
             'Incorrect API URL in environment variables',
@@ -146,7 +152,7 @@ class ApiService {
           ],
           timestamp: new Date().toISOString()
         });
-        throw new Error(`Network Error: Cannot connect to ${this.baseURL}. Please verify the server is running and the API URL is correct.`);
+        throw new Error(`Network Error: Cannot connect to ${baseUrl}. Please verify the server is running and the API URL is correct.`);
       }
 
       console.error('🚨 API Request Error:', {
@@ -155,7 +161,7 @@ class ApiService {
         stack: (error as Error).stack,
         url,
         endpoint,
-        baseURL: this.baseURL,
+        baseURL: baseUrl,
         timestamp: new Date().toISOString()
       });
       
@@ -171,7 +177,7 @@ class ApiService {
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     try {
       console.log('🏥 Performing health check...');
-      return await this.request('/health');
+      return await this.request('/health', {}, this.rootURL);
     } catch (error) {
       console.error('🏥 Health check failed:', error);
       throw error;
@@ -222,7 +228,7 @@ class ApiService {
       console.log('✅ Server is reachable, proceeding with registration');
     } catch (healthError) {
       console.error('❌ Server health check failed:', healthError);
-      throw new Error(`Cannot connect to server at ${this.baseURL}. Please check if the backend server is running and accessible.`);
+      throw new Error(`Cannot connect to server at ${this.rootURL}. Please check if the backend server is running and accessible.`);
     }
 
     return this.request('/auth/register', {
