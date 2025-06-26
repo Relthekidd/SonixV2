@@ -12,27 +12,33 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
-import { apiService } from '@/services/api';
+import { supabase } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Search, Play, Pause, Music, User, Disc } from 'lucide-react-native';
+import { Search, Play, Pause, Music, User, Disc, Users, Lock, Globe } from 'lucide-react-native';
 
 interface SearchResults {
   tracks: any[];
   albums: any[];
   singles: any[];
   artists: any[];
+  users: any[];
 }
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResults>({ tracks: [], albums: [], singles: [], artists: [] });
+  const [results, setResults] = useState<SearchResults>({ 
+    tracks: [], 
+    albums: [], 
+    singles: [], 
+    artists: [], 
+    users: [] 
+  });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
   
   const { 
-    searchMusic, 
     currentTrack, 
     isPlaying, 
     playTrack, 
@@ -47,13 +53,13 @@ export default function SearchScreen() {
 
   useEffect(() => {
     if (query.trim() === '') {
-      setResults({ tracks: [], albums: [], singles: [], artists: [] });
+      setResults({ tracks: [], albums: [], singles: [], artists: [], users: [] });
       setSuggestions([]);
       return;
     }
 
     const debounceTimer = setTimeout(() => {
-      loadSuggestions(query);
+      handleSearch(query);
     }, 300);
 
     return () => clearTimeout(debounceTimer);
@@ -61,52 +67,54 @@ export default function SearchScreen() {
 
   const loadTrendingSearches = async () => {
     try {
-      const trending = await apiService.getTrendingSearches(8);
-      setTrendingSearches(trending);
+      // Mock trending searches for now
+      setTrendingSearches([
+        'Electronic Music',
+        'Chill Vibes',
+        'Hip Hop',
+        'Indie Rock',
+        'Jazz',
+        'Classical',
+        'Pop Hits',
+        'R&B'
+      ]);
     } catch (error) {
       console.error('Error loading trending searches:', error);
     }
   };
 
-  const loadSuggestions = async (searchQuery: string) => {
-    if (searchQuery.trim().length < 2) return;
-    
-    setIsLoadingSuggestions(true);
-    try {
-      const suggestionResults = await apiService.getSearchSuggestions(searchQuery, 5);
-      setSuggestions(suggestionResults.map(item => item.title || item.name || item.stage_name));
-    } catch (error) {
-      console.error('Error loading suggestions:', error);
-    } finally {
-      setIsLoadingSuggestions(false);
-    }
-  };
-
   const handleSearch = async (searchQuery: string) => {
-    setQuery(searchQuery);
-    
     if (searchQuery.trim() === '') {
-      setResults({ tracks: [], albums: [], singles: [], artists: [] });
+      setResults({ tracks: [], albums: [], singles: [], artists: [], users: [] });
       return;
     }
 
     setIsSearching(true);
     try {
-      // Search all content types
-      const [tracksResult, albumsResult, singlesResult, artistsResult] = await Promise.all([
-        apiService.search(searchQuery, 'tracks', 20),
-        apiService.search(searchQuery, 'albums', 10),
-        apiService.getSingles({ limit: 10 }), // Mock singles search
-        apiService.search(searchQuery, 'artists', 10),
-      ]);
+      // Search users
+      const { data: usersData, error: usersError } = await supabase
+        .rpc('search_users', { 
+          search_query: searchQuery, 
+          limit_count: 20 
+        });
+
+      if (usersError) {
+        console.error('Error searching users:', usersError);
+      }
+
+      // For now, use mock data for other content types
+      // In a real app, you'd search tracks, albums, etc. from your database
+      const mockTracks = trendingTracks.filter(track =>
+        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        track.artist.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
       setResults({
-        tracks: tracksResult.tracks || [],
-        albums: albumsResult.albums || [],
-        singles: singlesResult.filter((single: any) => 
-          single.title.toLowerCase().includes(searchQuery.toLowerCase())
-        ) || [],
-        artists: artistsResult.artists || [],
+        tracks: mockTracks,
+        albums: [],
+        singles: [],
+        artists: [],
+        users: usersData || [],
       });
       setSuggestions([]);
     } catch (error) {
@@ -116,11 +124,8 @@ export default function SearchScreen() {
     }
   };
 
-  const handleSuggestionPress = (suggestion: string) => {
-    handleSearch(suggestion);
-  };
-
   const handleTrendingPress = (trending: string) => {
+    setQuery(trending);
     handleSearch(trending);
   };
 
@@ -136,16 +141,8 @@ export default function SearchScreen() {
     }
   };
 
-  const handleAlbumPress = (album: any) => {
-    router.push(`/album/${album.id}`);
-  };
-
-  const handleSinglePress = (single: any) => {
-    router.push(`/single/${single.id}`);
-  };
-
-  const handleArtistPress = (artist: any) => {
-    router.push(`/artist/${artist.id}`);
+  const handleUserPress = (user: any) => {
+    router.push(`/user/${user.id}`);
   };
 
   const renderTrackItem = ({ item }: { item: any }) => (
@@ -153,7 +150,7 @@ export default function SearchScreen() {
       style={styles.resultItem}
       onPress={() => handleTrackPress(item)}
     >
-      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
+      <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
       <View style={styles.resultInfo}>
         <Text style={styles.resultTitle} numberOfLines={1}>
           {item.title}
@@ -172,64 +169,47 @@ export default function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderAlbumItem = ({ item }: { item: any }) => (
+  const renderUserItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.resultItem}
-      onPress={() => handleAlbumPress(item)}
+      onPress={() => handleUserPress(item)}
     >
-      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
+      <Image 
+        source={{ 
+          uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
+        }} 
+        style={[styles.resultImage, styles.userImage]} 
+      />
       <View style={styles.resultInfo}>
         <Text style={styles.resultTitle} numberOfLines={1}>
-          {item.title}
+          {item.display_name}
         </Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>
-          {item.artist} • Album
-        </Text>
+        <View style={styles.userMeta}>
+          <Text style={styles.resultSubtitle} numberOfLines={1}>
+            {item.role} • {item.follower_count} followers
+          </Text>
+          <View style={styles.privacyIndicator}>
+            {item.is_private ? (
+              <Lock color="#f59e0b" size={12} />
+            ) : (
+              <Globe color="#10b981" size={12} />
+            )}
+          </View>
+        </View>
       </View>
-      <Disc color="#94a3b8" size={20} />
-    </TouchableOpacity>
-  );
-
-  const renderSingleItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.resultItem}
-      onPress={() => handleSinglePress(item)}
-    >
-      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
-      <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>
-          {item.artist} • Single
-        </Text>
+      <View style={styles.followIndicator}>
+        {item.is_following && (
+          <Text style={styles.followingText}>Following</Text>
+        )}
+        <User color="#94a3b8" size={20} />
       </View>
-      <Music color="#94a3b8" size={20} />
-    </TouchableOpacity>
-  );
-
-  const renderArtistItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.resultItem}
-      onPress={() => handleArtistPress(item)}
-    >
-      <Image source={{ uri: item.avatar_url || item.coverUrl }} style={[styles.resultImage, styles.artistImage]} />
-      <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>
-          {item.stage_name || item.name}
-        </Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>
-          Artist
-        </Text>
-      </View>
-      <User color="#94a3b8" size={20} />
     </TouchableOpacity>
   );
 
   const renderGenreItem = ({ item }: { item: string }) => (
     <TouchableOpacity 
       style={styles.genreItem}
-      onPress={() => handleSearch(item)}
+      onPress={() => handleTrendingPress(item)}
     >
       <LinearGradient
         colors={['#8b5cf6', '#a855f7']}
@@ -240,7 +220,30 @@ export default function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const genres = ['Electronic', 'Pop', 'Rock', 'Hip Hop', 'Jazz', 'Classical', 'Indie', 'R&B'];
+  const tabs = [
+    { id: 'all', title: 'All' },
+    { id: 'tracks', title: 'Songs' },
+    { id: 'users', title: 'People' },
+    { id: 'albums', title: 'Albums' },
+    { id: 'artists', title: 'Artists' },
+  ];
+
+  const getFilteredResults = () => {
+    switch (activeTab) {
+      case 'tracks':
+        return { tracks: results.tracks };
+      case 'users':
+        return { users: results.users };
+      case 'albums':
+        return { albums: results.albums };
+      case 'artists':
+        return { artists: results.artists };
+      default:
+        return results;
+    }
+  };
+
+  const filteredResults = getFilteredResults();
 
   return (
     <LinearGradient
@@ -253,39 +256,48 @@ export default function SearchScreen() {
           <Search color="#94a3b8" size={20} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="What do you want to listen to?"
+            placeholder="Search for songs, people, albums..."
             placeholderTextColor="#64748b"
             value={query}
             onChangeText={setQuery}
-            onSubmitEditing={() => handleSearch(query)}
             autoCapitalize="none"
           />
-          {isLoadingSuggestions && (
+          {isSearching && (
             <ActivityIndicator size="small" color="#8b5cf6" style={styles.loadingIcon} />
           )}
         </View>
       </View>
 
+      {query !== '' && (
+        <View style={styles.tabBar}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {tabs.map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={[
+                  styles.tab,
+                  activeTab === tab.id && styles.activeTab,
+                ]}
+                onPress={() => setActiveTab(tab.id)}
+              >
+                <Text 
+                  style={[
+                    styles.tabText,
+                    activeTab === tab.id && styles.activeTabText,
+                  ]}
+                >
+                  {tab.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {error && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>{error}</Text>
-          </View>
-        )}
-
-        {/* Search Suggestions */}
-        {suggestions.length > 0 && query.trim() !== '' && (
-          <View style={styles.suggestionsContainer}>
-            {suggestions.map((suggestion, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.suggestionItem}
-                onPress={() => handleSuggestionPress(suggestion)}
-              >
-                <Search color="#94a3b8" size={16} />
-                <Text style={styles.suggestionText}>{suggestion}</Text>
-              </TouchableOpacity>
-            ))}
           </View>
         )}
 
@@ -312,7 +324,7 @@ export default function SearchScreen() {
             {/* Browse by Genre */}
             <Text style={styles.sectionTitle}>Browse by Genre</Text>
             <FlatList
-              data={genres}
+              data={trendingSearches.slice(0, 6)}
               renderItem={renderGenreItem}
               keyExtractor={(item) => item}
               numColumns={2}
@@ -340,11 +352,11 @@ export default function SearchScreen() {
             
             {!isSearching && (
               <>
-                {results.tracks.length > 0 && (
+                {filteredResults.tracks && filteredResults.tracks.length > 0 && (
                   <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Songs</Text>
                     <FlatList
-                      data={results.tracks}
+                      data={filteredResults.tracks}
                       renderItem={renderTrackItem}
                       keyExtractor={(item) => item.id}
                       scrollEnabled={false}
@@ -352,36 +364,12 @@ export default function SearchScreen() {
                   </View>
                 )}
 
-                {results.albums.length > 0 && (
+                {filteredResults.users && filteredResults.users.length > 0 && (
                   <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Albums</Text>
+                    <Text style={styles.sectionTitle}>People</Text>
                     <FlatList
-                      data={results.albums}
-                      renderItem={renderAlbumItem}
-                      keyExtractor={(item) => item.id}
-                      scrollEnabled={false}
-                    />
-                  </View>
-                )}
-
-                {results.singles.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Singles</Text>
-                    <FlatList
-                      data={results.singles}
-                      renderItem={renderSingleItem}
-                      keyExtractor={(item) => item.id}
-                      scrollEnabled={false}
-                    />
-                  </View>
-                )}
-
-                {results.artists.length > 0 && (
-                  <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Artists</Text>
-                    <FlatList
-                      data={results.artists}
-                      renderItem={renderArtistItem}
+                      data={filteredResults.users}
+                      renderItem={renderUserItem}
                       keyExtractor={(item) => item.id}
                       scrollEnabled={false}
                     />
@@ -389,10 +377,7 @@ export default function SearchScreen() {
                 )}
 
                 {!isSearching && 
-                 results.tracks.length === 0 && 
-                 results.albums.length === 0 && 
-                 results.singles.length === 0 && 
-                 results.artists.length === 0 && 
+                 Object.values(filteredResults).every(arr => arr.length === 0) && 
                  query !== '' && (
                   <View style={styles.noResultsContainer}>
                     <Text style={styles.noResults}>No results found for "{query}"</Text>
@@ -447,6 +432,28 @@ const styles = StyleSheet.create({
   loadingIcon: {
     marginLeft: 8,
   },
+  tabBar: {
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  tab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+  },
+  activeTab: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+  },
+  tabText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#64748b',
+  },
+  activeTabText: {
+    color: '#8b5cf6',
+  },
   content: {
     flex: 1,
   },
@@ -464,26 +471,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Medium',
     textAlign: 'center',
-  },
-  suggestionsContainer: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginHorizontal: 24,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  suggestionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  suggestionText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    marginLeft: 12,
   },
   section: {
     marginBottom: 32,
@@ -550,7 +537,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderRadius: 8,
   },
-  artistImage: {
+  userImage: {
     borderRadius: 25,
   },
   resultInfo: {
@@ -567,6 +554,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
+  },
+  userMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  privacyIndicator: {
+    marginLeft: 8,
+  },
+  followIndicator: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  followingText: {
+    fontSize: 10,
+    fontFamily: 'Inter-Medium',
+    color: '#10b981',
   },
   playButton: {
     width: 40,

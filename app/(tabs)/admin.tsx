@@ -5,23 +5,28 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { apiService } from '@/services/api';
+import { supabase } from '@/providers/AuthProvider';
 import { Users, Music, Upload, ChartBar as BarChart3, Settings, Shield, Plus, TrendingUp, CirclePlay as PlayCircle, Heart, Calendar } from 'lucide-react-native';
 
 interface AdminStats {
   totalUsers: number;
   totalTracks: number;
+  totalAlbums: number;
+  totalArtists: number;
   totalPlays: number;
   totalLikes: number;
   newUsersToday: number;
-  tracksUploadedToday: number;
+  newTracksToday: number;
+  playsToday: number;
+  topTracks: any[];
+  topArtists: any[];
+  recentUsers: any[];
 }
 
 export default function AdminScreen() {
@@ -29,10 +34,16 @@ export default function AdminScreen() {
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalTracks: 0,
+    totalAlbums: 0,
+    totalArtists: 0,
     totalPlays: 0,
     totalLikes: 0,
     newUsersToday: 0,
-    tracksUploadedToday: 0,
+    newTracksToday: 0,
+    playsToday: 0,
+    topTracks: [],
+    topArtists: [],
+    recentUsers: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,19 +55,93 @@ export default function AdminScreen() {
   const loadAdminStats = async () => {
     try {
       setIsLoading(true);
-      // Mock data for now - replace with actual API calls
-      setStats({
-        totalUsers: 1247,
-        totalTracks: 3892,
-        totalPlays: 45678,
-        totalLikes: 12456,
-        newUsersToday: 23,
-        tracksUploadedToday: 8,
-      });
+      
+      // Call the admin statistics function
+      const { data, error } = await supabase
+        .rpc('get_admin_statistics');
+
+      if (error) {
+        console.error('Error loading admin stats:', error);
+        // Fallback to individual queries if function fails
+        await loadStatsManually();
+        return;
+      }
+
+      if (data && data.length > 0) {
+        const statsData = data[0];
+        setStats({
+          totalUsers: parseInt(statsData.total_users) || 0,
+          totalTracks: parseInt(statsData.total_tracks) || 0,
+          totalAlbums: parseInt(statsData.total_albums) || 0,
+          totalArtists: parseInt(statsData.total_artists) || 0,
+          totalPlays: parseInt(statsData.total_plays) || 0,
+          totalLikes: parseInt(statsData.total_likes) || 0,
+          newUsersToday: parseInt(statsData.new_users_today) || 0,
+          newTracksToday: parseInt(statsData.new_tracks_today) || 0,
+          playsToday: parseInt(statsData.plays_today) || 0,
+          topTracks: statsData.top_tracks || [],
+          topArtists: statsData.top_artists || [],
+          recentUsers: statsData.recent_users || [],
+        });
+      }
     } catch (error) {
       console.error('Error loading admin stats:', error);
+      await loadStatsManually();
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadStatsManually = async () => {
+    try {
+      // Get basic counts
+      const [
+        usersResult,
+        tracksResult,
+        albumsResult,
+        artistsResult,
+        playsResult,
+      ] = await Promise.all([
+        supabase.from('users').select('*', { count: 'exact', head: true }),
+        supabase.from('tracks').select('*', { count: 'exact', head: true }),
+        supabase.from('albums').select('*', { count: 'exact', head: true }),
+        supabase.from('artists').select('*', { count: 'exact', head: true }),
+        supabase.from('song_plays').select('*', { count: 'exact', head: true }),
+      ]);
+
+      // Get today's stats
+      const today = new Date().toISOString().split('T')[0];
+      const [newUsersResult, newTracksResult, playsToday] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
+        supabase
+          .from('tracks')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
+        supabase
+          .from('song_plays')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
+      ]);
+
+      setStats({
+        totalUsers: usersResult.count || 0,
+        totalTracks: tracksResult.count || 0,
+        totalAlbums: albumsResult.count || 0,
+        totalArtists: artistsResult.count || 0,
+        totalPlays: playsResult.count || 0,
+        totalLikes: 0, // Would need to implement likes tracking
+        newUsersToday: newUsersResult.count || 0,
+        newTracksToday: newTracksResult.count || 0,
+        playsToday: playsToday.count || 0,
+        topTracks: [],
+        topArtists: [],
+        recentUsers: [],
+      });
+    } catch (error) {
+      console.error('Error loading manual stats:', error);
     }
   };
 
@@ -88,20 +173,20 @@ export default function AdminScreen() {
 
   const adminOptions = [
     {
-      id: 'upload-content',
-      title: 'Upload Content',
-      description: 'Upload singles, albums, and manage tracks',
-      icon: Upload,
-      color: '#8b5cf6',
-      route: '/admin/upload',
-    },
-    {
       id: 'artists',
       title: 'Artist Management',
       description: 'Review and approve artist applications',
       icon: Users,
       color: '#10b981',
       route: '/(admin)/artists',
+    },
+    {
+      id: 'upload-content',
+      title: 'Upload Content',
+      description: 'Upload singles, albums, and manage tracks',
+      icon: Upload,
+      color: '#8b5cf6',
+      route: '/admin/upload',
     },
     {
       id: 'content-management',
@@ -148,22 +233,22 @@ export default function AdminScreen() {
     {
       title: 'Total Tracks',
       value: stats.totalTracks.toLocaleString(),
-      change: `+${stats.tracksUploadedToday} today`,
+      change: `+${stats.newTracksToday} today`,
       icon: Music,
       color: '#10b981',
     },
     {
       title: 'Total Plays',
       value: stats.totalPlays.toLocaleString(),
-      change: '+2.3k today',
+      change: `+${stats.playsToday} today`,
       icon: PlayCircle,
       color: '#f59e0b',
     },
     {
-      title: 'Total Likes',
-      value: stats.totalLikes.toLocaleString(),
-      change: '+456 today',
-      icon: Heart,
+      title: 'Total Artists',
+      value: stats.totalArtists.toLocaleString(),
+      change: 'Active artists',
+      icon: Users,
       color: '#ef4444',
     },
   ];
@@ -223,14 +308,14 @@ export default function AdminScreen() {
             
             <TouchableOpacity 
               style={styles.quickActionButton}
-              onPress={() => router.push('/admin/playlists')}
+              onPress={() => router.push('/(admin)/artists')}
             >
               <LinearGradient
                 colors={['#10b981', '#059669']}
                 style={styles.quickActionGradient}
               >
-                <Music color="#ffffff" size={24} />
-                <Text style={styles.quickActionText}>Create Playlist</Text>
+                <Users color="#ffffff" size={24} />
+                <Text style={styles.quickActionText}>Manage Artists</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>

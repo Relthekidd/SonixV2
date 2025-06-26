@@ -15,7 +15,6 @@ export default function TabLayout() {
     }
   }, [user, isLoading]);
 
-  // Show loading or redirect if no user
   if (isLoading || !user) {
     return null;
   }
@@ -68,7 +67,8 @@ export default function TabLayout() {
             ),
           }}
         />
-        {user.role === 'artist' && (
+        {/* Only show artist dashboard for verified artists, not admins */}
+        {user.role === 'artist' && user.artistVerified && (
           <Tabs.Screen
             name="artist-dashboard"
             options={{

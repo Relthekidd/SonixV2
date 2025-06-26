@@ -12,30 +12,29 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth, supabase } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
-import { apiService } from '@/services/api';
-import { ArrowLeft, Settings, UserPlus, UserMinus, Lock, Music, Play, Pause, Heart, Users, Calendar, CreditCard as Edit3 } from 'lucide-react-native';
+import { ArrowLeft, Settings, UserPlus, UserMinus, Lock, Music, Play, Pause, Heart, Users, Calendar, Globe, MessageCircle } from 'lucide-react-native';
 
 interface UserProfile {
   id: string;
-  displayName: string;
-  firstName?: string;
-  lastName?: string;
+  display_name: string;
+  first_name?: string;
+  last_name?: string;
   bio?: string;
-  profilePictureUrl?: string;
-  isPrivate: boolean;
-  followerCount: number;
-  followingCount: number;
-  createdAt: string;
-  topArtists: any[];
-  topTracks: any[];
-  showcaseStatus?: string;
-  showcaseNowPlaying?: string;
-  publicPlaylists: any[];
-  isFollowing?: boolean;
-  hasRequestedFollow?: boolean;
-  canView?: boolean;
+  profile_picture_url?: string;
+  is_private: boolean;
+  follower_count: number;
+  following_count: number;
+  created_at: string;
+  top_artists: any[];
+  top_songs: any[];
+  status_text?: string;
+  pinned_content_type?: string;
+  pinned_content_id?: string;
+  is_following: boolean;
+  has_pending_request: boolean;
+  can_view: boolean;
 }
 
 export default function UserProfileScreen() {
@@ -61,8 +60,20 @@ export default function UserProfileScreen() {
     setError(null);
     
     try {
-      const profileData = await apiService.getUserProfile(id!);
-      setProfile(profileData);
+      const { data, error } = await supabase
+        .rpc('get_user_profile_with_stats', { target_user_id: id });
+
+      if (error) {
+        console.error('Error loading user profile:', error);
+        setError('Failed to load user profile');
+        return;
+      }
+
+      if (data && data.length > 0) {
+        setProfile(data[0]);
+      } else {
+        setError('User not found');
+      }
     } catch (err) {
       console.error('Error loading user profile:', err);
       setError('Failed to load user profile');
@@ -76,31 +87,41 @@ export default function UserProfileScreen() {
 
     setIsFollowLoading(true);
     try {
-      if (profile.isPrivate && !profile.isFollowing) {
-        // Send follow request for private accounts
-        await apiService.sendFollowRequest(profile.id);
-        setProfile(prev => prev ? { ...prev, hasRequestedFollow: true } : null);
-        Alert.alert('Request Sent', 'Your follow request has been sent');
-      } else if (profile.isFollowing) {
+      if (profile.is_following) {
         // Unfollow
-        await apiService.unfollowUser(profile.id);
+        const { error } = await supabase.rpc('unfollow_user', {
+          target_user_id: profile.id
+        });
+
+        if (error) throw error;
+
         setProfile(prev => prev ? { 
           ...prev, 
-          isFollowing: false, 
-          followerCount: Math.max(prev.followerCount - 1, 0) 
+          is_following: false, 
+          follower_count: Math.max(prev.follower_count - 1, 0) 
         } : null);
       } else {
-        // Follow public account
-        await apiService.followUser(profile.id);
-        setProfile(prev => prev ? { 
-          ...prev, 
-          isFollowing: true, 
-          followerCount: prev.followerCount + 1 
-        } : null);
+        // Follow or send follow request
+        const { error } = await supabase.rpc('send_follow_request', {
+          target_user_id: profile.id
+        });
+
+        if (error) throw error;
+
+        if (profile.is_private) {
+          setProfile(prev => prev ? { ...prev, has_pending_request: true } : null);
+          Alert.alert('Request Sent', 'Your follow request has been sent');
+        } else {
+          setProfile(prev => prev ? { 
+            ...prev, 
+            is_following: true, 
+            follower_count: prev.follower_count + 1 
+          } : null);
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error handling follow:', error);
-      Alert.alert('Error', 'Failed to update follow status');
+      Alert.alert('Error', error.message || 'Failed to update follow status');
     } finally {
       setIsFollowLoading(false);
     }
@@ -111,10 +132,10 @@ export default function UserProfileScreen() {
       if (isPlaying) {
         pauseTrack();
       } else {
-        playTrack(track, profile?.topTracks || []);
+        playTrack(track, profile?.top_songs || []);
       }
     } else {
-      playTrack(track, profile?.topTracks || []);
+      playTrack(track, profile?.top_songs || []);
     }
   };
 
@@ -131,7 +152,7 @@ export default function UserProfileScreen() {
       onPress={() => handleTrackPress(item)}
     >
       <Text style={styles.topTrackRank}>{index + 1}</Text>
-      <Image source={{ uri: item.coverUrl }} style={styles.topTrackCover} />
+      <Image source={{ uri: item.cover_url }} style={styles.topTrackCover} />
       <View style={styles.topTrackInfo}>
         <Text style={styles.topTrackTitle} numberOfLines={1}>
           {item.title}
@@ -152,24 +173,10 @@ export default function UserProfileScreen() {
 
   const renderTopArtist = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.topArtistItem}>
-      <Image source={{ uri: item.avatarUrl }} style={styles.topArtistAvatar} />
+      <Image source={{ uri: item.avatar_url }} style={styles.topArtistAvatar} />
       <Text style={styles.topArtistName} numberOfLines={1}>
         {item.name}
       </Text>
-    </TouchableOpacity>
-  );
-
-  const renderPlaylist = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.playlistItem}>
-      <Image source={{ uri: item.coverUrl }} style={styles.playlistCover} />
-      <View style={styles.playlistInfo}>
-        <Text style={styles.playlistTitle} numberOfLines={1}>
-          {item.name}
-        </Text>
-        <Text style={styles.playlistDescription} numberOfLines={1}>
-          {item.tracks.length} songs
-        </Text>
-      </View>
     </TouchableOpacity>
   );
 
@@ -204,7 +211,7 @@ export default function UserProfileScreen() {
   }
 
   // Check if user can view this profile
-  if (profile.isPrivate && !profile.canView && !isOwnProfile) {
+  if (profile.is_private && !profile.can_view && !isOwnProfile) {
     return (
       <LinearGradient
         colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -224,21 +231,21 @@ export default function UserProfileScreen() {
           <Lock color="#64748b" size={64} />
           <Text style={styles.privateTitle}>This Account is Private</Text>
           <Text style={styles.privateText}>
-            Follow {profile.displayName} to see their profile
+            Follow {profile.display_name} to see their profile
           </Text>
           
           <TouchableOpacity
             style={[styles.followButton, isFollowLoading && styles.followButtonDisabled]}
             onPress={handleFollow}
-            disabled={isFollowLoading || profile.hasRequestedFollow}
+            disabled={isFollowLoading || profile.has_pending_request}
           >
             <LinearGradient
-              colors={profile.hasRequestedFollow ? ['#64748b', '#64748b'] : ['#8b5cf6', '#a855f7']}
+              colors={profile.has_pending_request ? ['#64748b', '#64748b'] : ['#8b5cf6', '#a855f7']}
               style={styles.followButtonGradient}
             >
               <UserPlus color="#ffffff" size={20} />
               <Text style={styles.followButtonText}>
-                {profile.hasRequestedFollow ? 'Request Sent' : 'Request to Follow'}
+                {profile.has_pending_request ? 'Request Sent' : 'Request to Follow'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -263,9 +270,9 @@ export default function UserProfileScreen() {
         {isOwnProfile && (
           <TouchableOpacity
             style={styles.headerButton}
-            onPress={() => router.push('/profile/edit')}
+            onPress={() => router.push('/(tabs)/profile')}
           >
-            <Edit3 color="#ffffff" size={24} />
+            <Settings color="#ffffff" size={24} />
           </TouchableOpacity>
         )}
       </View>
@@ -275,30 +282,41 @@ export default function UserProfileScreen() {
         <View style={styles.profileHeader}>
           <Image 
             source={{ 
-              uri: profile.profilePictureUrl || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
+              uri: profile.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
             }} 
             style={styles.profilePicture} 
           />
           
-          <Text style={styles.displayName}>{profile.displayName}</Text>
+          <Text style={styles.displayName}>{profile.display_name}</Text>
           
           {profile.bio && (
             <Text style={styles.bio}>{profile.bio}</Text>
           )}
 
+          {/* Privacy Indicator */}
+          <View style={styles.privacyIndicator}>
+            {profile.is_private ? (
+              <>
+                <Lock color="#f59e0b" size={16} />
+                <Text style={styles.privacyText}>Private Account</Text>
+              </>
+            ) : (
+              <>
+                <Globe color="#10b981" size={16} />
+                <Text style={[styles.privacyText, { color: '#10b981' }]}>Public Account</Text>
+              </>
+            )}
+          </View>
+
           {/* Stats */}
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.followerCount}</Text>
+              <Text style={styles.statValue}>{profile.follower_count}</Text>
               <Text style={styles.statLabel}>Followers</Text>
             </View>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.followingCount}</Text>
+              <Text style={styles.statValue}>{profile.following_count}</Text>
               <Text style={styles.statLabel}>Following</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{profile.publicPlaylists.length}</Text>
-              <Text style={styles.statLabel}>Playlists</Text>
             </View>
           </View>
 
@@ -306,7 +324,7 @@ export default function UserProfileScreen() {
           <View style={styles.joinDate}>
             <Calendar color="#94a3b8" size={16} />
             <Text style={styles.joinDateText}>
-              Joined {formatDate(profile.createdAt)}
+              Joined {formatDate(profile.created_at)}
             </Text>
           </View>
 
@@ -318,16 +336,16 @@ export default function UserProfileScreen() {
               disabled={isFollowLoading}
             >
               <LinearGradient
-                colors={profile.isFollowing ? ['#ef4444', '#dc2626'] : ['#8b5cf6', '#a855f7']}
+                colors={profile.is_following ? ['#ef4444', '#dc2626'] : ['#8b5cf6', '#a855f7']}
                 style={styles.followButtonGradient}
               >
-                {profile.isFollowing ? (
+                {profile.is_following ? (
                   <UserMinus color="#ffffff" size={20} />
                 ) : (
                   <UserPlus color="#ffffff" size={20} />
                 )}
                 <Text style={styles.followButtonText}>
-                  {isFollowLoading ? 'Loading...' : profile.isFollowing ? 'Unfollow' : 'Follow'}
+                  {isFollowLoading ? 'Loading...' : profile.is_following ? 'Unfollow' : 'Follow'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -335,27 +353,21 @@ export default function UserProfileScreen() {
         </View>
 
         {/* Showcase Status */}
-        {profile.showcaseStatus && (
+        {profile.status_text && (
           <View style={styles.showcaseSection}>
             <Text style={styles.sectionTitle}>Status</Text>
             <View style={styles.showcaseCard}>
-              <Text style={styles.showcaseStatus}>{profile.showcaseStatus}</Text>
-              {profile.showcaseNowPlaying && (
-                <View style={styles.nowPlayingContainer}>
-                  <Music color="#8b5cf6" size={16} />
-                  <Text style={styles.nowPlayingText}>{profile.showcaseNowPlaying}</Text>
-                </View>
-              )}
+              <Text style={styles.showcaseStatus}>{profile.status_text}</Text>
             </View>
           </View>
         )}
 
         {/* Top Artists */}
-        {profile.topArtists.length > 0 && (
+        {profile.top_artists && profile.top_artists.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Top Artists</Text>
             <FlatList
-              data={profile.topArtists.slice(0, 5)}
+              data={profile.top_artists.slice(0, 5)}
               renderItem={renderTopArtist}
               keyExtractor={(item) => item.id}
               horizontal
@@ -366,25 +378,12 @@ export default function UserProfileScreen() {
         )}
 
         {/* Top Tracks */}
-        {profile.topTracks.length > 0 && (
+        {profile.top_songs && profile.top_songs.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Top Tracks</Text>
             <FlatList
-              data={profile.topTracks.slice(0, 5)}
+              data={profile.top_songs.slice(0, 5)}
               renderItem={renderTopTrack}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {/* Public Playlists */}
-        {profile.publicPlaylists.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Public Playlists</Text>
-            <FlatList
-              data={profile.publicPlaylists}
-              renderItem={renderPlaylist}
               keyExtractor={(item) => item.id}
               scrollEnabled={false}
             />
@@ -502,8 +501,19 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#cbd5e1',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 22,
+  },
+  privacyIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 6,
+  },
+  privacyText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#f59e0b',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -571,17 +581,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: '#ffffff',
-    marginBottom: 8,
-  },
-  nowPlayingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nowPlayingText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#8b5cf6',
+    lineHeight: 22,
   },
   section: {
     marginBottom: 32,
@@ -658,36 +658,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  playlistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginHorizontal: 24,
-    marginBottom: 8,
-    borderRadius: 12,
-  },
-  playlistCover: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-  },
-  playlistInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  playlistTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  playlistDescription: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
   },
   bottomPadding: {
     height: 120,
