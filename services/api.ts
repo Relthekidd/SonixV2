@@ -40,10 +40,9 @@ class ApiService {
     const config: RequestInit = {
       ...options,
       headers,
-      timeout: 15000, // Increased timeout to 15 seconds
+      timeout: 15000,
     };
 
-    // Enhanced logging for debugging
     console.log('🌐 API Request:', {
       url,
       method: options.method || 'GET',
@@ -53,7 +52,6 @@ class ApiService {
     });
 
     try {
-      // Test network connectivity first
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
       
@@ -81,7 +79,6 @@ class ApiService {
           if (contentType && contentType.includes('application/json')) {
             errorData = await response.json();
             
-            // Extract meaningful error message from various possible response formats
             if (errorData.message) {
               errorMessage = errorData.message;
             } else if (errorData.error) {
@@ -92,7 +89,6 @@ class ApiService {
               errorMessage = errorData.errors.join(', ');
             }
             
-            // Log detailed error information
             console.error('❌ API Error Details:', {
               status: response.status,
               statusText: response.statusText,
@@ -117,7 +113,6 @@ class ApiService {
           console.error('❌ Error parsing error response:', parseError);
         }
 
-        // Provide more specific error messages based on status codes
         let userFriendlyMessage = errorMessage;
         
         switch (response.status) {
@@ -155,7 +150,6 @@ class ApiService {
             userFriendlyMessage = errorMessage || `An error occurred (${response.status}). Please try again.`;
         }
 
-        // Create a more descriptive error with additional context
         const error = new Error(userFriendlyMessage);
         (error as any).status = response.status;
         (error as any).data = errorData;
@@ -174,7 +168,6 @@ class ApiService {
       });
       return data.data || data;
     } catch (error) {
-      // Enhanced error logging with network diagnostics
       if (error.name === 'AbortError') {
         console.error('🚨 Request Timeout:', {
           message: 'Request timed out after 15 seconds',
@@ -192,13 +185,6 @@ class ApiService {
           url,
           endpoint,
           baseURL: baseUrl,
-          possibleCauses: [
-            'Backend server is not running',
-            'Incorrect API URL in environment variables',
-            'Network connectivity issues',
-            'Firewall blocking the connection',
-            'CORS configuration issues'
-          ],
           timestamp: new Date().toISOString()
         });
         throw new Error(`Network Error: Cannot connect to ${baseUrl}. Please check your internet connection and try again.`);
@@ -214,17 +200,15 @@ class ApiService {
         timestamp: new Date().toISOString()
       });
       
-      // Re-throw the error without additional wrapping if it already has context
       if ((error as any).status || (error as any).endpoint) {
         throw error;
       }
       
-      // Only wrap if it's a generic error
       throw new Error(`Connection failed: ${(error as Error).message}`);
     }
   }
 
-  // Health check method to test connectivity
+  // Health check method
   async healthCheck(): Promise<{ status: string; timestamp: string }> {
     try {
       console.log('🏥 Performing health check...');
@@ -243,37 +227,29 @@ class ApiService {
     });
   }
 
-  async register(
-    email: string,
-    password: string,
-    displayName: string,
-    role: 'listener' | 'artist' = 'listener'
-  ): Promise<{ user: User; token: string }> {
-    // Enhanced logging for registration requests
+  async register(signupData: any): Promise<{ user: User; token: string }> {
     console.log('🔐 Registration attempt:', {
-      email,
-      displayName,
-      role,
-      passwordLength: password.length,
+      email: signupData.email,
+      displayName: signupData.displayName,
+      role: signupData.role,
+      passwordLength: signupData.password.length,
       apiUrl: this.baseURL,
       timestamp: new Date().toISOString()
     });
 
-    // Validate input before making request
-    if (!email || !password || !displayName) {
+    if (!signupData.email || !signupData.password || !signupData.displayName) {
       throw new Error('Missing required fields: email, password, and displayName are required');
     }
 
-    if (password.length < 6) {
+    if (signupData.password.length < 6) {
       throw new Error('Password must be at least 6 characters long');
     }
 
-    if (!email.includes('@')) {
+    if (!signupData.email.includes('@')) {
       throw new Error('Invalid email format');
     }
 
     try {
-      // First, try a health check to ensure the server is reachable
       console.log('🏥 Testing server connectivity before registration...');
       await this.healthCheck();
       console.log('✅ Server is reachable, proceeding with registration');
@@ -284,7 +260,7 @@ class ApiService {
 
     return this.request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, password, displayName, role }),
+      body: JSON.stringify(signupData),
     });
   }
 
@@ -297,6 +273,47 @@ class ApiService {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
+  }
+
+  // User Profile Management
+  async getUserProfile(userId: string): Promise<any> {
+    return this.request(`/users/${userId}/profile`);
+  }
+
+  async updateUserProfile(updates: Partial<User>): Promise<any> {
+    return this.request('/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
+  async followUser(userId: string): Promise<void> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'POST',
+    });
+  }
+
+  async unfollowUser(userId: string): Promise<void> {
+    return this.request(`/users/${userId}/follow`, {
+      method: 'DELETE',
+    });
+  }
+
+  async sendFollowRequest(userId: string): Promise<void> {
+    return this.request(`/users/${userId}/follow-request`, {
+      method: 'POST',
+    });
+  }
+
+  async respondToFollowRequest(requestId: string, accept: boolean): Promise<void> {
+    return this.request(`/follow-requests/${requestId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ accept }),
+    });
+  }
+
+  async getFollowRequests(): Promise<any[]> {
+    return this.request('/follow-requests');
   }
 
   // Tracks
@@ -325,7 +342,7 @@ class ApiService {
   async createTrack(trackData: FormData): Promise<Track> {
     return this.request('/tracks', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: trackData,
     });
   }
@@ -370,7 +387,7 @@ class ApiService {
   async createArtistProfile(profileData: FormData): Promise<any> {
     return this.request('/artists/profile', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: profileData,
     });
   }
@@ -404,7 +421,7 @@ class ApiService {
   async createAlbum(albumData: FormData): Promise<any> {
     return this.request('/albums', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: albumData,
     });
   }
@@ -426,7 +443,7 @@ class ApiService {
   async createSingle(singleData: FormData): Promise<any> {
     return this.request('/singles', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: singleData,
     });
   }
@@ -528,7 +545,7 @@ class ApiService {
     
     return this.request('/upload/audio', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: formData,
     });
   }
@@ -539,7 +556,7 @@ class ApiService {
     
     return this.request('/upload/image', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: formData,
     });
   }
@@ -556,7 +573,7 @@ class ApiService {
     
     return this.request('/upload/track', {
       method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
+      headers: {},
       body: formData,
     });
   }

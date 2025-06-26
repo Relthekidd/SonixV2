@@ -6,11 +6,21 @@ export interface User {
   id: string;
   email: string;
   displayName: string;
+  firstName?: string;
+  lastName?: string;
   avatar?: string;
+  profilePictureUrl?: string;
   bio?: string;
   role: 'admin' | 'listener' | 'artist';
-  isPublic: boolean;
+  isPrivate: boolean;
   showFavoriteStats: boolean;
+  topArtists?: any[];
+  topTracks?: any[];
+  showcaseStatus?: string;
+  showcaseNowPlaying?: string;
+  followerCount?: number;
+  followingCount?: number;
+  createdAt?: string;
 }
 
 interface AuthContextType {
@@ -18,10 +28,14 @@ interface AuthContextType {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
-  signup: (email: string, password: string, displayName: string, role?: 'listener' | 'artist') => Promise<void>;
+  signup: (email: string, password: string, displayName: string, role?: 'listener' | 'artist', additionalData?: any) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  followUser: (userId: string) => Promise<void>;
+  unfollowUser: (userId: string) => Promise<void>;
+  sendFollowRequest: (userId: string) => Promise<void>;
+  respondToFollowRequest: (requestId: string, accept: boolean) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -48,11 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         apiService.setAuthToken(storedToken);
         setUser(JSON.parse(storedUser));
         
-        // Verify token is still valid
+        // Verify token is still valid and get updated user data
         try {
           const currentUser = await apiService.getCurrentUser();
-          setUser(currentUser);
-          await AsyncStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+          const transformedUser = transformUserData(currentUser);
+          setUser(transformedUser);
+          await AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser));
         } catch (error) {
           // Token is invalid, clear stored data
           await clearStoredAuth();
@@ -75,17 +90,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   };
 
+  const transformUserData = (apiUser: any): User => ({
+    id: apiUser.id,
+    email: apiUser.email,
+    displayName: apiUser.display_name || apiUser.displayName,
+    firstName: apiUser.first_name,
+    lastName: apiUser.last_name,
+    avatar: apiUser.profile_picture_url || apiUser.avatar,
+    profilePictureUrl: apiUser.profile_picture_url,
+    bio: apiUser.bio,
+    role: apiUser.role || 'listener',
+    isPrivate: apiUser.is_private || false,
+    showFavoriteStats: apiUser.show_favorite_stats || true,
+    topArtists: apiUser.top_artists || [],
+    topTracks: apiUser.top_tracks || [],
+    showcaseStatus: apiUser.showcase_status,
+    showcaseNowPlaying: apiUser.showcase_now_playing,
+    followerCount: apiUser.follower_count || 0,
+    followingCount: apiUser.following_count || 0,
+    createdAt: apiUser.created_at,
+  });
+
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
       const response = await apiService.login(email, password);
       
       apiService.setAuthToken(response.token);
-      setUser(response.user);
+      const transformedUser = transformUserData(response.user);
+      setUser(transformedUser);
       
       await Promise.all([
         AsyncStorage.setItem(TOKEN_KEY, response.token),
-        AsyncStorage.setItem(USER_KEY, JSON.stringify(response.user)),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser)),
       ]);
     } catch (error) {
       console.error('Login error:', error);
@@ -105,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         email: 'user@gmail.com',
         displayName: 'Google User',
         role: 'listener',
-        isPublic: true,
+        isPrivate: false,
         showFavoriteStats: true,
       };
       
@@ -119,7 +156,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signup = async (email: string, password: string, displayName: string, role: 'listener' | 'artist' = 'listener') => {
+  const signup = async (
+    email: string, 
+    password: string, 
+    displayName: string, 
+    role: 'listener' | 'artist' = 'listener',
+    additionalData?: any
+  ) => {
     setIsLoading(true);
     try {
       console.log('🔐 Starting signup process:', {
@@ -127,6 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         displayName,
         role,
         passwordLength: password.length,
+        additionalData,
         timestamp: new Date().toISOString()
       });
 
@@ -147,27 +191,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Please enter a valid email address');
       }
 
-      const response = await apiService.register(email.trim(), password, displayName.trim(), role);
+      const signupData = {
+        email: email.trim(),
+        password,
+        displayName: displayName.trim(),
+        role,
+        ...additionalData
+      };
+
+      const response = await apiService.register(signupData);
       
       console.log('✅ Signup successful, storing auth data');
       
       apiService.setAuthToken(response.token);
-      setUser(response.user);
+      const transformedUser = transformUserData(response.user);
+      setUser(transformedUser);
       
       await Promise.all([
         AsyncStorage.setItem(TOKEN_KEY, response.token),
-        AsyncStorage.setItem(USER_KEY, JSON.stringify(response.user)),
+        AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser)),
       ]);
     } catch (error) {
       console.error('❌ Signup error details:', {
         message: (error as Error).message,
         name: (error as Error).name,
         stack: (error as Error).stack,
-        status: (error as any).status,
-        data: (error as any).data,
-        url: (error as any).url,
-        endpoint: (error as any).endpoint,
-        originalMessage: (error as any).originalMessage,
         timestamp: new Date().toISOString()
       });
       
@@ -177,9 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error instanceof Error) {
         const errorMessage = error.message.toLowerCase();
         
-        // Check if the error already has a user-friendly message from the API service
         if ((error as any).status) {
-          // This error came from the API service and already has a user-friendly message
           userFriendlyMessage = error.message;
         } else if (errorMessage.includes('network') || errorMessage.includes('connect')) {
           userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
@@ -207,10 +253,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...updates };
-      setUser(updatedUser);
-      await AsyncStorage.setItem(USER_KEY, JSON.stringify(updatedUser));
+    if (!user) return;
+
+    try {
+      const updatedUserData = await apiService.updateUserProfile(updates);
+      const transformedUser = transformUserData({ ...user, ...updatedUserData });
+      setUser(transformedUser);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(transformedUser));
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      throw error;
     }
   };
 
@@ -219,6 +271,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await apiService.resetPassword(email);
     } catch (error) {
       console.error('Reset password error:', error);
+      throw error;
+    }
+  };
+
+  const followUser = async (userId: string) => {
+    if (!user) return;
+
+    try {
+      await apiService.followUser(userId);
+      // Update local user data
+      setUser(prev => prev ? { ...prev, followingCount: (prev.followingCount || 0) + 1 } : null);
+    } catch (error) {
+      console.error('Error following user:', error);
+      throw error;
+    }
+  };
+
+  const unfollowUser = async (userId: string) => {
+    if (!user) return;
+
+    try {
+      await apiService.unfollowUser(userId);
+      // Update local user data
+      setUser(prev => prev ? { ...prev, followingCount: Math.max((prev.followingCount || 0) - 1, 0) } : null);
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+      throw error;
+    }
+  };
+
+  const sendFollowRequest = async (userId: string) => {
+    if (!user) return;
+
+    try {
+      await apiService.sendFollowRequest(userId);
+    } catch (error) {
+      console.error('Error sending follow request:', error);
+      throw error;
+    }
+  };
+
+  const respondToFollowRequest = async (requestId: string, accept: boolean) => {
+    if (!user) return;
+
+    try {
+      await apiService.respondToFollowRequest(requestId, accept);
+      if (accept) {
+        setUser(prev => prev ? { ...prev, followerCount: (prev.followerCount || 0) + 1 } : null);
+      }
+    } catch (error) {
+      console.error('Error responding to follow request:', error);
       throw error;
     }
   };
@@ -234,6 +337,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         updateProfile,
         resetPassword,
+        followUser,
+        unfollowUser,
+        sendFollowRequest,
+        respondToFollowRequest,
       }}
     >
       {children}
