@@ -235,11 +235,6 @@ export default function AdminUploadScreen() {
       return false;
     }
 
-    if (!formData.primaryArtist) {
-      Alert.alert('Error', 'Primary artist is required');
-      return false;
-    }
-
     if (formData.genres.length === 0) {
       Alert.alert('Error', 'At least one genre is required');
       return false;
@@ -276,7 +271,6 @@ export default function AdminUploadScreen() {
       const uploadFormData = new FormData();
       
       // Add metadata
-      uploadFormData.append('type', formData.type);
       uploadFormData.append('title', formData.title);
       uploadFormData.append('releaseDate', formData.releaseDate);
       uploadFormData.append('genres', JSON.stringify(formData.genres));
@@ -297,35 +291,63 @@ export default function AdminUploadScreen() {
         uploadFormData.append('cover', coverFileForUpload as any);
       }
 
-      // Add tracks
-      for (let i = 0; i < formData.tracks.length; i++) {
-        const track = formData.tracks[i];
+      // For singles, just upload the first track
+      if (formData.type === 'single') {
+        const track = formData.tracks[0];
         
         // Add track metadata
-        uploadFormData.append(`tracks[${i}][title]`, track.title);
-        uploadFormData.append(`tracks[${i}][lyrics]`, track.lyrics);
-        uploadFormData.append(`tracks[${i}][explicit]`, track.explicit.toString());
-        uploadFormData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
-        uploadFormData.append(`tracks[${i}][featuringArtists]`, JSON.stringify(track.featuringArtists));
+        uploadFormData.append('lyrics', track.lyrics);
+        uploadFormData.append('duration', track.duration.toString() || '180');
 
         // Add audio file
         if (track.audioFile) {
           const audioFileForUpload = await createFileFromUri(
             track.audioFile.uri,
-            track.audioFile.name || `track-${i + 1}.mp3`,
+            track.audioFile.name || 'audio.mp3',
             track.audioFile.mimeType || 'audio/mpeg'
           );
-          uploadFormData.append(`tracks[${i}][audio]`, audioFileForUpload as any);
+          uploadFormData.append('audio', audioFileForUpload as any);
+        }
+
+        // Mark as single (no album_id)
+        uploadFormData.append('is_single', 'true');
+      } else {
+        // For albums, add all tracks
+        for (let i = 0; i < formData.tracks.length; i++) {
+          const track = formData.tracks[i];
+          
+          // Add track metadata
+          uploadFormData.append(`tracks[${i}][title]`, track.title);
+          uploadFormData.append(`tracks[${i}][lyrics]`, track.lyrics);
+          uploadFormData.append(`tracks[${i}][explicit]`, track.explicit.toString());
+          uploadFormData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
+          uploadFormData.append(`tracks[${i}][featuringArtists]`, JSON.stringify(track.featuringArtists));
+          uploadFormData.append(`tracks[${i}][duration]`, track.duration.toString() || '180');
+
+          // Add audio file
+          if (track.audioFile) {
+            const audioFileForUpload = await createFileFromUri(
+              track.audioFile.uri,
+              track.audioFile.name || `track-${i + 1}.mp3`,
+              track.audioFile.mimeType || 'audio/mpeg'
+            );
+            uploadFormData.append(`tracks[${i}][audio]`, audioFileForUpload as any);
+          }
         }
       }
 
       let uploadResult;
       
-      // Choose the appropriate upload method based on type
+      // Always use the tracks endpoint for uploads
       if (formData.type === 'single') {
-        uploadResult = await apiService.createSingle(uploadFormData);
+        console.log('📀 Uploading single as track...');
+        uploadResult = await apiService.createTrack(uploadFormData);
       } else {
-        uploadResult = await apiService.createAlbum(uploadFormData);
+        console.log('💿 Uploading album...');
+        // For albums, we might need to create the album first, then tracks
+        // For now, use tracks endpoint and handle album creation on backend
+        uploadFormData.append('type', 'album');
+        uploadResult = await apiService.createTrack(uploadFormData);
       }
 
       console.log('✅ Upload successful:', uploadResult);
@@ -527,35 +549,6 @@ export default function AdminUploadScreen() {
               trackColor={{ false: '#374151', true: '#8b5cf6' }}
               thumbColor={formData.isPublic ? '#ffffff' : '#9ca3af'}
             />
-          </View>
-        </View>
-
-        {/* Artist Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Artist Information</Text>
-          
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Primary Artist *</Text>
-            <View style={styles.artistSelector}>
-              <View style={styles.selectContainer}>
-                <TouchableOpacity style={styles.selectButton}>
-                  <User color="#8b5cf6" size={20} />
-                  <Text style={styles.selectButtonText}>
-                    {formData.primaryArtist 
-                      ? artists.find(a => a.id === formData.primaryArtist)?.stage_name || 'Select Artist'
-                      : 'Select Primary Artist'
-                    }
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.newArtistButton}
-                onPress={() => setShowNewArtistModal(true)}
-              >
-                <Plus color="#8b5cf6" size={20} />
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
 
@@ -904,40 +897,6 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 8,
     marginTop: 12,
-  },
-  artistSelector: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  selectContainer: {
-    flex: 1,
-  },
-  selectButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    gap: 12,
-  },
-  selectButtonText: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-  },
-  newArtistButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   tagContainer: {
     flexDirection: 'row',
