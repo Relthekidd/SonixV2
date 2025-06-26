@@ -6,49 +6,20 @@ import {
   TouchableOpacity,
   ScrollView,
   TextInput,
-  Switch,
   Alert,
   ActivityIndicator,
   Image,
+  FlatList,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
+import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { 
-  ArrowLeft, 
-  Upload, 
-  Music, 
-  Image as ImageIcon, 
-  Plus, 
-  X, 
-  Check,
-  Calendar,
-  User,
-  FileText,
-  Settings,
-  Save
-} from 'lucide-react-native';
-
-interface Artist {
-  id: string;
-  name: string;
-  stage_name: string;
-}
-
-interface Track {
-  id: string;
-  title: string;
-  audioFile: any;
-  lyrics: string;
-  explicit: boolean;
-  trackNumber: number;
-  featuringArtists: string[];
-  duration: number;
-}
+import { router } from 'expo-router';
+import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown } from 'lucide-react-native';
 
 interface UploadFormData {
   type: 'single' | 'album';
@@ -60,9 +31,18 @@ interface UploadFormData {
   explicit: boolean;
   isPublic: boolean;
   description: string;
-  primaryArtist: string;
-  featuringArtists: string[];
   tracks: Track[];
+}
+
+interface Track {
+  id: string;
+  title: string;
+  audioFile: any;
+  lyrics: string;
+  explicit: boolean;
+  trackNumber: number;
+  featuringArtists: string[];
+  duration: number;
 }
 
 const GENRES = [
@@ -77,11 +57,7 @@ const MOODS = [
 
 export default function AdminUploadScreen() {
   const { user } = useAuth();
-  const [artists, setArtists] = useState<Artist[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [showNewArtistModal, setShowNewArtistModal] = useState(false);
-  const [newArtistName, setNewArtistName] = useState('');
 
   const [formData, setFormData] = useState<UploadFormData>({
     type: 'single',
@@ -93,8 +69,6 @@ export default function AdminUploadScreen() {
     explicit: false,
     isPublic: true,
     description: '',
-    primaryArtist: '',
-    featuringArtists: [],
     tracks: [{
       id: '1',
       title: '',
@@ -106,22 +80,6 @@ export default function AdminUploadScreen() {
       duration: 0,
     }],
   });
-
-  useEffect(() => {
-    loadArtists();
-  }, []);
-
-  const loadArtists = async () => {
-    try {
-      setIsLoading(true);
-      const artistsData = await apiService.getArtists({ limit: 100 });
-      setArtists(artistsData);
-    } catch (error) {
-      console.error('Error loading artists:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const pickCoverImage = async () => {
     try {
@@ -176,7 +134,30 @@ export default function AdminUploadScreen() {
   const removeTrack = (trackIndex: number) => {
     if (formData.tracks.length > 1) {
       const updatedTracks = formData.tracks.filter((_, index) => index !== trackIndex);
-      setFormData(prev => ({ ...prev, tracks: updatedTracks }));
+      // Renumber tracks to maintain proper order
+      const renumberedTracks = updatedTracks.map((track, index) => ({
+        ...track,
+        trackNumber: index + 1
+      }));
+      setFormData(prev => ({ ...prev, tracks: renumberedTracks }));
+    }
+  };
+
+  const moveTrack = (trackIndex: number, direction: 'up' | 'down') => {
+    const tracks = [...formData.tracks];
+    const newIndex = direction === 'up' ? trackIndex - 1 : trackIndex + 1;
+    
+    if (newIndex >= 0 && newIndex < tracks.length) {
+      // Swap tracks
+      [tracks[trackIndex], tracks[newIndex]] = [tracks[newIndex], tracks[trackIndex]];
+      
+      // Renumber tracks to maintain proper order
+      const renumberedTracks = tracks.map((track, index) => ({
+        ...track,
+        trackNumber: index + 1
+      }));
+      
+      setFormData(prev => ({ ...prev, tracks: renumberedTracks }));
     }
   };
 
@@ -202,31 +183,6 @@ export default function AdminUploadScreen() {
         ? prev.moods.filter(m => m !== mood)
         : [...prev.moods, mood]
     }));
-  };
-
-  const createNewArtist = async () => {
-    if (!newArtistName.trim()) {
-      Alert.alert('Error', 'Please enter an artist name');
-      return;
-    }
-
-    try {
-      // Mock artist creation - replace with actual API call
-      const newArtist: Artist = {
-        id: Date.now().toString(),
-        name: newArtistName,
-        stage_name: newArtistName,
-      };
-      
-      setArtists(prev => [...prev, newArtist]);
-      setFormData(prev => ({ ...prev, primaryArtist: newArtist.id }));
-      setNewArtistName('');
-      setShowNewArtistModal(false);
-      Alert.alert('Success', 'Artist created successfully!');
-    } catch (error) {
-      console.error('Error creating artist:', error);
-      Alert.alert('Error', 'Failed to create artist');
-    }
   };
 
   const validateForm = (): boolean => {
@@ -278,8 +234,6 @@ export default function AdminUploadScreen() {
       uploadFormData.append('explicit', formData.explicit.toString());
       uploadFormData.append('isPublic', formData.isPublic.toString());
       uploadFormData.append('description', formData.description);
-      uploadFormData.append('primaryArtist', formData.primaryArtist);
-      uploadFormData.append('featuringArtists', JSON.stringify(formData.featuringArtists));
 
       // Add cover file
       if (formData.coverFile) {
@@ -312,17 +266,21 @@ export default function AdminUploadScreen() {
         // Mark as single (no album_id)
         uploadFormData.append('is_single', 'true');
       } else {
-        // For albums, add all tracks
+        // For albums, add all tracks with proper ordering
+        uploadFormData.append('type', 'album');
+        uploadFormData.append('track_count', formData.tracks.length.toString());
+        
         for (let i = 0; i < formData.tracks.length; i++) {
           const track = formData.tracks[i];
           
-          // Add track metadata
+          // Add track metadata with explicit track number for ordering
           uploadFormData.append(`tracks[${i}][title]`, track.title);
           uploadFormData.append(`tracks[${i}][lyrics]`, track.lyrics);
           uploadFormData.append(`tracks[${i}][explicit]`, track.explicit.toString());
           uploadFormData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
           uploadFormData.append(`tracks[${i}][featuringArtists]`, JSON.stringify(track.featuringArtists));
           uploadFormData.append(`tracks[${i}][duration]`, track.duration.toString() || '180');
+          uploadFormData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
 
           // Add audio file
           if (track.audioFile) {
@@ -346,8 +304,7 @@ export default function AdminUploadScreen() {
         console.log('💿 Uploading album...');
         // For albums, we might need to create the album first, then tracks
         // For now, use tracks endpoint and handle album creation on backend
-        uploadFormData.append('type', 'album');
-        uploadResult = await apiService.createTrack(uploadFormData);
+        uploadResult = await apiService.createAlbum(uploadFormData);
       }
 
       console.log('✅ Upload successful:', uploadResult);
@@ -374,8 +331,6 @@ export default function AdminUploadScreen() {
         explicit: false,
         isPublic: true,
         description: '',
-        primaryArtist: '',
-        featuringArtists: [],
         tracks: [{
           id: '1',
           title: '',
@@ -530,26 +485,6 @@ export default function AdminUploadScreen() {
               numberOfLines={3}
             />
           </View>
-
-          <View style={styles.toggleRow}>
-            <Text style={styles.label}>Explicit Content</Text>
-            <Switch
-              value={formData.explicit}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, explicit: value }))}
-              trackColor={{ false: '#374151', true: '#8b5cf6' }}
-              thumbColor={formData.explicit ? '#ffffff' : '#9ca3af'}
-            />
-          </View>
-
-          <View style={styles.toggleRow}>
-            <Text style={styles.label}>Public Release</Text>
-            <Switch
-              value={formData.isPublic}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, isPublic: value }))}
-              trackColor={{ false: '#374151', true: '#8b5cf6' }}
-              thumbColor={formData.isPublic ? '#ffffff' : '#9ca3af'}
-            />
-          </View>
         </View>
 
         {/* Genres */}
@@ -613,15 +548,33 @@ export default function AdminUploadScreen() {
           {formData.tracks.map((track, index) => (
             <View key={track.id} style={styles.trackCard}>
               <View style={styles.trackHeader}>
-                <Text style={styles.trackNumber}>Track {index + 1}</Text>
-                {formData.type === 'album' && formData.tracks.length > 1 && (
-                  <TouchableOpacity
-                    style={styles.removeTrackButton}
-                    onPress={() => removeTrack(index)}
-                  >
-                    <X color="#ef4444" size={20} />
-                  </TouchableOpacity>
-                )}
+                <Text style={styles.trackNumber}>Track {track.trackNumber}</Text>
+                <View style={styles.trackControls}>
+                  {formData.type === 'album' && formData.tracks.length > 1 && (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.trackControlButton, index === 0 && styles.trackControlButtonDisabled]}
+                        onPress={() => moveTrack(index, 'up')}
+                        disabled={index === 0}
+                      >
+                        <ArrowUp color={index === 0 ? "#64748b" : "#8b5cf6"} size={16} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.trackControlButton, index === formData.tracks.length - 1 && styles.trackControlButtonDisabled]}
+                        onPress={() => moveTrack(index, 'down')}
+                        disabled={index === formData.tracks.length - 1}
+                      >
+                        <ArrowDown color={index === formData.tracks.length - 1 ? "#64748b" : "#8b5cf6"} size={16} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.removeTrackButton}
+                        onPress={() => removeTrack(index)}
+                      >
+                        <X color="#ef4444" size={16} />
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
 
               <View style={styles.formGroup}>
@@ -662,13 +615,15 @@ export default function AdminUploadScreen() {
                 />
               </View>
 
-              <View style={styles.toggleRow}>
-                <Text style={styles.label}>Explicit</Text>
-                <Switch
-                  value={track.explicit}
-                  onValueChange={(value) => updateTrack(index, 'explicit', value)}
-                  trackColor={{ false: '#374151', true: '#8b5cf6' }}
-                  thumbColor={track.explicit ? '#ffffff' : '#9ca3af'}
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Duration (seconds)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., 180"
+                  placeholderTextColor="#64748b"
+                  value={track.duration.toString()}
+                  onChangeText={(text) => updateTrack(index, 'duration', parseInt(text) || 0)}
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -700,44 +655,6 @@ export default function AdminUploadScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-
-      {/* New Artist Modal */}
-      {showNewArtistModal && (
-        <View style={styles.modal}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Create New Artist</Text>
-              <TouchableOpacity
-                onPress={() => setShowNewArtistModal(false)}
-                style={styles.closeButton}
-              >
-                <X color="#ffffff" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            <TextInput
-              style={styles.modalInput}
-              placeholder="Artist name"
-              placeholderTextColor="#64748b"
-              value={newArtistName}
-              onChangeText={setNewArtistName}
-              autoFocus
-            />
-
-            <TouchableOpacity
-              style={styles.createArtistButton}
-              onPress={createNewArtist}
-            >
-              <LinearGradient
-                colors={['#8b5cf6', '#a855f7']}
-                style={styles.createArtistGradient}
-              >
-                <Text style={styles.createArtistText}>Create Artist</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </LinearGradient>
   );
 }
@@ -862,12 +779,6 @@ const styles = StyleSheet.create({
     height: 80,
     textAlignVertical: 'top',
   },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
   fileButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -958,6 +869,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#8b5cf6',
   },
+  trackControls: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  trackControlButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  trackControlButtonDisabled: {
+    backgroundColor: 'rgba(100, 116, 139, 0.2)',
+  },
   removeTrackButton: {
     width: 32,
     height: 32,
@@ -985,66 +911,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   submitButtonText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
-  modal: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    paddingHorizontal: 24,
-    paddingVertical: 20,
-    width: '90%',
-    maxWidth: 400,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  createArtistButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  createArtistGradient: {
-    paddingVertical: 14,
-    alignItems: 'center',
-  },
-  createArtistText: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',

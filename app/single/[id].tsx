@@ -8,12 +8,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Share,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, Calendar, Music, Clock } from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, Plus, Calendar, Music, Clock, MoreVertical } from 'lucide-react-native';
 
 export default function SingleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -28,7 +29,9 @@ export default function SingleDetailScreen() {
     playTrack, 
     pauseTrack,
     toggleLike,
-    likedSongs 
+    likedSongs,
+    addToPlaylist,
+    playlists
   } = useMusic();
 
   useEffect(() => {
@@ -96,6 +99,37 @@ export default function SingleDetailScreen() {
     } catch (error) {
       console.error('Error toggling like:', error);
     }
+  };
+
+  const handleAddToQueue = () => {
+    if (!track) return;
+    // Implement add to queue functionality
+    Alert.alert('Added to Queue', `"${track.title}" added to your queue`);
+  };
+
+  const handleAddToPlaylist = () => {
+    if (!track) return;
+    
+    if (playlists.length === 0) {
+      Alert.alert('No Playlists', 'Create a playlist first to add this track');
+      return;
+    }
+
+    Alert.alert(
+      'Add to Playlist',
+      'Choose a playlist to add this track',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...playlists.slice(0, 3).map(playlist => ({
+          text: playlist.name,
+          onPress: () => {
+            addToPlaylist(playlist.id, track);
+            Alert.alert('Success', `Added "${track.title}" to ${playlist.name}`);
+          }
+        })),
+        { text: 'View All Playlists', onPress: () => router.push('/(tabs)/library') }
+      ]
+    );
   };
 
   const handleShare = async () => {
@@ -166,8 +200,8 @@ export default function SingleDetailScreen() {
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-          <ShareIcon color="#ffffff" size={24} />
+        <TouchableOpacity style={styles.headerButton}>
+          <MoreVertical color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
 
@@ -219,7 +253,7 @@ export default function SingleDetailScreen() {
 
         <View style={styles.controlsSection}>
           <TouchableOpacity
-            style={styles.likeButton}
+            style={styles.actionButton}
             onPress={handleLike}
           >
             <Heart 
@@ -245,8 +279,19 @@ export default function SingleDetailScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleAddToQueue}>
+            <Plus color="#ffffff" size={24} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
             <ShareIcon color="#ffffff" size={24} />
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.actionsSection}>
+          <TouchableOpacity style={styles.actionRow} onPress={handleAddToPlaylist}>
+            <Plus color="#8b5cf6" size={20} />
+            <Text style={styles.actionText}>Add to Playlist</Text>
           </TouchableOpacity>
         </View>
 
@@ -399,14 +444,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 40,
+    marginBottom: 32,
+    gap: 16,
   },
-  likeButton: {
+  actionButton: {
     width: 50,
     height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 24,
   },
   playButton: {
     width: 80,
@@ -418,18 +465,29 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
+    marginHorizontal: 16,
   },
   playButtonGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  shareButton: {
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
+  actionsSection: {
+    paddingHorizontal: 24,
+    marginBottom: 32,
+  },
+  actionRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    gap: 12,
+  },
+  actionText: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
   },
   lyricsSection: {
     paddingHorizontal: 24,

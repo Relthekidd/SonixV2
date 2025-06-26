@@ -9,12 +9,13 @@ import {
   FlatList,
   ActivityIndicator,
   Share,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, MoveVertical as MoreVertical, Calendar, Music, Clock } from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, Plus, Calendar, Music, Clock, MoreVertical } from 'lucide-react-native';
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,6 +23,7 @@ export default function AlbumDetailScreen() {
   const [tracks, setTracks] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isLiked, setIsLiked] = useState(false);
   
   const { 
     currentTrack, 
@@ -29,7 +31,9 @@ export default function AlbumDetailScreen() {
     playTrack, 
     pauseTrack,
     toggleLike,
-    likedSongs 
+    likedSongs,
+    addToPlaylist,
+    playlists
   } = useMusic();
 
   useEffect(() => {
@@ -46,7 +50,7 @@ export default function AlbumDetailScreen() {
       const albumData = await apiService.getAlbumById(id!);
       setAlbum(albumData);
       
-      // Transform tracks for playback
+      // Transform tracks for playback and sort by track number
       const transformedTracks = albumData.tracks?.map((track: any, index: number) => ({
         id: track.id,
         title: track.title,
@@ -58,12 +62,19 @@ export default function AlbumDetailScreen() {
         isLiked: likedSongs.some(liked => liked.id === track.id),
         genre: Array.isArray(albumData.genres) ? albumData.genres[0] : albumData.genre || 'Unknown',
         releaseDate: albumData.release_date || new Date().toISOString(),
-        trackNumber: index + 1,
+        trackNumber: track.track_number || track.trackNumber || index + 1,
         playCount: track.play_count,
         likeCount: track.like_count,
+        lyrics: track.lyrics,
       })) || [];
       
+      // Sort tracks by track number to maintain proper order
+      transformedTracks.sort((a, b) => a.trackNumber - b.trackNumber);
+      
       setTracks(transformedTracks);
+      
+      // Check if album is liked (you might want to implement album likes)
+      setIsLiked(false); // Placeholder
     } catch (err) {
       console.error('Error loading album details:', err);
       setError('Failed to load album details');
@@ -88,6 +99,42 @@ export default function AlbumDetailScreen() {
     } else {
       playTrack(track, tracks);
     }
+  };
+
+  const handleLikeAlbum = () => {
+    // Implement album like functionality
+    setIsLiked(!isLiked);
+  };
+
+  const handleAddToQueue = () => {
+    // Add all tracks to queue
+    tracks.forEach(track => {
+      // Implement add to queue functionality
+    });
+    Alert.alert('Added to Queue', `${tracks.length} tracks added to your queue`);
+  };
+
+  const handleAddToPlaylist = () => {
+    if (playlists.length === 0) {
+      Alert.alert('No Playlists', 'Create a playlist first to add tracks');
+      return;
+    }
+
+    Alert.alert(
+      'Add to Playlist',
+      'Choose a playlist to add all tracks from this album',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        ...playlists.slice(0, 3).map(playlist => ({
+          text: playlist.name,
+          onPress: () => {
+            tracks.forEach(track => addToPlaylist(playlist.id, track));
+            Alert.alert('Success', `Added ${tracks.length} tracks to ${playlist.name}`);
+          }
+        })),
+        { text: 'View All Playlists', onPress: () => router.push('/(tabs)/library') }
+      ]
+    );
   };
 
   const handleShare = async () => {
@@ -125,7 +172,7 @@ export default function AlbumDetailScreen() {
       onPress={() => handleTrackPress(item)}
     >
       <View style={styles.trackNumber}>
-        <Text style={styles.trackNumberText}>{index + 1}</Text>
+        <Text style={styles.trackNumberText}>{item.trackNumber}</Text>
       </View>
       
       <View style={styles.trackInfo}>
@@ -206,8 +253,8 @@ export default function AlbumDetailScreen() {
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.headerButton} onPress={handleShare}>
-          <ShareIcon color="#ffffff" size={24} />
+        <TouchableOpacity style={styles.headerButton}>
+          <MoreVertical color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
 
@@ -258,6 +305,14 @@ export default function AlbumDetailScreen() {
         </View>
 
         <View style={styles.controlsSection}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleLikeAlbum}>
+            <Heart 
+              color={isLiked ? '#ef4444' : '#ffffff'} 
+              size={24}
+              fill={isLiked ? '#ef4444' : 'transparent'}
+            />
+          </TouchableOpacity>
+
           <TouchableOpacity style={styles.playAllButton} onPress={handlePlayAlbum}>
             <LinearGradient
               colors={['#8b5cf6', '#a855f7']}
@@ -267,10 +322,23 @@ export default function AlbumDetailScreen() {
               <Text style={styles.playAllText}>Play Album</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleAddToQueue}>
+            <Plus color="#ffffff" size={24} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+            <ShareIcon color="#ffffff" size={24} />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.tracksSection}>
-          <Text style={styles.sectionTitle}>Tracklist</Text>
+          <View style={styles.tracksSectionHeader}>
+            <Text style={styles.sectionTitle}>Tracklist</Text>
+            <TouchableOpacity onPress={handleAddToPlaylist}>
+              <Text style={styles.addToPlaylistText}>Add to Playlist</Text>
+            </TouchableOpacity>
+          </View>
           
           {tracks.length > 0 ? (
             <FlatList
@@ -426,12 +494,26 @@ const styles = StyleSheet.create({
     color: '#8b5cf6',
   },
   controlsSection: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 32,
+    gap: 16,
+  },
+  actionButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   playAllButton: {
+    flex: 1,
     borderRadius: 12,
     overflow: 'hidden',
+    marginHorizontal: 16,
   },
   playAllGradient: {
     flexDirection: 'row',
@@ -448,11 +530,21 @@ const styles = StyleSheet.create({
   tracksSection: {
     paddingHorizontal: 24,
   },
+  tracksSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 22,
     fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
-    marginBottom: 16,
+  },
+  addToPlaylistText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#8b5cf6',
   },
   trackItem: {
     flexDirection: 'row',
