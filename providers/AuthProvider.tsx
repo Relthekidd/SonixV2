@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { apiService } from '../services/api';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -61,6 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session?.user?.id);
       setSession(session);
+      
+      // Sync auth token with API service
+      apiService.setAuthToken(session?.access_token || null);
+      
       if (session?.user) {
         loadUserProfile(session.user.id);
       } else {
@@ -75,6 +80,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Auth state changed:', event, session?.user?.id);
       
       setSession(session);
+      
+      // Always sync the auth token with API service when session changes
+      apiService.setAuthToken(session?.access_token || null);
       
       if (event === 'SIGNED_IN' && session?.user) {
         await loadUserProfile(session.user.id);
@@ -307,6 +315,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clear local state
       setUser(null);
       setSession(null);
+      
+      // Clear API service token
+      apiService.setAuthToken(null);
       
       console.log('✅ Logout successful');
     } catch (error) {
