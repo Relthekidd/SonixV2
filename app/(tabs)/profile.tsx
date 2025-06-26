@@ -16,26 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth, supabase } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import { 
-  Edit3, 
-  Settings, 
-  LogOut, 
-  User, 
-  Mail, 
-  Eye, 
-  EyeOff,
-  Camera,
-  Save,
-  X,
-  Users,
-  Music,
-  Heart,
-  Calendar,
-  Lock,
-  Globe,
-  Play,
-  Pause
-} from 'lucide-react-native';
+import { CreditCard as Edit3, Settings, LogOut, User, Mail, Eye, EyeOff, Camera, Save, X, Users, Music, Heart, Calendar, Lock, Globe, Play, Pause } from 'lucide-react-native';
 
 interface UserProfile {
   id: string;
