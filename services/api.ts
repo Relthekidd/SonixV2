@@ -487,7 +487,7 @@ class ApiService {
   }
 
   async getLikedTracks(): Promise<Track[]> {
-    return this.request('/users/liked-tracks');
+    return this.request('/tracks/my-liked');
   }
 
   // File Uploads
