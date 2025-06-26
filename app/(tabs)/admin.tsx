@@ -13,19 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { apiService } from '@/services/api';
-import { 
-  Users, 
-  Music, 
-  Upload, 
-  BarChart3, 
-  Settings, 
-  Shield,
-  Plus,
-  TrendingUp,
-  PlayCircle,
-  Heart,
-  Calendar
-} from 'lucide-react-native';
+import { Users, Music, Upload, ChartBar as BarChart3, Settings, Shield, Plus, TrendingUp, CirclePlay as PlayCircle, Heart, Calendar } from 'lucide-react-native';
 
 interface AdminStats {
   totalUsers: number;
