@@ -1,7 +1,7 @@
 import { User } from '@/providers/AuthProvider';
 import { Track, Album, Playlist } from '@/providers/MusicProvider';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://sonix-backend-production.up.railway.app';
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://sonix-backend-production.up.railway.app/';
 
 class ApiService {
   private baseURL: string;
