@@ -33,6 +33,8 @@ export interface User {
   followerCount?: number;
   followingCount?: number;
   createdAt?: string;
+  emailConfirmed?: boolean;
+  artistVerified?: boolean;
 }
 
 interface AuthContextType {
@@ -44,6 +46,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -56,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
       setSession(session);
       if (session?.user) {
         loadUserProfile(session.user.id);
@@ -72,11 +76,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setSession(session);
       
-      if (session?.user) {
+      if (event === 'SIGNED_IN' && session?.user) {
         await loadUserProfile(session.user.id);
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsLoading(false);
+      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
+        // Optionally refresh user profile on token refresh
+        await loadUserProfile(session.user.id);
       }
     });
 
@@ -85,6 +92,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const loadUserProfile = async (userId: string) => {
     try {
+      console.log('Loading user profile for:', userId);
+      
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -93,6 +102,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Error loading user profile:', error);
+        
+        // If user profile doesn't exist, this might be a new user
+        if (error.code === 'PGRST116') {
+          console.log('User profile not found, might be a new user');
+          setIsLoading(false);
+          return;
+        }
+        
         throw error;
       }
 
@@ -107,14 +124,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: data.bio,
           role: data.role,
           isPrivate: data.is_private || false,
-          showFavoriteStats: data.show_favorite_stats || true,
+          showFavoriteStats: data.show_favorite_stats !== false, // Default to true
           topArtists: data.top_artists || [],
           topTracks: data.top_tracks || [],
           showcaseStatus: data.showcase_status,
           showcaseNowPlaying: data.showcase_now_playing,
           createdAt: data.created_at,
+          emailConfirmed: true, // If we can load profile, email is confirmed
+          artistVerified: data.artist_verified || false,
         };
         
+        console.log('User profile loaded:', transformedUser.displayName, transformedUser.role);
         setUser(transformedUser);
       }
     } catch (error) {
@@ -127,21 +147,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string) => {
     setIsLoading(true);
     try {
+      console.log('Attempting login for:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
       if (error) {
-        throw error;
+        console.error('Login error:', error);
+        
+        // Provide user-friendly error messages
+        if (error.message.includes('Invalid login credentials')) {
+          throw new Error('Invalid email or password. Please check your credentials and try again.');
+        } else if (error.message.includes('Email not confirmed')) {
+          throw new Error('Please check your email and click the confirmation link before signing in.');
+        } else if (error.message.includes('Too many requests')) {
+          throw new Error('Too many login attempts. Please wait a moment and try again.');
+        }
+        
+        throw new Error(error.message || 'Login failed');
       }
 
       if (data.user) {
-        await loadUserProfile(data.user.id);
+        console.log('Login successful for user:', data.user.id);
+        // loadUserProfile will be called by the auth state change listener
       }
     } catch (error: any) {
       console.error('Login error:', error);
-      throw new Error(error.message || 'Login failed');
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -199,7 +233,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.error('Supabase signup error:', error);
-        throw error;
+        
+        // Provide user-friendly error messages
+        if (error.message.includes('User already registered')) {
+          throw new Error('An account with this email already exists. Please try logging in instead.');
+        } else if (error.message.includes('Password should be at least')) {
+          throw new Error('Password must be at least 6 characters long.');
+        } else if (error.message.includes('Unable to validate email address')) {
+          throw new Error('Please enter a valid email address.');
+        } else if (error.message.includes('Signup is disabled')) {
+          throw new Error('Account registration is currently disabled. Please contact support.');
+        }
+        
+        throw new Error(error.message || 'Signup failed');
       }
 
       if (!data.user) {
@@ -208,41 +254,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('✅ Supabase signup successful:', data.user.id);
 
-      // If user is immediately confirmed, load their profile
-      if (data.user && !data.user.email_confirmed_at) {
+      // Check if email confirmation is required
+      if (!data.session && data.user && !data.user.email_confirmed_at) {
         console.log('📧 Email confirmation required');
-        // For development, we might want to auto-confirm
-        // In production, user will need to confirm email
+        throw new Error('Please check your email and click the confirmation link to complete your registration.');
       }
 
-      // The trigger will automatically create the user profile
-      // Load the profile if user is confirmed
-      if (data.user && data.session) {
-        await loadUserProfile(data.user.id);
+      // If user is immediately confirmed and we have a session, the auth state change will handle profile loading
+      if (data.session) {
+        console.log('✅ User immediately confirmed with session');
       }
 
     } catch (error: any) {
       console.error('❌ Signup error:', error);
-      
-      let userFriendlyMessage = 'Registration failed. Please try again.';
-      
-      if (error.message) {
-        const errorMessage = error.message.toLowerCase();
-        
-        if (errorMessage.includes('email') && errorMessage.includes('already')) {
-          userFriendlyMessage = 'An account with this email already exists. Please use a different email or try logging in.';
-        } else if (errorMessage.includes('password')) {
-          userFriendlyMessage = 'Password does not meet requirements. Please ensure it is at least 6 characters long.';
-        } else if (errorMessage.includes('invalid') && errorMessage.includes('email')) {
-          userFriendlyMessage = 'Please enter a valid email address.';
-        } else if (errorMessage.includes('weak password')) {
-          userFriendlyMessage = 'Password is too weak. Please choose a stronger password.';
-        } else {
-          userFriendlyMessage = error.message;
-        }
-      }
-      
-      throw new Error(userFriendlyMessage);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -251,12 +276,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true);
     try {
+      console.log('Logging out user:', user?.id);
+      
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('Logout error:', error);
         throw error;
       }
+      
+      // Clear local state
       setUser(null);
       setSession(null);
+      
+      console.log('✅ Logout successful');
     } catch (error) {
       console.error('Logout error:', error);
       throw error;
@@ -266,9 +298,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<User>) => {
-    if (!user) return;
+    if (!user) {
+      throw new Error('No user logged in');
+    }
 
     try {
+      console.log('Updating profile for user:', user.id);
+      
       const updateData: any = {};
       
       if (updates.displayName !== undefined) updateData.display_name = updates.displayName;
@@ -289,11 +325,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
+        console.error('Profile update error:', error);
         throw error;
       }
 
       // Update local user state
       setUser(prev => prev ? { ...prev, ...updates } : null);
+      
+      console.log('✅ Profile updated successfully');
     } catch (error) {
       console.error('Error updating profile:', error);
       throw error;
@@ -302,15 +341,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      console.log('Sending password reset email to:', email);
+      
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
+        console.error('Reset password error:', error);
+        
+        if (error.message.includes('For security purposes')) {
+          throw new Error('For security purposes, we cannot confirm if this email exists. If you have an account, you will receive a reset link.');
+        }
+        
         throw error;
       }
+      
+      console.log('✅ Password reset email sent');
     } catch (error) {
       console.error('Reset password error:', error);
+      throw error;
+    }
+  };
+
+  const resendConfirmation = async (email: string) => {
+    try {
+      console.log('Resending confirmation email to:', email);
+      
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      });
+
+      if (error) {
+        console.error('Resend confirmation error:', error);
+        throw error;
+      }
+      
+      console.log('✅ Confirmation email resent');
+    } catch (error) {
+      console.error('Resend confirmation error:', error);
       throw error;
     }
   };
@@ -326,6 +396,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         logout,
         updateProfile,
         resetPassword,
+        resendConfirmation,
       }}
     >
       {children}

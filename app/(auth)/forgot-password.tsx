@@ -5,31 +5,39 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Mail, ArrowLeft } from 'lucide-react-native';
+import { Mail, ArrowLeft, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { resetPassword } = useAuth();
 
   const handleResetPassword = async () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email address');
+    setError(null);
+    
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
     try {
-      await resetPassword(email);
+      await resetPassword(email.trim());
       setEmailSent(true);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to send reset email');
+    } catch (error: any) {
+      console.error('Reset password error:', error);
+      setError(error.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -57,6 +65,14 @@ export default function ForgotPasswordScreen() {
               Enter your email address and we'll send you a link to reset your password
             </Text>
 
+            {/* Error Display */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <AlertCircle color="#ef4444" size={16} style={styles.errorIcon} />
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+
             <View style={styles.form}>
               <View style={styles.inputContainer}>
                 <Mail color="#8b5cf6" size={20} style={styles.inputIcon} />
@@ -69,16 +85,17 @@ export default function ForgotPasswordScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  editable={!isLoading}
                 />
               </View>
 
               <TouchableOpacity
-                style={styles.resetButton}
+                style={[styles.resetButton, isLoading && styles.resetButtonDisabled]}
                 onPress={handleResetPassword}
                 disabled={isLoading}
               >
                 <LinearGradient
-                  colors={['#8b5cf6', '#a855f7', '#c084fc']}
+                  colors={isLoading ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.resetButtonText}>
@@ -90,10 +107,17 @@ export default function ForgotPasswordScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.title}>Check Your Email</Text>
-            <Text style={styles.subtitle}>
-              We've sent a password reset link to {email}
-            </Text>
+            <View style={styles.successContainer}>
+              <CheckCircle color="#10b981" size={64} />
+              <Text style={styles.successTitle}>Check Your Email</Text>
+              <Text style={styles.successSubtitle}>
+                We've sent a password reset link to
+              </Text>
+              <Text style={styles.emailText}>{email}</Text>
+              <Text style={styles.instructionText}>
+                Click the link in the email to reset your password. If you don't see the email, check your spam folder.
+              </Text>
+            </View>
 
             <TouchableOpacity
               style={styles.resetButton}
@@ -105,6 +129,18 @@ export default function ForgotPasswordScreen() {
               >
                 <Text style={styles.resetButtonText}>Back to Login</Text>
               </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={() => {
+                setEmailSent(false);
+                setEmail('');
+              }}
+            >
+              <Text style={styles.resendButtonText}>
+                Didn't receive the email? Try again
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -147,6 +183,26 @@ const styles = StyleSheet.create({
     marginBottom: 32,
     lineHeight: 24,
   },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorIcon: {
+    marginRight: 8,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ef4444',
+    lineHeight: 20,
+  },
   form: {
     gap: 24,
   },
@@ -173,6 +229,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  resetButtonDisabled: {
+    opacity: 0.7,
+  },
   buttonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
@@ -181,5 +240,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
+  },
+  successContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+    marginTop: 24,
+    marginBottom: 16,
+  },
+  successSubtitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  emailText: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#8b5cf6',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  instructionText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  resendButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+  },
+  resendButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#8b5cf6',
+    textAlign: 'center',
   },
 });
