@@ -76,13 +76,6 @@ class ApiService {
       });
       
       if (!response.ok) {
-        // Handle 401 Unauthorized responses, but skip auto-logout for uploads if specified
-        if (response.status === 401 && !skipAutoLogout && this.onUnauthorizedCallback) {
-          console.log('🔒 Unauthorized response detected, triggering logout');
-          this.onUnauthorizedCallback();
-          throw new Error('Session expired. Please log in again.');
-        }
-
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
         try {
@@ -97,6 +90,20 @@ class ApiService {
           if (response.status === 404) {
             errorMessage = `API endpoint not found: ${url}. Please check if your backend server is running and the URL is correct.`;
           }
+        }
+
+        // Handle 401 Unauthorized responses, but skip auto-logout for uploads if specified
+        if (response.status === 401 && !skipAutoLogout && this.onUnauthorizedCallback) {
+          console.log('🔒 Unauthorized response detected, triggering logout');
+          this.onUnauthorizedCallback();
+          throw new Error('Session expired. Please log in again.');
+        }
+
+        // Check for "Invalid token" message regardless of status code or skipAutoLogout flag
+        if (errorMessage.toLowerCase().includes('invalid token') && this.onUnauthorizedCallback) {
+          console.log('🔒 Invalid token detected in error message, triggering logout');
+          this.onUnauthorizedCallback();
+          throw new Error('Session expired. Please log in again.');
         }
         
         console.error('❌ API Error:', errorMessage);
