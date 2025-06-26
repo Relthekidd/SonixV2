@@ -9,6 +9,7 @@ class ApiService {
 
   constructor() {
     this.baseURL = API_BASE_URL;
+    console.log('🔧 ApiService initialized with baseURL:', this.baseURL);
   }
 
   setAuthToken(token: string | null) {
@@ -33,20 +34,146 @@ class ApiService {
     const config: RequestInit = {
       ...options,
       headers,
+      timeout: 10000, // 10 second timeout
     };
 
+    // Enhanced logging for debugging
+    console.log('🌐 API Request:', {
+      url,
+      method: options.method || 'GET',
+      headers: headers,
+      body: options.body,
+      timestamp: new Date().toISOString()
+    });
+
     try {
-      const response = await fetch(url, config);
+      // Test network connectivity first
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
       
+      const response = await fetch(url, {
+        ...config,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      console.log('📡 API Response Status:', {
+        status: response.status,
+        statusText: response.statusText,
+        url: url,
+        headers: Object.fromEntries(response.headers.entries()),
+        timestamp: new Date().toISOString()
+      });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP ${response.status}: ${response.statusText}`);
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        let errorData: any = {};
+        
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            errorData = await response.json();
+            errorMessage = errorData.message || errorData.error || errorData.details || errorMessage;
+            
+            // Log detailed error information
+            console.error('❌ API Error Details:', {
+              status: response.status,
+              statusText: response.statusText,
+              errorData,
+              url,
+              endpoint,
+              timestamp: new Date().toISOString()
+            });
+          } else {
+            const textError = await response.text();
+            errorMessage = textError || errorMessage;
+            console.error('❌ API Error (Non-JSON):', {
+              status: response.status,
+              statusText: response.statusText,
+              textError,
+              url,
+              endpoint,
+              timestamp: new Date().toISOString()
+            });
+          }
+        } catch (parseError) {
+          console.error('❌ Error parsing error response:', parseError);
+        }
+
+        // Create a more descriptive error
+        const error = new Error(errorMessage);
+        (error as any).status = response.status;
+        (error as any).data = errorData;
+        (error as any).url = url;
+        (error as any).endpoint = endpoint;
+        throw error;
       }
 
       const data = await response.json();
+      console.log('✅ API Success:', {
+        data,
+        url,
+        endpoint,
+        timestamp: new Date().toISOString()
+      });
       return data.data || data;
     } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
+      // Enhanced error logging with network diagnostics
+      if (error.name === 'AbortError') {
+        console.error('🚨 Request Timeout:', {
+          message: 'Request timed out after 10 seconds',
+          url,
+          endpoint,
+          baseURL: this.baseURL,
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Request timeout: Unable to connect to ${this.baseURL}. Please check if the server is running and accessible.`);
+      }
+      
+      if (error.name === 'TypeError' && error.message.includes('Network request failed')) {
+        console.error('🚨 Network Connection Error:', {
+          message: 'Network request failed - server may be unreachable',
+          url,
+          endpoint,
+          baseURL: this.baseURL,
+          possibleCauses: [
+            'Backend server is not running',
+            'Incorrect API URL in environment variables',
+            'Network connectivity issues',
+            'Firewall blocking the connection',
+            'CORS configuration issues'
+          ],
+          timestamp: new Date().toISOString()
+        });
+        throw new Error(`Network Error: Cannot connect to ${this.baseURL}. Please verify the server is running and the API URL is correct.`);
+      }
+
+      console.error('🚨 API Request Error:', {
+        message: (error as Error).message,
+        name: (error as Error).name,
+        stack: (error as Error).stack,
+        url,
+        endpoint,
+        baseURL: this.baseURL,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Re-throw with additional context
+      if (error instanceof Error) {
+        throw new Error(`API Error (${endpoint}): ${error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  // Health check method to test connectivity
+  async healthCheck(): Promise<{ status: string; timestamp: string }> {
+    try {
+      console.log('🏥 Performing health check...');
+      return await this.request('/health');
+    } catch (error) {
+      console.error('🏥 Health check failed:', error);
       throw error;
     }
   }
@@ -65,6 +192,39 @@ class ApiService {
     displayName: string,
     role: 'listener' | 'artist' = 'listener'
   ): Promise<{ user: User; token: string }> {
+    // Enhanced logging for registration requests
+    console.log('🔐 Registration attempt:', {
+      email,
+      displayName,
+      role,
+      passwordLength: password.length,
+      apiUrl: this.baseURL,
+      timestamp: new Date().toISOString()
+    });
+
+    // Validate input before making request
+    if (!email || !password || !displayName) {
+      throw new Error('Missing required fields: email, password, and displayName are required');
+    }
+
+    if (password.length < 6) {
+      throw new Error('Password must be at least 6 characters long');
+    }
+
+    if (!email.includes('@')) {
+      throw new Error('Invalid email format');
+    }
+
+    try {
+      // First, try a health check to ensure the server is reachable
+      console.log('🏥 Testing server connectivity before registration...');
+      await this.healthCheck();
+      console.log('✅ Server is reachable, proceeding with registration');
+    } catch (healthError) {
+      console.error('❌ Server health check failed:', healthError);
+      throw new Error(`Cannot connect to server at ${this.baseURL}. Please check if the backend server is running and accessible.`);
+    }
+
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, displayName, role }),

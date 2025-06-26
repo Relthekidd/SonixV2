@@ -25,32 +25,45 @@ export default function SignupScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { signup } = useAuth();
 
   const handleSignup = async () => {
-    if (!email || !password || !confirmPassword || !displayName) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Clear any previous errors
+    setError(null);
+
+    // Client-side validation
+    if (!email?.trim() || !password || !confirmPassword || !displayName?.trim()) {
+      setError('Please fill in all required fields');
       return;
     }
 
-    if (selectedRole === 'artist' && !bio.trim()) {
-      Alert.alert('Error', 'Bio is required for artist accounts');
+    if (selectedRole === 'artist' && !bio?.trim()) {
+      setError('Bio is required for artist accounts');
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      setError('Passwords do not match');
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      setError('Password must be at least 6 characters');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address');
       return;
     }
 
     setIsLoading(true);
     try {
-      await signup(email, password, displayName, selectedRole);
+      console.log('🚀 Starting signup process from UI');
+      await signup(email.trim(), password, displayName.trim(), selectedRole);
+      
+      console.log('✅ Signup completed successfully');
       
       if (selectedRole === 'artist') {
         Alert.alert(
@@ -62,7 +75,20 @@ export default function SignupScreen() {
         router.replace('/(tabs)');
       }
     } catch (error) {
-      Alert.alert('Signup Failed', 'An error occurred during signup');
+      console.error('❌ Signup failed in UI:', error);
+      
+      // Display the error message to the user
+      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during signup';
+      setError(errorMessage);
+      
+      // Also show an alert for critical errors
+      if (errorMessage.includes('connect') || errorMessage.includes('network') || errorMessage.includes('server')) {
+        Alert.alert(
+          'Connection Error', 
+          errorMessage + '\n\nPlease check:\n• Your internet connection\n• That the backend server is running\n• The API URL configuration',
+          [{ text: 'OK' }]
+        );
+      }
     } finally {
       setIsLoading(false);
     }
@@ -85,6 +111,13 @@ export default function SignupScreen() {
           <View style={styles.content}>
             <Text style={styles.title}>Create Account</Text>
             <Text style={styles.subtitle}>Join the Sonix community</Text>
+
+            {/* Error Display */}
+            {error && (
+              <View style={styles.errorContainer}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
 
             {/* Role Selection */}
             <View style={styles.roleSection}>
@@ -140,6 +173,7 @@ export default function SignupScreen() {
                   value={displayName}
                   onChangeText={setDisplayName}
                   autoCapitalize="words"
+                  editable={!isLoading}
                 />
               </View>
 
@@ -154,6 +188,7 @@ export default function SignupScreen() {
                   keyboardType="email-address"
                   autoCapitalize="none"
                   autoComplete="email"
+                  editable={!isLoading}
                 />
               </View>
 
@@ -169,6 +204,7 @@ export default function SignupScreen() {
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
+                    editable={!isLoading}
                   />
                 </View>
               )}
@@ -183,10 +219,12 @@ export default function SignupScreen() {
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   autoComplete="new-password"
+                  editable={!isLoading}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPassword(!showPassword)}
                   style={styles.eyeIcon}
+                  disabled={isLoading}
                 >
                   {showPassword ? (
                     <EyeOff color="#64748b" size={20} />
@@ -206,10 +244,12 @@ export default function SignupScreen() {
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
                   autoComplete="new-password"
+                  editable={!isLoading}
                 />
                 <TouchableOpacity
                   onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                   style={styles.eyeIcon}
+                  disabled={isLoading}
                 >
                   {showConfirmPassword ? (
                     <EyeOff color="#64748b" size={20} />
@@ -228,12 +268,12 @@ export default function SignupScreen() {
               )}
 
               <TouchableOpacity
-                style={styles.signupButton}
+                style={[styles.signupButton, isLoading && styles.signupButtonDisabled]}
                 onPress={handleSignup}
                 disabled={isLoading}
               >
                 <LinearGradient
-                  colors={['#8b5cf6', '#a855f7', '#c084fc']}
+                  colors={isLoading ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.signupButtonText}>
@@ -249,8 +289,11 @@ export default function SignupScreen() {
 
               <View style={styles.loginContainer}>
                 <Text style={styles.loginText}>Already have an account? </Text>
-                <TouchableOpacity onPress={() => router.push('/(auth)/login')}>
-                  <Text style={styles.loginLink}>Sign In</Text>
+                <TouchableOpacity 
+                  onPress={() => router.push('/(auth)/login')}
+                  disabled={isLoading}
+                >
+                  <Text style={[styles.loginLink, isLoading && styles.loginLinkDisabled]}>Sign In</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -293,6 +336,21 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     marginBottom: 32,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  errorText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#ef4444',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   roleSection: {
     marginBottom: 24,
@@ -400,6 +458,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
   },
+  signupButtonDisabled: {
+    opacity: 0.7,
+  },
   buttonGradient: {
     paddingVertical: 16,
     alignItems: 'center',
@@ -423,5 +484,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     color: '#8b5cf6',
+  },
+  loginLinkDisabled: {
+    opacity: 0.5,
   },
 });

@@ -122,7 +122,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signup = async (email: string, password: string, displayName: string, role: 'listener' | 'artist' = 'listener') => {
     setIsLoading(true);
     try {
-      const response = await apiService.register(email, password, displayName, role);
+      console.log('🔐 Starting signup process:', {
+        email,
+        displayName,
+        role,
+        passwordLength: password.length,
+        timestamp: new Date().toISOString()
+      });
+
+      // Validate inputs before making API call
+      if (!email?.trim()) {
+        throw new Error('Email is required');
+      }
+      if (!password?.trim()) {
+        throw new Error('Password is required');
+      }
+      if (!displayName?.trim()) {
+        throw new Error('Display name is required');
+      }
+      if (password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+      if (!email.includes('@')) {
+        throw new Error('Please enter a valid email address');
+      }
+
+      const response = await apiService.register(email.trim(), password, displayName.trim(), role);
+      
+      console.log('✅ Signup successful, storing auth data');
       
       apiService.setAuthToken(response.token);
       setUser(response.user);
@@ -132,8 +159,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.setItem(USER_KEY, JSON.stringify(response.user)),
       ]);
     } catch (error) {
-      console.error('Signup error:', error);
-      throw error;
+      console.error('❌ Signup error details:', {
+        message: (error as Error).message,
+        name: (error as Error).name,
+        stack: (error as Error).stack,
+        status: (error as any).status,
+        data: (error as any).data,
+        url: (error as any).url,
+        endpoint: (error as any).endpoint,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Provide more user-friendly error messages
+      let userFriendlyMessage = 'Registration failed. Please try again.';
+      
+      if (error instanceof Error) {
+        const errorMessage = error.message.toLowerCase();
+        
+        if (errorMessage.includes('network') || errorMessage.includes('connect')) {
+          userFriendlyMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+        } else if (errorMessage.includes('timeout')) {
+          userFriendlyMessage = 'Request timed out. Please check your connection and try again.';
+        } else if (errorMessage.includes('email') && errorMessage.includes('exist')) {
+          userFriendlyMessage = 'An account with this email already exists. Please use a different email or try logging in.';
+        } else if (errorMessage.includes('password')) {
+          userFriendlyMessage = 'Password does not meet requirements. Please ensure it is at least 6 characters long.';
+        } else if (errorMessage.includes('validation') || errorMessage.includes('invalid')) {
+          userFriendlyMessage = 'Please check your information and try again. Make sure all fields are filled correctly.';
+        } else if (error.message && !error.message.includes('API Error')) {
+          userFriendlyMessage = error.message;
+        }
+      }
+      
+      throw new Error(userFriendlyMessage);
     } finally {
       setIsLoading(false);
     }
