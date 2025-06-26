@@ -5,6 +5,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/a
 class ApiService {
   private baseURL: string;
   private token: string | null = null;
+  private onUnauthorizedCallback: (() => void) | null = null;
 
   constructor() {
     this.baseURL = API_BASE_URL;
@@ -27,6 +28,10 @@ class ApiService {
 
   setAuthToken(token: string | null) {
     this.token = token;
+  }
+
+  setOnUnauthorizedCallback(callback: (() => void) | null) {
+    this.onUnauthorizedCallback = callback;
   }
 
   async request<T>(
@@ -69,6 +74,13 @@ class ApiService {
       });
       
       if (!response.ok) {
+        // Handle 401 Unauthorized responses
+        if (response.status === 401 && this.onUnauthorizedCallback) {
+          console.log('🔒 Unauthorized response detected, triggering logout');
+          this.onUnauthorizedCallback();
+          throw new Error('Session expired. Please log in again.');
+        }
+
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
         try {

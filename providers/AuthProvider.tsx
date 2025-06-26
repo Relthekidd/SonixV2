@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
@@ -57,7 +57,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const logout = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      console.log('Logging out user:', user?.id);
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+        throw error;
+      }
+      
+      // Clear local state
+      setUser(null);
+      setSession(null);
+      
+      // Clear API service token
+      apiService.setAuthToken(null);
+      
+      console.log('✅ Logout successful');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
+    // Set up the unauthorized callback for API service
+    apiService.setOnUnauthorizedCallback(logout);
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('Initial session:', session?.user?.id);
@@ -95,8 +125,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      subscription.unsubscribe();
+      // Clear the callback when component unmounts
+      apiService.setOnUnauthorizedCallback(null);
+    };
+  }, [logout]);
 
   const loadUserProfile = async (userId: string) => {
     try {
@@ -295,33 +329,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     } catch (error: any) {
       console.error('❌ Signup error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const logout = async () => {
-    setIsLoading(true);
-    try {
-      console.log('Logging out user:', user?.id);
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error('Logout error:', error);
-        throw error;
-      }
-      
-      // Clear local state
-      setUser(null);
-      setSession(null);
-      
-      // Clear API service token
-      apiService.setAuthToken(null);
-      
-      console.log('✅ Logout successful');
-    } catch (error) {
-      console.error('Logout error:', error);
       throw error;
     } finally {
       setIsLoading(false);
