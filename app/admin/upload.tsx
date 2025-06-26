@@ -19,7 +19,7 @@ import { apiService } from '@/services/api';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown } from 'lucide-react-native';
+import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown, ArrowLeft } from 'lucide-react-native';
 
 interface UploadFormData {
   type: 'single' | 'album';
