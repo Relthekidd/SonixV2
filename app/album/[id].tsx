@@ -14,7 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, MoreVertical, Calendar, Music, Clock } from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, MoveVertical as MoreVertical, Calendar, Music, Clock } from 'lucide-react-native';
 
 export default function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
