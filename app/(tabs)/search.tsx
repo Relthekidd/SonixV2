@@ -13,11 +13,19 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { Search, Play, Pause } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Search, Play, Pause, Music, User, Disc } from 'lucide-react-native';
+
+interface SearchResults {
+  tracks: any[];
+  albums: any[];
+  singles: any[];
+  artists: any[];
+}
 
 export default function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any>({ tracks: [], albums: [], playlists: [] });
+  const [results, setResults] = useState<SearchResults>({ tracks: [], albums: [], singles: [], artists: [] });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -39,7 +47,7 @@ export default function SearchScreen() {
 
   useEffect(() => {
     if (query.trim() === '') {
-      setResults({ tracks: [], albums: [], playlists: [] });
+      setResults({ tracks: [], albums: [], singles: [], artists: [] });
       setSuggestions([]);
       return;
     }
@@ -78,14 +86,28 @@ export default function SearchScreen() {
     setQuery(searchQuery);
     
     if (searchQuery.trim() === '') {
-      setResults({ tracks: [], albums: [], playlists: [] });
+      setResults({ tracks: [], albums: [], singles: [], artists: [] });
       return;
     }
 
     setIsSearching(true);
     try {
-      const searchResults = await searchMusic(searchQuery);
-      setResults(searchResults);
+      // Search all content types
+      const [tracksResult, albumsResult, singlesResult, artistsResult] = await Promise.all([
+        apiService.search(searchQuery, 'tracks', 20),
+        apiService.search(searchQuery, 'albums', 10),
+        apiService.getSingles({ limit: 10 }), // Mock singles search
+        apiService.search(searchQuery, 'artists', 10),
+      ]);
+
+      setResults({
+        tracks: tracksResult.tracks || [],
+        albums: albumsResult.albums || [],
+        singles: singlesResult.filter((single: any) => 
+          single.title.toLowerCase().includes(searchQuery.toLowerCase())
+        ) || [],
+        artists: artistsResult.artists || [],
+      });
       setSuggestions([]);
     } catch (error) {
       console.error('Search error:', error);
@@ -114,18 +136,30 @@ export default function SearchScreen() {
     }
   };
 
+  const handleAlbumPress = (album: any) => {
+    router.push(`/album/${album.id}`);
+  };
+
+  const handleSinglePress = (single: any) => {
+    router.push(`/single/${single.id}`);
+  };
+
+  const handleArtistPress = (artist: any) => {
+    router.push(`/artist/${artist.id}`);
+  };
+
   const renderTrackItem = ({ item }: { item: any }) => (
     <TouchableOpacity 
-      style={styles.trackItem}
+      style={styles.resultItem}
       onPress={() => handleTrackPress(item)}
     >
-      <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
+      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultTitle} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {item.artist} • {item.album}
+        <Text style={styles.resultSubtitle} numberOfLines={1}>
+          {item.artist} • Song
         </Text>
       </View>
       <TouchableOpacity style={styles.playButton}>
@@ -139,14 +173,56 @@ export default function SearchScreen() {
   );
 
   const renderAlbumItem = ({ item }: { item: any }) => (
-    <TouchableOpacity style={styles.albumItem}>
-      <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
-      <Text style={styles.albumTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={styles.albumArtist} numberOfLines={1}>
-        {item.artist} • {item.year}
-      </Text>
+    <TouchableOpacity 
+      style={styles.resultItem}
+      onPress={() => handleAlbumPress(item)}
+    >
+      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>
+          {item.artist} • Album
+        </Text>
+      </View>
+      <Disc color="#94a3b8" size={20} />
+    </TouchableOpacity>
+  );
+
+  const renderSingleItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.resultItem}
+      onPress={() => handleSinglePress(item)}
+    >
+      <Image source={{ uri: item.coverUrl || item.cover_url }} style={styles.resultImage} />
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>
+          {item.artist} • Single
+        </Text>
+      </View>
+      <Music color="#94a3b8" size={20} />
+    </TouchableOpacity>
+  );
+
+  const renderArtistItem = ({ item }: { item: any }) => (
+    <TouchableOpacity 
+      style={styles.resultItem}
+      onPress={() => handleArtistPress(item)}
+    >
+      <Image source={{ uri: item.avatar_url || item.coverUrl }} style={[styles.resultImage, styles.artistImage]} />
+      <View style={styles.resultInfo}>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.stage_name || item.name}
+        </Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>
+          Artist
+        </Text>
+      </View>
+      <User color="#94a3b8" size={20} />
     </TouchableOpacity>
   );
 
@@ -283,14 +359,41 @@ export default function SearchScreen() {
                       data={results.albums}
                       renderItem={renderAlbumItem}
                       keyExtractor={(item) => item.id}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={styles.horizontalList}
+                      scrollEnabled={false}
                     />
                   </View>
                 )}
 
-                {!isSearching && results.tracks.length === 0 && results.albums.length === 0 && query !== '' && (
+                {results.singles.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Singles</Text>
+                    <FlatList
+                      data={results.singles}
+                      renderItem={renderSingleItem}
+                      keyExtractor={(item) => item.id}
+                      scrollEnabled={false}
+                    />
+                  </View>
+                )}
+
+                {results.artists.length > 0 && (
+                  <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Artists</Text>
+                    <FlatList
+                      data={results.artists}
+                      renderItem={renderArtistItem}
+                      keyExtractor={(item) => item.id}
+                      scrollEnabled={false}
+                    />
+                  </View>
+                )}
+
+                {!isSearching && 
+                 results.tracks.length === 0 && 
+                 results.albums.length === 0 && 
+                 results.singles.length === 0 && 
+                 results.artists.length === 0 && 
+                 query !== '' && (
                   <View style={styles.noResultsContainer}>
                     <Text style={styles.noResults}>No results found for "{query}"</Text>
                     <Text style={styles.noResultsSubtext}>Try searching for something else</Text>
@@ -432,7 +535,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
   },
-  trackItem: {
+  resultItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
@@ -442,22 +545,25 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 12,
   },
-  trackCover: {
+  resultImage: {
     width: 50,
     height: 50,
     borderRadius: 8,
   },
-  trackInfo: {
+  artistImage: {
+    borderRadius: 25,
+  },
+  resultInfo: {
     flex: 1,
     marginLeft: 12,
   },
-  trackTitle: {
+  resultTitle: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
     marginBottom: 4,
   },
-  trackArtist: {
+  resultSubtitle: {
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
@@ -469,30 +575,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  horizontalList: {
-    paddingHorizontal: 24,
-  },
-  albumItem: {
-    width: 140,
-    marginRight: 16,
-  },
-  albumCover: {
-    width: 140,
-    height: 140,
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  albumTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  albumArtist: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
   },
   loadingContainer: {
     alignItems: 'center',

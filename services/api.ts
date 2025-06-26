@@ -401,6 +401,14 @@ class ApiService {
     return this.request(`/albums/${id}`);
   }
 
+  async createAlbum(albumData: FormData): Promise<any> {
+    return this.request('/albums', {
+      method: 'POST',
+      headers: {}, // Let browser set Content-Type for FormData
+      body: albumData,
+    });
+  }
+
   // Singles
   async getSingles(params?: { page?: number; limit?: number }): Promise<any[]> {
     const searchParams = new URLSearchParams();
@@ -411,19 +419,15 @@ class ApiService {
     return this.request(`/singles${query ? `?${query}` : ''}`);
   }
 
+  async getSingleById(id: string): Promise<any> {
+    return this.request(`/singles/${id}`);
+  }
+
   async createSingle(singleData: FormData): Promise<any> {
     return this.request('/singles', {
       method: 'POST',
       headers: {}, // Let browser set Content-Type for FormData
       body: singleData,
-    });
-  }
-
-  async createAlbum(albumData: FormData): Promise<any> {
-    return this.request('/albums', {
-      method: 'POST',
-      headers: {}, // Let browser set Content-Type for FormData
-      body: albumData,
     });
   }
 
@@ -471,11 +475,12 @@ class ApiService {
   }
 
   // Search
-  async search(query: string, type: 'all' | 'tracks' | 'artists' | 'albums' | 'playlists' = 'all', limit = 20): Promise<{
+  async search(query: string, type: 'all' | 'tracks' | 'artists' | 'albums' | 'playlists' | 'singles' = 'all', limit = 20): Promise<{
     tracks?: Track[];
     artists?: any[];
     albums?: Album[];
     playlists?: Playlist[];
+    singles?: any[];
   }> {
     const searchParams = new URLSearchParams({
       q: query,

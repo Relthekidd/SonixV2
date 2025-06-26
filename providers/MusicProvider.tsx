@@ -15,6 +15,8 @@ export interface Track {
   releaseDate: string;
   playCount?: number;
   likeCount?: number;
+  trackNumber?: number;
+  lyrics?: string;
 }
 
 export interface Album {
@@ -25,6 +27,21 @@ export interface Album {
   year: string;
   tracks: Track[];
   genre: string;
+  description?: string;
+  releaseDate?: string;
+  genres?: string[];
+}
+
+export interface Single {
+  id: string;
+  title: string;
+  artist: string;
+  coverUrl: string;
+  track: Track;
+  genre: string;
+  description?: string;
+  releaseDate?: string;
+  genres?: string[];
 }
 
 export interface Playlist {
@@ -48,6 +65,7 @@ interface MusicContextType {
   likedSongs: Track[];
   playlists: Playlist[];
   albums: Album[];
+  singles: Single[];
   trendingTracks: Track[];
   newReleases: Album[];
   isLoading: boolean;
@@ -60,7 +78,7 @@ interface MusicContextType {
   createPlaylist: (name: string, description: string) => Promise<void>;
   addToPlaylist: (playlistId: string, track: Track) => Promise<void>;
   removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
-  searchMusic: (query: string) => Promise<{ tracks: Track[], albums: Album[], playlists: Playlist[] }>;
+  searchMusic: (query: string) => Promise<{ tracks: Track[], albums: Album[], playlists: Playlist[], singles: Single[] }>;
   refreshData: () => Promise<void>;
 }
 
@@ -77,6 +95,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [likedSongs, setLikedSongs] = useState<Track[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [albums, setAlbums] = useState<Album[]>([]);
+  const [singles, setSingles] = useState<Single[]>([]);
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [newReleases, setNewReleases] = useState<Album[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,20 +115,23 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const [
         trendingData,
         albumsData,
+        singlesData,
         playlistsData,
         likedData,
       ] = await Promise.all([
         apiService.getTrendingTracks(20),
         apiService.getAlbums({ limit: 10 }),
+        apiService.getSingles({ limit: 10 }),
         user ? apiService.getUserPlaylists() : apiService.getPublicPlaylists({ limit: 10 }),
         user ? apiService.getLikedTracks() : Promise.resolve([]),
       ]);
 
       setTrendingTracks(trendingData.map(transformTrack));
+      setAlbums(albumsData.map(transformAlbum));
+      setSingles(singlesData.map(transformSingle));
       setNewReleases(albumsData.map(transformAlbum));
       setPlaylists(playlistsData.map(transformPlaylist));
       setLikedSongs(likedData.map(transformTrack));
-      setAlbums(albumsData.map(transformAlbum));
     } catch (err) {
       console.error('Error loading initial data:', err);
       setError('Failed to load music data');
@@ -128,7 +150,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     title: apiTrack.title,
     artist: apiTrack.artist_name || apiTrack.artist || 'Unknown Artist',
     album: apiTrack.album || 'Unknown Album',
-    duration: apiTrack.duration,
+    duration: apiTrack.duration || 180,
     coverUrl: apiTrack.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
     audioUrl: apiTrack.audio_url,
     isLiked: apiTrack.is_liked || false,
@@ -136,6 +158,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     releaseDate: apiTrack.created_at || apiTrack.release_date || new Date().toISOString(),
     playCount: apiTrack.play_count,
     likeCount: apiTrack.like_count,
+    trackNumber: apiTrack.track_number,
+    lyrics: apiTrack.lyrics,
   });
 
   const transformAlbum = (apiAlbum: any): Album => ({
@@ -146,6 +170,21 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     year: apiAlbum.release_date ? new Date(apiAlbum.release_date).getFullYear().toString() : '2024',
     tracks: apiAlbum.tracks ? apiAlbum.tracks.map(transformTrack) : [],
     genre: Array.isArray(apiAlbum.genres) ? apiAlbum.genres[0] : apiAlbum.genre || 'Unknown',
+    description: apiAlbum.description,
+    releaseDate: apiAlbum.release_date,
+    genres: apiAlbum.genres,
+  });
+
+  const transformSingle = (apiSingle: any): Single => ({
+    id: apiSingle.id,
+    title: apiSingle.title,
+    artist: apiSingle.artist_name || apiSingle.artist || 'Unknown Artist',
+    coverUrl: apiSingle.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+    track: transformTrack(apiSingle),
+    genre: Array.isArray(apiSingle.genres) ? apiSingle.genres[0] : apiSingle.genre || 'Unknown',
+    description: apiSingle.description,
+    releaseDate: apiSingle.release_date,
+    genres: apiSingle.genres,
   });
 
   const transformPlaylist = (apiPlaylist: any): Playlist => ({
@@ -291,11 +330,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks: (results.tracks || []).map(transformTrack),
         albums: (results.albums || []).map(transformAlbum),
         playlists: (results.playlists || []).map(transformPlaylist),
+        singles: (results.singles || []).map(transformSingle),
       };
     } catch (error) {
       console.error('Error searching music:', error);
       setError('Search failed');
-      return { tracks: [], albums: [], playlists: [] };
+      return { tracks: [], albums: [], playlists: [], singles: [] };
     }
   };
 
@@ -311,6 +351,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         likedSongs,
         playlists,
         albums,
+        singles,
         trendingTracks,
         newReleases,
         isLoading,
