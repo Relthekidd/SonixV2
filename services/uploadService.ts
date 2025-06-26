@@ -193,6 +193,7 @@ class UploadService {
 
   /**
    * Check if user is authenticated and has upload permissions
+   * Currently restricted to admin users only to match backend API restrictions
    */
   async checkUploadPermissions(): Promise<boolean> {
     try {
@@ -202,10 +203,10 @@ class UploadService {
         return false;
       }
 
-      // Check if user has admin role or artist role with verification
+      // Check if user has admin role - only admins can upload per backend restrictions
       const { data: user, error } = await supabase
         .from('users')
-        .select('role, artist_verified')
+        .select('role')
         .eq('id', session.user.id)
         .single();
 
@@ -214,8 +215,8 @@ class UploadService {
         return false;
       }
 
-      // Allow admins or verified artists to upload
-      return user.role === 'admin' || (user.role === 'artist' && user.artist_verified);
+      // Only allow admins to upload (matching backend API restrictions)
+      return user.role === 'admin';
 
     } catch (error) {
       console.error('Error checking upload permissions:', error);
