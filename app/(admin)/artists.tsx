@@ -13,20 +13,18 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { apiService } from '@/services/api';
+import { supabase } from '@/providers/AuthProvider';
 import { ArrowLeft, Check, X, User, Mail, Calendar, FileText } from 'lucide-react-native';
 
 interface PendingArtist {
   id: string;
-  user_id: string;
-  stage_name: string;
-  bio?: string;
   email: string;
   display_name: string;
+  bio?: string;
   created_at: string;
-  user_created_at: string;
-  genres: string[];
-  social_links: Record<string, string>;
+  artist_verified: boolean;
+  first_name?: string;
+  last_name?: string;
 }
 
 export default function AdminArtistsScreen() {
@@ -42,8 +40,21 @@ export default function AdminArtistsScreen() {
   const loadPendingArtists = async () => {
     try {
       setIsLoading(true);
-      const artists = await apiService.getPendingArtists();
-      setPendingArtists(artists);
+      
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'artist')
+        .eq('artist_verified', false)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading pending artists:', error);
+        Alert.alert('Error', 'Failed to load pending artists');
+        return;
+      }
+
+      setPendingArtists(data || []);
     } catch (error) {
       console.error('Error loading pending artists:', error);
       Alert.alert('Error', 'Failed to load pending artists');
@@ -82,7 +93,26 @@ export default function AdminArtistsScreen() {
     setProcessingIds(prev => new Set(prev).add(artistId));
     
     try {
-      await apiService.updateArtistStatus(artistId, isVerified);
+      if (isVerified) {
+        // Approve artist
+        const { error } = await supabase
+          .from('users')
+          .update({ artist_verified: true })
+          .eq('id', artistId);
+
+        if (error) throw error;
+      } else {
+        // Reject artist - change role back to listener
+        const { error } = await supabase
+          .from('users')
+          .update({ 
+            role: 'listener',
+            artist_verified: false 
+          })
+          .eq('id', artistId);
+
+        if (error) throw error;
+      }
       
       // Remove from pending list
       setPendingArtists(prev => prev.filter(artist => artist.id !== artistId));
@@ -121,8 +151,13 @@ export default function AdminArtistsScreen() {
             <User color="#8b5cf6" size={24} />
           </View>
           <View style={styles.artistInfo}>
-            <Text style={styles.artistName}>{item.stage_name}</Text>
-            <Text style={styles.artistDisplayName}>{item.display_name}</Text>
+            <Text style={styles.artistName}>{item.display_name}</Text>
+            <Text style={styles.artistDisplayName}>
+              {item.first_name && item.last_name 
+                ? `${item.first_name} ${item.last_name}` 
+                : item.email
+              }
+            </Text>
           </View>
         </View>
 
@@ -143,25 +178,12 @@ export default function AdminArtistsScreen() {
               <Text style={styles.bioText}>{item.bio}</Text>
             </View>
           )}
-
-          {item.genres && item.genres.length > 0 && (
-            <View style={styles.genresContainer}>
-              <Text style={styles.genresLabel}>Genres:</Text>
-              <View style={styles.genresList}>
-                {item.genres.map((genre, index) => (
-                  <View key={index} style={styles.genreTag}>
-                    <Text style={styles.genreText}>{genre}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
         </View>
 
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.rejectButton]}
-            onPress={() => handleArtistAction(item.id, false, item.stage_name)}
+            onPress={() => handleArtistAction(item.id, false, item.display_name)}
             disabled={isProcessing}
           >
             {isProcessing ? (
@@ -176,7 +198,7 @@ export default function AdminArtistsScreen() {
 
           <TouchableOpacity
             style={[styles.actionButton, styles.approveButton]}
-            onPress={() => handleArtistAction(item.id, true, item.stage_name)}
+            onPress={() => handleArtistAction(item.id, true, item.display_name)}
             disabled={isProcessing}
           >
             {isProcessing ? (
@@ -384,33 +406,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     flex: 1,
     lineHeight: 20,
-  },
-  genresContainer: {
-    marginTop: 12,
-  },
-  genresLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#ffffff',
-    marginBottom: 8,
-  },
-  genresList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  genreTag: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  genreText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: '#8b5cf6',
   },
   actionButtons: {
     flexDirection: 'row',
