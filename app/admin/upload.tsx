@@ -317,13 +317,8 @@ export default function AdminUploadScreen() {
         }
       }
 
-      // Upload to backend
-      const endpoint = formData.type === 'single' ? '/singles' : '/albums';
-      await apiService.request(endpoint, {
-        method: 'POST',
-        headers: {}, // Let browser set Content-Type for FormData
-        body: uploadFormData,
-      });
+      // Use the existing createTrack method which posts to the correct /tracks endpoint
+      await apiService.createTrack(uploadFormData);
 
       Alert.alert('Success', `${formData.type === 'single' ? 'Single' : 'Album'} uploaded successfully!`);
       router.back();
