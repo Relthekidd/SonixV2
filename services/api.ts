@@ -9,6 +9,9 @@ class ApiService {
   constructor() {
     this.baseURL = API_BASE_URL;
     this.loadStoredToken();
+    
+    // Log the API base URL for debugging
+    console.log('🌐 API Base URL:', this.baseURL);
   }
 
   private async loadStoredToken() {
@@ -26,12 +29,18 @@ class ApiService {
     this.token = token;
   }
 
-  private async request<T>(
+  async request<T>(
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
+    console.log('🔄 API Request:', {
+      method: options.method || 'GET',
+      url,
+      hasToken: !!this.token
+    });
+
     const headers: HeadersInit = {
       ...options.headers,
     };
@@ -53,6 +62,12 @@ class ApiService {
     try {
       const response = await fetch(url, config);
       
+      console.log('📡 API Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        url
+      });
+      
       if (!response.ok) {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
@@ -60,19 +75,47 @@ class ApiService {
           const errorData = await response.json();
           if (errorData.message) {
             errorMessage = errorData.message;
+          } else if (errorData.error) {
+            errorMessage = errorData.error;
           }
         } catch {
-          // If we can't parse JSON, use the status text
+          // If we can't parse JSON, check if it's a 404 with helpful message
+          if (response.status === 404) {
+            errorMessage = `API endpoint not found: ${url}. Please check if your backend server is running and the URL is correct.`;
+          }
         }
         
+        console.error('❌ API Error:', errorMessage);
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
+      console.log('✅ API Success:', { endpoint, dataKeys: Object.keys(data) });
       return data.data || data;
     } catch (error) {
-      console.error('API Request Error:', error);
+      console.error('🚨 Network Error:', {
+        message: error.message,
+        url,
+        endpoint
+      });
+      
+      // Provide more helpful error messages
+      if (error.message.includes('Network request failed')) {
+        throw new Error(`Cannot connect to server at ${this.baseURL}. Please check your network connection and ensure the backend server is running.`);
+      }
+      
       throw error;
+    }
+  }
+
+  // Test connection method
+  async testConnection(): Promise<boolean> {
+    try {
+      await this.request('/health');
+      return true;
+    } catch (error) {
+      console.error('Connection test failed:', error);
+      return false;
     }
   }
 
