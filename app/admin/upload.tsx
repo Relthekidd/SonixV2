@@ -270,6 +270,8 @@ export default function AdminUploadScreen() {
 
     setIsUploading(true);
     try {
+      console.log('🚀 Starting upload process...');
+      
       // Create FormData for upload
       const uploadFormData = new FormData();
       
@@ -317,14 +319,56 @@ export default function AdminUploadScreen() {
         }
       }
 
-      // Use the existing createTrack method which posts to the correct /tracks endpoint
-      await apiService.createTrack(uploadFormData);
+      let uploadResult;
+      
+      // Choose the appropriate upload method based on type
+      if (formData.type === 'single') {
+        uploadResult = await apiService.createSingle(uploadFormData);
+      } else {
+        uploadResult = await apiService.createAlbum(uploadFormData);
+      }
 
-      Alert.alert('Success', `${formData.type === 'single' ? 'Single' : 'Album'} uploaded successfully!`);
-      router.back();
+      console.log('✅ Upload successful:', uploadResult);
+
+      Alert.alert(
+        'Success', 
+        `${formData.type === 'single' ? 'Single' : 'Album'} uploaded successfully!`,
+        [
+          {
+            text: 'View Uploads',
+            onPress: () => router.push('/admin/uploads')
+          }
+        ]
+      );
+      
+      // Reset form
+      setFormData({
+        type: 'single',
+        title: '',
+        releaseDate: new Date().toISOString().split('T')[0],
+        coverFile: null,
+        genres: [],
+        moods: [],
+        explicit: false,
+        isPublic: true,
+        description: '',
+        primaryArtist: '',
+        featuringArtists: [],
+        tracks: [{
+          id: '1',
+          title: '',
+          audioFile: null,
+          lyrics: '',
+          explicit: false,
+          trackNumber: 1,
+          featuringArtists: [],
+          duration: 0,
+        }],
+      });
+      
     } catch (error) {
-      console.error('Upload error:', error);
-      Alert.alert('Error', 'Failed to upload content. Please try again.');
+      console.error('❌ Upload failed:', error);
+      Alert.alert('Error', `Failed to upload ${formData.type}. Please try again.`);
     } finally {
       setIsUploading(false);
     }
@@ -366,7 +410,12 @@ export default function AdminUploadScreen() {
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
         <Text style={styles.title}>Upload Content</Text>
-        <View style={styles.placeholder} />
+        <TouchableOpacity
+          style={styles.uploadsButton}
+          onPress={() => router.push('/admin/uploads')}
+        >
+          <Text style={styles.uploadsButtonText}>View Uploads</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -489,7 +538,6 @@ export default function AdminUploadScreen() {
             <Text style={styles.label}>Primary Artist *</Text>
             <View style={styles.artistSelector}>
               <View style={styles.selectContainer}>
-                {/* Mock select - replace with proper dropdown */}
                 <TouchableOpacity style={styles.selectButton}>
                   <User color="#8b5cf6" size={20} />
                   <Text style={styles.selectButtonText}>
@@ -724,8 +772,18 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
   },
-  placeholder: {
-    width: 44,
+  uploadsButton: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  uploadsButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#8b5cf6',
   },
   scrollView: {
     flex: 1,

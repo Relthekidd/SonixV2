@@ -36,14 +36,16 @@ class ApiService {
 
   async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    skipAutoLogout: boolean = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
     console.log('🔄 API Request:', {
       method: options.method || 'GET',
       url,
-      hasToken: !!this.token
+      hasToken: !!this.token,
+      skipAutoLogout
     });
 
     const headers: HeadersInit = {
@@ -74,8 +76,8 @@ class ApiService {
       });
       
       if (!response.ok) {
-        // Handle 401 Unauthorized responses
-        if (response.status === 401 && this.onUnauthorizedCallback) {
+        // Handle 401 Unauthorized responses, but skip auto-logout for uploads if specified
+        if (response.status === 401 && !skipAutoLogout && this.onUnauthorizedCallback) {
           console.log('🔒 Unauthorized response detected, triggering logout');
           this.onUnauthorizedCallback();
           throw new Error('Session expired. Please log in again.');
@@ -247,10 +249,11 @@ class ApiService {
   }
 
   async createTrack(trackData: FormData): Promise<any> {
+    // Skip auto-logout for track uploads to prevent session termination during file upload
     return this.request('/tracks', {
       method: 'POST',
       body: trackData,
-    });
+    }, true); // skipAutoLogout = true
   }
 
   async recordPlay(trackId: string, playData: any): Promise<void> {
@@ -274,6 +277,14 @@ class ApiService {
     return this.request(`/albums/${id}`);
   }
 
+  async createAlbum(albumData: FormData): Promise<any> {
+    // Skip auto-logout for album uploads
+    return this.request('/albums', {
+      method: 'POST',
+      body: albumData,
+    }, true); // skipAutoLogout = true
+  }
+
   // Singles
   async getSingles(params?: { page?: number; limit?: number }): Promise<any[]> {
     const searchParams = new URLSearchParams();
@@ -286,6 +297,14 @@ class ApiService {
 
   async getSingleById(id: string): Promise<any> {
     return this.request(`/singles/${id}`);
+  }
+
+  async createSingle(singleData: FormData): Promise<any> {
+    // Skip auto-logout for single uploads
+    return this.request('/singles', {
+      method: 'POST',
+      body: singleData,
+    }, true); // skipAutoLogout = true
   }
 
   // Playlists
@@ -375,7 +394,7 @@ class ApiService {
     return this.request('/upload/audio', {
       method: 'POST',
       body: formData,
-    });
+    }, true); // skipAutoLogout = true
   }
 
   async uploadImage(imageFile: File): Promise<{ imageUrl: string }> {
@@ -385,7 +404,7 @@ class ApiService {
     return this.request('/upload/image', {
       method: 'POST',
       body: formData,
-    });
+    }, true); // skipAutoLogout = true
   }
 
   // Admin
@@ -401,6 +420,17 @@ class ApiService {
     
     const query = searchParams.toString();
     return this.request(`/admin/analytics${query ? `?${query}` : ''}`);
+  }
+
+  // Get recently uploaded content
+  async getRecentUploads(): Promise<{ singles: any[], albums: any[], tracks: any[] }> {
+    const [singles, albums, tracks] = await Promise.all([
+      this.getSingles({ limit: 10 }),
+      this.getAlbums({ limit: 10 }),
+      this.getTracks({ limit: 10 })
+    ]);
+
+    return { singles, albums, tracks };
   }
 }
 
