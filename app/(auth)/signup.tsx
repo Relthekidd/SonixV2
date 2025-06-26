@@ -13,7 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Mail, Lock, User, FileText, AlertCircle } from 'lucide-react-native';
+import { Eye, EyeOff, Mail, Lock, User, FileText, CircleAlert as AlertCircle } from 'lucide-react-native';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
