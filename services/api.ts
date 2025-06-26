@@ -401,6 +401,32 @@ class ApiService {
     return this.request(`/albums/${id}`);
   }
 
+  // Singles
+  async getSingles(params?: { page?: number; limit?: number }): Promise<any[]> {
+    const searchParams = new URLSearchParams();
+    if (params?.page) searchParams.append('page', params.page.toString());
+    if (params?.limit) searchParams.append('limit', params.limit.toString());
+    
+    const query = searchParams.toString();
+    return this.request(`/singles${query ? `?${query}` : ''}`);
+  }
+
+  async createSingle(singleData: FormData): Promise<any> {
+    return this.request('/singles', {
+      method: 'POST',
+      headers: {}, // Let browser set Content-Type for FormData
+      body: singleData,
+    });
+  }
+
+  async createAlbum(albumData: FormData): Promise<any> {
+    return this.request('/albums', {
+      method: 'POST',
+      headers: {}, // Let browser set Content-Type for FormData
+      body: albumData,
+    });
+  }
+
   // Playlists
   async getPublicPlaylists(params?: { page?: number; limit?: number }): Promise<Playlist[]> {
     const searchParams = new URLSearchParams();
@@ -528,6 +554,32 @@ class ApiService {
       headers: {}, // Let browser set Content-Type for FormData
       body: formData,
     });
+  }
+
+  // Admin Analytics
+  async getAdminStats(): Promise<{
+    totalUsers: number;
+    totalTracks: number;
+    totalPlays: number;
+    totalLikes: number;
+    newUsersToday: number;
+    tracksUploadedToday: number;
+  }> {
+    return this.request('/admin/stats');
+  }
+
+  async getAnalytics(params?: {
+    startDate?: string;
+    endDate?: string;
+    metric?: string;
+  }): Promise<any> {
+    const searchParams = new URLSearchParams();
+    if (params?.startDate) searchParams.append('startDate', params.startDate);
+    if (params?.endDate) searchParams.append('endDate', params.endDate);
+    if (params?.metric) searchParams.append('metric', params.metric);
+    
+    const query = searchParams.toString();
+    return this.request(`/admin/analytics${query ? `?${query}` : ''}`);
   }
 }
 
