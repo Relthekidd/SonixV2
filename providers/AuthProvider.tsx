@@ -94,23 +94,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Loading user profile for:', userId);
       
-      const { data, error } = await supabase
+      // First try to get existing user profile
+      let { data, error } = await supabase
         .from('users')
         .select('*')
         .eq('id', userId)
         .single();
 
-      if (error) {
-        console.error('Error loading user profile:', error);
+      if (error && error.code === 'PGRST116') {
+        console.log('User profile not found, attempting to create...');
         
-        // If user profile doesn't exist, this might be a new user
-        if (error.code === 'PGRST116') {
-          console.log('User profile not found, might be a new user');
+        // Try to use the get_or_create_user_profile function
+        const { data: profileData, error: profileError } = await supabase
+          .rpc('get_or_create_user_profile', { user_id: userId });
+
+        if (profileError) {
+          console.error('Error creating user profile:', profileError);
           setIsLoading(false);
           return;
         }
-        
-        throw error;
+
+        if (profileData && profileData.length > 0) {
+          data = profileData[0];
+        } else {
+          console.log('Could not create user profile');
+          setIsLoading(false);
+          return;
+        }
+      } else if (error) {
+        console.error('Error loading user profile:', error);
+        setIsLoading(false);
+        return;
       }
 
       if (data) {
@@ -221,12 +235,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         options: {
           data: {
             display_name: displayName.trim(),
+            displayName: displayName.trim(), // Include both for compatibility
             role,
             first_name: additionalData?.firstName?.trim() || '',
+            firstName: additionalData?.firstName?.trim() || '', // Include both for compatibility
             last_name: additionalData?.lastName?.trim() || '',
+            lastName: additionalData?.lastName?.trim() || '', // Include both for compatibility
             bio: additionalData?.bio?.trim() || '',
             is_private: additionalData?.isPrivate || false,
+            isPrivate: additionalData?.isPrivate || false, // Include both for compatibility
             profile_picture_url: additionalData?.profilePictureUrl || '',
+            profilePictureUrl: additionalData?.profilePictureUrl || '', // Include both for compatibility
           },
         },
       });
