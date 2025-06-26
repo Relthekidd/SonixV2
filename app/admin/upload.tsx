@@ -345,7 +345,19 @@ export default function AdminUploadScreen() {
       
     } catch (error) {
       console.error('❌ Upload failed:', error);
-      Alert.alert('Error', `Failed to upload ${formData.type}. Please try again.`);
+      
+      // Check if the error is due to invalid token
+      if (error instanceof Error && error.message === 'Invalid token') {
+        Alert.alert(
+          'Session Expired', 
+          'Your session has expired. Please log out and log back in to continue uploading content.',
+          [
+            { text: 'OK', style: 'default' }
+          ]
+        );
+      } else {
+        Alert.alert('Error', `Failed to upload ${formData.type}. Please try again.`);
+      }
     } finally {
       setIsUploading(false);
     }
