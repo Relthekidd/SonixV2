@@ -120,7 +120,8 @@ class ApiService {
             userFriendlyMessage = errorMessage || 'Invalid request. Please check your input and try again.';
             break;
           case 401:
-            userFriendlyMessage = 'Authentication failed. Please check your credentials.';
+            // Use the specific backend message if available, otherwise fall back to generic message
+            userFriendlyMessage = errorMessage || 'Authentication failed. Please check your credentials.';
             break;
           case 403:
             userFriendlyMessage = 'Access denied. You do not have permission to perform this action.';
