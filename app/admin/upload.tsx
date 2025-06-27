@@ -312,7 +312,7 @@ export default function AdminUploadScreen() {
           ]
         );
       } else {
-        Alert.alert('Error', `Failed to upload ${formData.type}. Please try again.`);
+        Alert.alert('Error', (error instanceof Error ? error.message : 'An unexpected error occurred') || `Failed to upload ${formData.type}. Please try again.`);
       }
     } finally {
       setIsUploading(false);
