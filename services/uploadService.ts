@@ -60,29 +60,33 @@ class UploadService {
       // Create FormData for the upload
       const formData = new FormData();
       
-      // Add REQUIRED metadata first
-      formData.append('title', singleData.title);
-      formData.append('created_by', singleData.artistId); // Required: who created it
+      // Add REQUIRED fields first (these are what the backend expects)
+      formData.append('title', singleData.title); // REQUIRED
+      formData.append('created_by', singleData.artistId); // REQUIRED - who created it
       
-      // Add optional metadata with proper defaults
+      // Artist information (REQUIRED for proper attribution)
+      formData.append('main_artist', singleData.mainArtist); // REQUIRED
+      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists || []));
+      
+      // Set artist_id to null since we're using main_artist name
+      formData.append('artist_id', ''); // Empty string instead of 'null'
+      
+      // Add optional metadata with proper defaults to avoid undefined values
       formData.append('lyrics', singleData.lyrics || '');
       formData.append('duration', (singleData.duration || 180).toString());
-      formData.append('genres', JSON.stringify(singleData.genres));
-      formData.append('explicit', singleData.explicit.toString());
+      formData.append('genres', JSON.stringify(singleData.genres || []));
+      formData.append('explicit', singleData.explicit ? 'true' : 'false');
       formData.append('description', singleData.description || '');
       formData.append('release_date', singleData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('is_single', 'true'); // Mark as single
-      
-      // Artist information
-      formData.append('main_artist', singleData.mainArtist);
-      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists));
-      
-      // Set artist_id to null if we're using main_artist name instead
-      formData.append('artist_id', 'null');
+      formData.append('is_published', 'false'); // Default to unpublished
+      formData.append('track_number', '1'); // Singles are track 1
       
       // Add price if provided
-      if (singleData.price !== undefined) {
+      if (singleData.price !== undefined && singleData.price !== '') {
         formData.append('price', singleData.price);
+      } else {
+        formData.append('price', '0');
       }
 
       // Add cover file if provided
@@ -101,7 +105,7 @@ class UploadService {
         singleData.audioFile.name || 'audio.mp3',
         singleData.audioFile.mimeType || 'audio/mpeg'
       );
-      formData.append('audio', audioFile as any);
+      formData.append('audio', audioFile as any); // REQUIRED
 
       // Set the auth token for the API service
       apiService.setAuthToken(session.access_token);
@@ -141,22 +145,23 @@ class UploadService {
       
       // Add REQUIRED album metadata
       formData.append('type', 'album');
-      formData.append('title', albumData.title);
-      formData.append('created_by', albumData.artistId); // Required: who created it
+      formData.append('title', albumData.title); // REQUIRED
+      formData.append('created_by', albumData.artistId); // REQUIRED - who created it
+      
+      // Artist information (REQUIRED for proper attribution)
+      formData.append('main_artist', albumData.mainArtist); // REQUIRED
+      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists || []));
+      
+      // Set artist_id to null since we're using main_artist name
+      formData.append('artist_id', ''); // Empty string instead of 'null'
       
       // Add optional album metadata with proper defaults
       formData.append('description', albumData.description || '');
       formData.append('release_date', albumData.releaseDate || new Date().toISOString().split('T')[0]);
-      formData.append('genres', JSON.stringify(albumData.genres));
-      formData.append('explicit', albumData.explicit.toString());
+      formData.append('genres', JSON.stringify(albumData.genres || []));
+      formData.append('explicit', albumData.explicit ? 'true' : 'false');
       formData.append('track_count', albumData.tracks.length.toString());
-      
-      // Artist information
-      formData.append('main_artist', albumData.mainArtist);
-      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists));
-      
-      // Set artist_id to null if we're using main_artist name instead
-      formData.append('artist_id', 'null');
+      formData.append('is_published', 'false'); // Default to unpublished
 
       // Add cover file if provided
       if (albumData.coverFile) {
@@ -173,15 +178,16 @@ class UploadService {
         const track = albumData.tracks[i];
         
         // Add REQUIRED track metadata
-        formData.append(`tracks[${i}][title]`, track.title);
-        formData.append(`tracks[${i}][track_number]`, track.trackNumber.toString());
+        formData.append(`tracks[${i}][title]`, track.title); // REQUIRED
+        formData.append(`tracks[${i}][track_number]`, track.trackNumber.toString()); // REQUIRED
         
         // Add optional track metadata with proper defaults
         formData.append(`tracks[${i}][lyrics]`, track.lyrics || '');
-        formData.append(`tracks[${i}][explicit]`, track.explicit.toString());
+        formData.append(`tracks[${i}][explicit]`, track.explicit ? 'true' : 'false');
         formData.append(`tracks[${i}][duration]`, (track.duration || 180).toString());
         formData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
-        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists));
+        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists || []));
+        formData.append(`tracks[${i}][is_published]`, 'false'); // Default to unpublished
 
         // Add REQUIRED audio file for this track
         const audioFile = await this.createFileFromUri(
@@ -189,7 +195,7 @@ class UploadService {
           track.audioFile.name || `track-${track.trackNumber}.mp3`,
           track.audioFile.mimeType || 'audio/mpeg'
         );
-        formData.append(`tracks[${i}][audio]`, audioFile as any);
+        formData.append(`tracks[${i}][audio]`, audioFile as any); // REQUIRED
       }
 
       // Set the auth token for the API service
