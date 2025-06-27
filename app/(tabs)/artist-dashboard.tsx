@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
+import { uploadService, SingleUploadData } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Upload, Music, Image as ImageIcon, Play, Pause, Plus, X, Check, CircleAlert as AlertCircle, Clock } from 'lucide-react-native';
@@ -25,7 +26,7 @@ interface UploadFormData {
   lyrics: string;
   duration: string;
   genres: string[];
-  isExplicit: boolean;
+  explicit: boolean;
   price: string;
 }
 
@@ -49,7 +50,7 @@ export default function ArtistDashboardScreen() {
     lyrics: '',
     duration: '',
     genres: [],
-    isExplicit: false,
+    explicit: false,
     price: '0',
   });
   const [newGenre, setNewGenre] = useState('');
@@ -142,18 +143,6 @@ export default function ArtistDashboardScreen() {
     }));
   };
 
-  const createFileFromUri = async (uri: string, name: string, type: string) => {
-    if (Platform.OS === 'web') {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      return new File([blob], name, { type });
-    } else {
-      // For mobile platforms, we'll need to handle this differently
-      // This is a simplified version for web compatibility
-      return { uri, name, type } as any;
-    }
-  };
-
   const handleUpload = async () => {
     if (!audioFile || !formData.title.trim()) {
       Alert.alert('Error', 'Please provide at least a title and audio file');
@@ -173,37 +162,22 @@ export default function ArtistDashboardScreen() {
     try {
       setIsUploading(true);
 
-      // Create FormData for track creation
-      const trackFormData = new FormData();
-      
-      // Add audio file
-      const audioFileForUpload = await createFileFromUri(
-        audioFile.uri, 
-        audioFile.name || 'audio.mp3', 
-        audioFile.mimeType || 'audio/mpeg'
-      );
-      trackFormData.append('audio', audioFileForUpload as any);
+      // Prepare upload data using the centralized service
+      const uploadData: SingleUploadData = {
+        title: formData.title,
+        lyrics: formData.lyrics,
+        duration: parseInt(formData.duration) || 180,
+        genres: formData.genres,
+        explicit: formData.explicit,
+        price: formData.price,
+        audioFile: audioFile,
+        coverFile: coverFile,
+        description: '', // Optional description
+        releaseDate: new Date().toISOString().split('T')[0], // Current date
+      };
 
-      // Add cover file if provided
-      if (coverFile) {
-        const coverFileForUpload = await createFileFromUri(
-          coverFile.uri,
-          coverFile.fileName || 'cover.jpg',
-          coverFile.mimeType || 'image/jpeg'
-        );
-        trackFormData.append('cover', coverFileForUpload as any);
-      }
-
-      // Add track metadata
-      trackFormData.append('title', formData.title);
-      trackFormData.append('lyrics', formData.lyrics);
-      trackFormData.append('duration', formData.duration || '180'); // Default 3 minutes
-      trackFormData.append('genres', JSON.stringify(formData.genres));
-      trackFormData.append('isExplicit', formData.isExplicit.toString());
-      trackFormData.append('price', formData.price);
-
-      // Upload track
-      await apiService.createTrack(trackFormData);
+      // Upload using the centralized service
+      await uploadService.uploadSingle(uploadData);
 
       Alert.alert('Success', 'Track uploaded successfully and is pending approval!');
       
@@ -213,7 +187,7 @@ export default function ArtistDashboardScreen() {
         lyrics: '',
         duration: '',
         genres: [],
-        isExplicit: false,
+        explicit: false,
         price: '0',
       });
       setAudioFile(null);
@@ -558,10 +532,10 @@ export default function ArtistDashboardScreen() {
               <View style={styles.formGroup}>
                 <TouchableOpacity
                   style={styles.checkboxContainer}
-                  onPress={() => setFormData(prev => ({ ...prev, isExplicit: !prev.isExplicit }))}
+                  onPress={() => setFormData(prev => ({ ...prev, explicit: !prev.explicit }))}
                 >
-                  <View style={[styles.checkbox, formData.isExplicit && styles.checkboxChecked]}>
-                    {formData.isExplicit && <Check color="#ffffff" size={16} />}
+                  <View style={[styles.checkbox, formData.explicit && styles.checkboxChecked]}>
+                    {formData.explicit && <Check color="#ffffff" size={16} />}
                   </View>
                   <Text style={styles.checkboxLabel}>Explicit Content</Text>
                 </TouchableOpacity>

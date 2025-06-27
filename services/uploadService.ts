@@ -11,6 +11,7 @@ export interface SingleUploadData {
   audioFile: any;
   description?: string;
   releaseDate?: string;
+  price?: string;
 }
 
 export interface AlbumUploadData {
@@ -61,6 +62,11 @@ class UploadService {
       formData.append('description', singleData.description || '');
       formData.append('releaseDate', singleData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('is_single', 'true'); // Mark as single
+      
+      // Add price if provided
+      if (singleData.price !== undefined) {
+        formData.append('price', singleData.price);
+      }
 
       // Add cover file if provided
       if (singleData.coverFile) {

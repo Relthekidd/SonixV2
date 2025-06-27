@@ -15,7 +15,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
-import { apiService } from '@/services/api';
+import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -223,91 +223,47 @@ export default function AdminUploadScreen() {
     try {
       console.log('🚀 Starting upload process...');
       
-      // Create FormData for upload
-      const uploadFormData = new FormData();
-      
-      // Add metadata
-      uploadFormData.append('title', formData.title);
-      uploadFormData.append('releaseDate', formData.releaseDate);
-      uploadFormData.append('genres', JSON.stringify(formData.genres));
-      uploadFormData.append('moods', JSON.stringify(formData.moods));
-      uploadFormData.append('explicit', formData.explicit.toString());
-      uploadFormData.append('isPublic', formData.isPublic.toString());
-      uploadFormData.append('description', formData.description);
-
-      // Add cover file
-      if (formData.coverFile) {
-        const coverFileForUpload = await createFileFromUri(
-          formData.coverFile.uri,
-          formData.coverFile.fileName || 'cover.jpg',
-          formData.coverFile.mimeType || 'image/jpeg'
-        );
-        uploadFormData.append('cover', coverFileForUpload as any);
-      }
-
-      // For singles, just upload the first track
       if (formData.type === 'single') {
+        // Prepare single upload data
         const track = formData.tracks[0];
-        
-        // Add track metadata
-        uploadFormData.append('lyrics', track.lyrics);
-        uploadFormData.append('duration', track.duration.toString() || '180');
+        const singleData: SingleUploadData = {
+          title: formData.title,
+          lyrics: track.lyrics,
+          duration: track.duration || 180,
+          genres: formData.genres,
+          explicit: formData.explicit,
+          coverFile: formData.coverFile,
+          audioFile: track.audioFile,
+          description: formData.description,
+          releaseDate: formData.releaseDate,
+        };
 
-        // Add audio file
-        if (track.audioFile) {
-          const audioFileForUpload = await createFileFromUri(
-            track.audioFile.uri,
-            track.audioFile.name || 'audio.mp3',
-            track.audioFile.mimeType || 'audio/mpeg'
-          );
-          uploadFormData.append('audio', audioFileForUpload as any);
-        }
-
-        // Mark as single (no album_id)
-        uploadFormData.append('is_single', 'true');
+        console.log('📀 Uploading single...');
+        await uploadService.uploadSingle(singleData);
       } else {
-        // For albums, add all tracks with proper ordering
-        uploadFormData.append('type', 'album');
-        uploadFormData.append('track_count', formData.tracks.length.toString());
-        
-        for (let i = 0; i < formData.tracks.length; i++) {
-          const track = formData.tracks[i];
-          
-          // Add track metadata with explicit track number for ordering
-          uploadFormData.append(`tracks[${i}][title]`, track.title);
-          uploadFormData.append(`tracks[${i}][lyrics]`, track.lyrics);
-          uploadFormData.append(`tracks[${i}][explicit]`, track.explicit.toString());
-          uploadFormData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
-          uploadFormData.append(`tracks[${i}][featuringArtists]`, JSON.stringify(track.featuringArtists));
-          uploadFormData.append(`tracks[${i}][duration]`, track.duration.toString() || '180');
-          uploadFormData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
+        // Prepare album upload data
+        const albumData: AlbumUploadData = {
+          title: formData.title,
+          description: formData.description,
+          releaseDate: formData.releaseDate,
+          coverFile: formData.coverFile,
+          genres: formData.genres,
+          explicit: formData.explicit,
+          tracks: formData.tracks.map(track => ({
+            title: track.title,
+            audioFile: track.audioFile,
+            lyrics: track.lyrics,
+            explicit: track.explicit,
+            trackNumber: track.trackNumber,
+            duration: track.duration || 180,
+          })),
+        };
 
-          // Add audio file
-          if (track.audioFile) {
-            const audioFileForUpload = await createFileFromUri(
-              track.audioFile.uri,
-              track.audioFile.name || `track-${i + 1}.mp3`,
-              track.audioFile.mimeType || 'audio/mpeg'
-            );
-            uploadFormData.append(`tracks[${i}][audio]`, audioFileForUpload as any);
-          }
-        }
-      }
-
-      let uploadResult;
-      
-      // Always use the tracks endpoint for uploads
-      if (formData.type === 'single') {
-        console.log('📀 Uploading single as track...');
-        uploadResult = await apiService.createTrack(uploadFormData);
-      } else {
         console.log('💿 Uploading album...');
-        // For albums, we might need to create the album first, then tracks
-        // For now, use tracks endpoint and handle album creation on backend
-        uploadResult = await apiService.createAlbum(uploadFormData);
+        await uploadService.uploadAlbum(albumData);
       }
 
-      console.log('✅ Upload successful:', uploadResult);
+      console.log('✅ Upload successful');
 
       Alert.alert(
         'Success', 
@@ -360,16 +316,6 @@ export default function AdminUploadScreen() {
       }
     } finally {
       setIsUploading(false);
-    }
-  };
-
-  const createFileFromUri = async (uri: string, name: string, type: string) => {
-    if (Platform.OS === 'web') {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      return new File([blob], name, { type });
-    } else {
-      return { uri, name, type } as any;
     }
   };
 
