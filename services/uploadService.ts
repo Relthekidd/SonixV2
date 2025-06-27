@@ -60,18 +60,25 @@ class UploadService {
       // Create FormData for the upload
       const formData = new FormData();
       
-      // Add metadata
+      // Add REQUIRED metadata first
       formData.append('title', singleData.title);
+      formData.append('created_by', singleData.artistId); // Required: who created it
+      
+      // Add optional metadata with proper defaults
       formData.append('lyrics', singleData.lyrics || '');
       formData.append('duration', (singleData.duration || 180).toString());
       formData.append('genres', JSON.stringify(singleData.genres));
       formData.append('explicit', singleData.explicit.toString());
       formData.append('description', singleData.description || '');
-      formData.append('releaseDate', singleData.releaseDate || new Date().toISOString().split('T')[0]);
+      formData.append('release_date', singleData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('is_single', 'true'); // Mark as single
-      formData.append('artist_id', singleData.artistId); // Add required artist ID
-      formData.append('main_artist', singleData.mainArtist); // Add main artist
-      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists)); // Add featured artists
+      
+      // Artist information
+      formData.append('main_artist', singleData.mainArtist);
+      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists));
+      
+      // Set artist_id to null if we're using main_artist name instead
+      formData.append('artist_id', 'null');
       
       // Add price if provided
       if (singleData.price !== undefined) {
@@ -88,7 +95,7 @@ class UploadService {
         formData.append('cover', coverFile as any);
       }
 
-      // Add audio file
+      // Add REQUIRED audio file
       const audioFile = await this.createFileFromUri(
         singleData.audioFile.uri,
         singleData.audioFile.name || 'audio.mp3',
@@ -132,17 +139,24 @@ class UploadService {
       // Create FormData for the upload
       const formData = new FormData();
       
-      // Add album metadata
+      // Add REQUIRED album metadata
       formData.append('type', 'album');
       formData.append('title', albumData.title);
+      formData.append('created_by', albumData.artistId); // Required: who created it
+      
+      // Add optional album metadata with proper defaults
       formData.append('description', albumData.description || '');
-      formData.append('releaseDate', albumData.releaseDate || new Date().toISOString().split('T')[0]);
+      formData.append('release_date', albumData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('genres', JSON.stringify(albumData.genres));
       formData.append('explicit', albumData.explicit.toString());
       formData.append('track_count', albumData.tracks.length.toString());
-      formData.append('artist_id', albumData.artistId); // Add required artist ID
-      formData.append('main_artist', albumData.mainArtist); // Add main artist
-      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists)); // Add featured artists
+      
+      // Artist information
+      formData.append('main_artist', albumData.mainArtist);
+      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists));
+      
+      // Set artist_id to null if we're using main_artist name instead
+      formData.append('artist_id', 'null');
 
       // Add cover file if provided
       if (albumData.coverFile) {
@@ -158,16 +172,18 @@ class UploadService {
       for (let i = 0; i < albumData.tracks.length; i++) {
         const track = albumData.tracks[i];
         
-        // Add track metadata with explicit ordering
+        // Add REQUIRED track metadata
         formData.append(`tracks[${i}][title]`, track.title);
+        formData.append(`tracks[${i}][track_number]`, track.trackNumber.toString());
+        
+        // Add optional track metadata with proper defaults
         formData.append(`tracks[${i}][lyrics]`, track.lyrics || '');
         formData.append(`tracks[${i}][explicit]`, track.explicit.toString());
-        formData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
         formData.append(`tracks[${i}][duration]`, (track.duration || 180).toString());
         formData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
-        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists)); // Track-specific featured artists
+        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists));
 
-        // Add audio file for this track
+        // Add REQUIRED audio file for this track
         const audioFile = await this.createFileFromUri(
           track.audioFile.uri,
           track.audioFile.name || `track-${track.trackNumber}.mp3`,
