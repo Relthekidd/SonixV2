@@ -12,7 +12,9 @@ export interface SingleUploadData {
   description?: string;
   releaseDate?: string;
   price?: string;
-  artistId: string; // Added required artist ID
+  artistId: string;
+  mainArtist: string;
+  featuredArtists: string[];
 }
 
 export interface AlbumUploadData {
@@ -22,7 +24,9 @@ export interface AlbumUploadData {
   coverFile?: any;
   genres: string[];
   explicit: boolean;
-  artistId: string; // Added required artist ID
+  artistId: string;
+  mainArtist: string;
+  featuredArtists: string[];
   tracks: Array<{
     title: string;
     audioFile: any;
@@ -30,6 +34,7 @@ export interface AlbumUploadData {
     explicit: boolean;
     trackNumber: number;
     duration?: number;
+    featuringArtists: string[];
   }>;
 }
 
@@ -65,6 +70,8 @@ class UploadService {
       formData.append('releaseDate', singleData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('is_single', 'true'); // Mark as single
       formData.append('artist_id', singleData.artistId); // Add required artist ID
+      formData.append('main_artist', singleData.mainArtist); // Add main artist
+      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists)); // Add featured artists
       
       // Add price if provided
       if (singleData.price !== undefined) {
@@ -134,6 +141,8 @@ class UploadService {
       formData.append('explicit', albumData.explicit.toString());
       formData.append('track_count', albumData.tracks.length.toString());
       formData.append('artist_id', albumData.artistId); // Add required artist ID
+      formData.append('main_artist', albumData.mainArtist); // Add main artist
+      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists)); // Add featured artists
 
       // Add cover file if provided
       if (albumData.coverFile) {
@@ -156,6 +165,7 @@ class UploadService {
         formData.append(`tracks[${i}][trackNumber]`, track.trackNumber.toString());
         formData.append(`tracks[${i}][duration]`, (track.duration || 180).toString());
         formData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
+        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists)); // Track-specific featured artists
 
         // Add audio file for this track
         const audioFile = await this.createFileFromUri(
