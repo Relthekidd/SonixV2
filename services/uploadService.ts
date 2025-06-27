@@ -12,6 +12,7 @@ export interface SingleUploadData {
   description?: string;
   releaseDate?: string;
   price?: string;
+  artistId: string; // Added required artist ID
 }
 
 export interface AlbumUploadData {
@@ -21,6 +22,7 @@ export interface AlbumUploadData {
   coverFile?: any;
   genres: string[];
   explicit: boolean;
+  artistId: string; // Added required artist ID
   tracks: Array<{
     title: string;
     audioFile: any;
@@ -62,6 +64,7 @@ class UploadService {
       formData.append('description', singleData.description || '');
       formData.append('releaseDate', singleData.releaseDate || new Date().toISOString().split('T')[0]);
       formData.append('is_single', 'true'); // Mark as single
+      formData.append('artist_id', singleData.artistId); // Add required artist ID
       
       // Add price if provided
       if (singleData.price !== undefined) {
@@ -130,6 +133,7 @@ class UploadService {
       formData.append('genres', JSON.stringify(albumData.genres));
       formData.append('explicit', albumData.explicit.toString());
       formData.append('track_count', albumData.tracks.length.toString());
+      formData.append('artist_id', albumData.artistId); // Add required artist ID
 
       // Add cover file if provided
       if (albumData.coverFile) {

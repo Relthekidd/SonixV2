@@ -17,7 +17,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
+import * * ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown, ArrowLeft } from 'lucide-react-native';
 
@@ -236,6 +236,7 @@ export default function AdminUploadScreen() {
           audioFile: track.audioFile,
           description: formData.description,
           releaseDate: formData.releaseDate,
+          artistId: user?.id || '', // Use admin's user ID as artist ID
         };
 
         console.log('📀 Uploading single...');
@@ -249,6 +250,7 @@ export default function AdminUploadScreen() {
           coverFile: formData.coverFile,
           genres: formData.genres,
           explicit: formData.explicit,
+          artistId: user?.id || '', // Use admin's user ID as artist ID
           tracks: formData.tracks.map(track => ({
             title: track.title,
             audioFile: track.audioFile,

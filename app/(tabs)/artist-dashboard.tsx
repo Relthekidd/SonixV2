@@ -174,6 +174,7 @@ export default function ArtistDashboardScreen() {
         coverFile: coverFile,
         description: '', // Optional description
         releaseDate: new Date().toISOString().split('T')[0], // Current date
+        artistId: artistProfile.id, // Add the required artist ID
       };
 
       // Upload using the centralized service
