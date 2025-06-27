@@ -17,7 +17,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
-import * * ImagePicker from 'expo-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown, ArrowLeft } from 'lucide-react-native';
 
