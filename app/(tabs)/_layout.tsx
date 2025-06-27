@@ -40,6 +40,7 @@ export default function TabLayout() {
           },
         }}
       >
+        {/* Home tab - visible to all users */}
         <Tabs.Screen
           name="index"
           options={{
@@ -49,6 +50,8 @@ export default function TabLayout() {
             ),
           }}
         />
+        
+        {/* Search tab - visible to all users */}
         <Tabs.Screen
           name="search"
           options={{
@@ -58,6 +61,8 @@ export default function TabLayout() {
             ),
           }}
         />
+        
+        {/* Library tab - visible to all users */}
         <Tabs.Screen
           name="library"
           options={{
@@ -67,7 +72,8 @@ export default function TabLayout() {
             ),
           }}
         />
-        {/* Only show artist dashboard for verified artists, not admins */}
+        
+        {/* Artist Dashboard - only visible to verified artists */}
         {user.role === 'artist' && user.artistVerified && (
           <Tabs.Screen
             name="artist-dashboard"
@@ -79,6 +85,8 @@ export default function TabLayout() {
             }}
           />
         )}
+        
+        {/* Admin Dashboard - only visible to admins */}
         {user.role === 'admin' && (
           <Tabs.Screen
             name="admin"
@@ -90,6 +98,8 @@ export default function TabLayout() {
             }}
           />
         )}
+        
+        {/* Profile tab - visible to all users */}
         <Tabs.Screen
           name="profile"
           options={{
