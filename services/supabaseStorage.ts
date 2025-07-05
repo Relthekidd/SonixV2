@@ -157,47 +157,10 @@ class SupabaseStorageService {
    */
   async initializeBuckets(): Promise<void> {
     try {
-      // Check if buckets exist
-      const { data: buckets, error } = await supabase.storage.listBuckets();
-      
-      if (error) {
-        console.error('❌ Error listing buckets:', error);
-        return;
-      }
-
-      const existingBuckets = buckets.map(bucket => bucket.name);
-
-      // Create audio bucket if it doesn't exist
-      if (!existingBuckets.includes(this.AUDIO_BUCKET)) {
-        const { error: audioError } = await supabase.storage.createBucket(this.AUDIO_BUCKET, {
-          public: true,
-          allowedMimeTypes: ['audio/*'],
-          fileSizeLimit: 100 * 1024 * 1024, // 100MB
-        });
-
-        if (audioError) {
-          console.error('❌ Error creating audio bucket:', audioError);
-        } else {
-          console.log('✅ Audio bucket created successfully');
-        }
-      }
-
-      // Create image bucket if it doesn't exist
-      if (!existingBuckets.includes(this.IMAGE_BUCKET)) {
-        const { error: imageError } = await supabase.storage.createBucket(this.IMAGE_BUCKET, {
-          public: true,
-          allowedMimeTypes: ['image/*'],
-          fileSizeLimit: 10 * 1024 * 1024, // 10MB
-        });
-
-        if (imageError) {
-          console.error('❌ Error creating image bucket:', imageError);
-        } else {
-          console.log('✅ Image bucket created successfully');
-        }
-      }
+      console.log('ℹ️ Storage buckets should be created manually in the Supabase dashboard');
+      console.log(`ℹ️ Required buckets: ${this.AUDIO_BUCKET}, ${this.IMAGE_BUCKET}`);
     } catch (error) {
-      console.error('❌ Error initializing buckets:', error);
+      console.error('❌ Error checking storage configuration:', error);
     }
   }
 }
