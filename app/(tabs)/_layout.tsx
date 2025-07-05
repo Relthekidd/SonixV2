@@ -73,7 +73,7 @@ export default function TabLayout() {
           }}
         />
         
-        {/* Artist Dashboard - only visible to verified artists */}
+        {/* Artist Dashboard - only visible to verified artists (NOT admins) */}
         {user.role === 'artist' && user.artistVerified && (
           <Tabs.Screen
             name="artist-dashboard"

@@ -9,12 +9,10 @@ import {
   Alert,
   ActivityIndicator,
   Image,
-  FlatList,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
-import { useMusic } from '@/providers/MusicProvider';
 import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,9 +27,7 @@ interface UploadFormData {
   releaseDate: string;
   coverFile: any;
   genres: string[];
-  moods: string[];
   explicit: boolean;
-  isPublic: boolean;
   description: string;
   tracks: Track[];
 }
@@ -52,11 +48,6 @@ const GENRES = [
   'Country', 'Reggae', 'Blues', 'Folk', 'Indie', 'Alternative', 'Funk'
 ];
 
-const MOODS = [
-  'Chill', 'Hype', 'Emotional', 'Romantic', 'Energetic', 'Melancholic',
-  'Uplifting', 'Dark', 'Peaceful', 'Aggressive', 'Nostalgic', 'Dreamy'
-];
-
 export default function AdminUploadScreen() {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -70,9 +61,7 @@ export default function AdminUploadScreen() {
     releaseDate: new Date().toISOString().split('T')[0],
     coverFile: null,
     genres: [],
-    moods: [],
     explicit: false,
-    isPublic: true,
     description: '',
     tracks: [{
       id: '1',
@@ -85,6 +74,11 @@ export default function AdminUploadScreen() {
       duration: 0,
     }],
   });
+
+  useEffect(() => {
+    // Initialize storage on component mount
+    uploadService.initializeStorage();
+  }, []);
 
   const pickCoverImage = async () => {
     try {
@@ -139,7 +133,6 @@ export default function AdminUploadScreen() {
   const removeTrack = (trackIndex: number) => {
     if (formData.tracks.length > 1) {
       const updatedTracks = formData.tracks.filter((_, index) => index !== trackIndex);
-      // Renumber tracks to maintain proper order
       const renumberedTracks = updatedTracks.map((track, index) => ({
         ...track,
         trackNumber: index + 1
@@ -153,15 +146,11 @@ export default function AdminUploadScreen() {
     const newIndex = direction === 'up' ? trackIndex - 1 : trackIndex + 1;
     
     if (newIndex >= 0 && newIndex < tracks.length) {
-      // Swap tracks
       [tracks[trackIndex], tracks[newIndex]] = [tracks[newIndex], tracks[trackIndex]];
-      
-      // Renumber tracks to maintain proper order
       const renumberedTracks = tracks.map((track, index) => ({
         ...track,
         trackNumber: index + 1
       }));
-      
       setFormData(prev => ({ ...prev, tracks: renumberedTracks }));
     }
   };
@@ -178,15 +167,6 @@ export default function AdminUploadScreen() {
       genres: prev.genres.includes(genre)
         ? prev.genres.filter(g => g !== genre)
         : [...prev.genres, genre]
-    }));
-  };
-
-  const toggleMood = (mood: string) => {
-    setFormData(prev => ({
-      ...prev,
-      moods: prev.moods.includes(mood)
-        ? prev.moods.filter(m => m !== mood)
-        : [...prev.moods, mood]
     }));
   };
 
@@ -239,11 +219,6 @@ export default function AdminUploadScreen() {
       return false;
     }
 
-    if (!formData.coverFile) {
-      Alert.alert('Error', 'Cover art is required');
-      return false;
-    }
-
     for (let i = 0; i < formData.tracks.length; i++) {
       const track = formData.tracks[i];
       if (!track.title.trim()) {
@@ -267,7 +242,6 @@ export default function AdminUploadScreen() {
       console.log('🚀 Starting upload process...');
       
       if (formData.type === 'single') {
-        // Prepare single upload data
         const track = formData.tracks[0];
         const singleData: SingleUploadData = {
           title: formData.title,
@@ -279,7 +253,7 @@ export default function AdminUploadScreen() {
           audioFile: track.audioFile,
           description: formData.description,
           releaseDate: formData.releaseDate,
-          artistId: user?.id || '', // Use admin's user ID as artist ID
+          artistId: user?.id || '',
           mainArtist: formData.mainArtist,
           featuredArtists: formData.featuredArtists,
         };
@@ -287,7 +261,6 @@ export default function AdminUploadScreen() {
         console.log('📀 Uploading single...');
         await uploadService.uploadSingle(singleData);
       } else {
-        // Prepare album upload data
         const albumData: AlbumUploadData = {
           title: formData.title,
           description: formData.description,
@@ -295,7 +268,7 @@ export default function AdminUploadScreen() {
           coverFile: formData.coverFile,
           genres: formData.genres,
           explicit: formData.explicit,
-          artistId: user?.id || '', // Use admin's user ID as artist ID
+          artistId: user?.id || '',
           mainArtist: formData.mainArtist,
           featuredArtists: formData.featuredArtists,
           tracks: formData.tracks.map(track => ({
@@ -335,9 +308,7 @@ export default function AdminUploadScreen() {
         releaseDate: new Date().toISOString().split('T')[0],
         coverFile: null,
         genres: [],
-        moods: [],
         explicit: false,
-        isPublic: true,
         description: '',
         tracks: [{
           id: '1',
@@ -353,19 +324,7 @@ export default function AdminUploadScreen() {
       
     } catch (error) {
       console.error('❌ Upload failed:', error);
-      
-      // Check if the error is due to invalid token
-      if (error instanceof Error && error.message === 'Invalid token') {
-        Alert.alert(
-          'Session Expired', 
-          'Your session has expired. Please log out and log back in to continue uploading content.',
-          [
-            { text: 'OK', style: 'default' }
-          ]
-        );
-      } else {
-        Alert.alert('Error', (error instanceof Error ? error.message : 'An unexpected error occurred') || `Failed to upload ${formData.type}. Please try again.`);
-      }
+      Alert.alert('Error', error instanceof Error ? error.message : `Failed to upload ${formData.type}. Please try again.`);
     } finally {
       setIsUploading(false);
     }
@@ -507,7 +466,7 @@ export default function AdminUploadScreen() {
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Cover Art *</Text>
+            <Text style={styles.label}>Cover Art</Text>
             <TouchableOpacity
               style={[styles.fileButton, formData.coverFile && styles.fileButtonSelected]}
               onPress={pickCoverImage}
@@ -554,28 +513,6 @@ export default function AdminUploadScreen() {
                   styles.tagText,
                   formData.genres.includes(genre) && styles.tagTextSelected
                 ]}>{genre}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* Moods */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Moods</Text>
-          <View style={styles.tagContainer}>
-            {MOODS.map((mood) => (
-              <TouchableOpacity
-                key={mood}
-                style={[
-                  styles.tag,
-                  formData.moods.includes(mood) && styles.tagSelected
-                ]}
-                onPress={() => toggleMood(mood)}
-              >
-                <Text style={[
-                  styles.tagText,
-                  formData.moods.includes(mood) && styles.tagTextSelected
-                ]}>{mood}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -650,34 +587,6 @@ export default function AdminUploadScreen() {
                   </Text>
                   {track.audioFile && <Check color="#8b5cf6" size={20} />}
                 </TouchableOpacity>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Track Featured Artists</Text>
-                <View style={styles.trackFeaturedContainer}>
-                  <TextInput
-                    style={styles.trackFeaturedInput}
-                    placeholder="Add featured artist for this track"
-                    placeholderTextColor="#64748b"
-                    onSubmitEditing={(e) => {
-                      addTrackFeaturedArtist(index, e.nativeEvent.text);
-                      e.target.clear();
-                    }}
-                  />
-                </View>
-                <View style={styles.trackFeaturedList}>
-                  {track.featuringArtists.map((artist, artistIndex) => (
-                    <TouchableOpacity
-                      key={artistIndex}
-                      style={styles.trackFeaturedTag}
-                      onPress={() => removeTrackFeaturedArtist(index, artist)}
-                    >
-                      <User color="#8b5cf6" size={14} />
-                      <Text style={styles.trackFeaturedTagText}>{artist}</Text>
-                      <X color="#8b5cf6" size={14} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
               </View>
 
               <View style={styles.formGroup}>
@@ -1018,41 +927,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  trackFeaturedContainer: {
-    marginBottom: 8,
-  },
-  trackFeaturedInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  trackFeaturedList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  trackFeaturedTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    gap: 4,
-  },
-  trackFeaturedTagText: {
-    fontSize: 10,
-    fontFamily: 'Inter-Medium',
-    color: '#8b5cf6',
   },
   submitContainer: {
     paddingHorizontal: 24,

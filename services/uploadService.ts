@@ -1,5 +1,5 @@
 import { supabase } from '@/providers/AuthProvider';
-import { apiService } from './api';
+import { supabaseStorage } from './supabaseStorage';
 
 export interface SingleUploadData {
   title: string;
@@ -40,81 +40,67 @@ export interface AlbumUploadData {
 
 class UploadService {
   /**
-   * Upload a single track using Supabase authentication
+   * Upload a single track using Supabase Storage and Database
    */
   async uploadSingle(singleData: SingleUploadData): Promise<any> {
     try {
-      // Get the current session and token
+      // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
         throw new Error('Failed to get authentication session');
       }
       
-      if (!session?.access_token) {
+      if (!session?.user) {
         throw new Error('Not authenticated - please log in again');
       }
 
-      console.log('🎵 Uploading single with Supabase auth...');
+      console.log('🎵 Uploading single with Supabase Storage...');
 
-      // Create FormData for the upload
-      const formData = new FormData();
-      
-      // Add REQUIRED fields first (these are what the backend expects)
-      formData.append('title', singleData.title); // REQUIRED
-      formData.append('created_by', singleData.artistId); // REQUIRED - who created it
-      
-      // Artist information (REQUIRED for proper attribution)
-      formData.append('main_artist', singleData.mainArtist); // REQUIRED
-      formData.append('featured_artists', JSON.stringify(singleData.featuredArtists || []));
-      
-      // Set artist_id to null since we're using main_artist name
-      formData.append('artist_id', ''); // Empty string instead of 'null'
-      
-      // Add optional metadata with proper defaults to avoid undefined values
-      formData.append('lyrics', singleData.lyrics || '');
-      formData.append('duration', (singleData.duration || 180).toString());
-      formData.append('genres', JSON.stringify(singleData.genres || []));
-      formData.append('explicit', singleData.explicit ? 'true' : 'false');
-      formData.append('description', singleData.description || '');
-      formData.append('release_date', singleData.releaseDate || new Date().toISOString().split('T')[0]);
-      formData.append('is_single', 'true'); // Mark as single
-      formData.append('is_published', 'false'); // Default to unpublished
-      formData.append('track_number', '1'); // Singles are track 1
-      
-      // Add price if provided
-      if (singleData.price !== undefined && singleData.price !== '') {
-        formData.append('price', singleData.price);
-      } else {
-        formData.append('price', '0');
-      }
+      // Step 1: Upload audio file to Supabase Storage
+      const audioFileName = singleData.audioFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+      const audioUpload = await supabaseStorage.uploadAudio(singleData.audioFile, audioFileName);
 
-      // Add cover file if provided
+      // Step 2: Upload cover image if provided
+      let coverUpload = null;
       if (singleData.coverFile) {
-        const coverFile = await this.createFileFromUri(
-          singleData.coverFile.uri,
-          singleData.coverFile.fileName || 'cover.jpg',
-          singleData.coverFile.mimeType || 'image/jpeg'
-        );
-        formData.append('cover', coverFile as any);
+        const coverFileName = singleData.coverFile.fileName || singleData.coverFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
+        coverUpload = await supabaseStorage.uploadImage(singleData.coverFile, coverFileName);
       }
 
-      // Add REQUIRED audio file
-      const audioFile = await this.createFileFromUri(
-        singleData.audioFile.uri,
-        singleData.audioFile.name || 'audio.mp3',
-        singleData.audioFile.mimeType || 'audio/mpeg'
-      );
-      formData.append('audio', audioFile as any); // REQUIRED
+      // Step 3: Create track record in database
+      const trackData = {
+        title: singleData.title,
+        artist_name: singleData.mainArtist,
+        audio_url: audioUpload.url,
+        cover_url: coverUpload?.url || null,
+        lyrics: singleData.lyrics || '',
+        duration: singleData.duration || 180,
+        genres: singleData.genres,
+        explicit: singleData.explicit,
+        description: singleData.description || '',
+        release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
+        price: parseFloat(singleData.price || '0'),
+        is_published: false, // Admin approval required
+        track_number: 1,
+        created_by: session.user.id,
+        featuring_artists: singleData.featuredArtists,
+      };
 
-      // Set the auth token for the API service
-      apiService.setAuthToken(session.access_token);
+      const { data: track, error: trackError } = await supabase
+        .from('tracks')
+        .insert(trackData)
+        .select()
+        .single();
 
-      // Upload using the API service
-      const result = await apiService.createTrack(formData);
-      
-      console.log('✅ Single upload successful:', result);
-      return result;
+      if (trackError) {
+        // Clean up uploaded files if database insert fails
+        await this.cleanupFiles(audioUpload.path, coverUpload?.path);
+        throw new Error(`Database error: ${trackError.message}`);
+      }
+
+      console.log('✅ Single upload successful:', track);
+      return track;
 
     } catch (error) {
       console.error('❌ Single upload failed:', error);
@@ -123,89 +109,114 @@ class UploadService {
   }
 
   /**
-   * Upload an album with multiple tracks, maintaining track order
+   * Upload an album with multiple tracks
    */
   async uploadAlbum(albumData: AlbumUploadData): Promise<any> {
     try {
-      // Get the current session and token
+      // Get the current session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
       
       if (sessionError) {
         throw new Error('Failed to get authentication session');
       }
       
-      if (!session?.access_token) {
+      if (!session?.user) {
         throw new Error('Not authenticated - please log in again');
       }
 
-      console.log('💿 Uploading album with Supabase auth...');
+      console.log('💿 Uploading album with Supabase Storage...');
 
-      // Create FormData for the upload
-      const formData = new FormData();
-      
-      // Add REQUIRED album metadata
-      formData.append('type', 'album');
-      formData.append('title', albumData.title); // REQUIRED
-      formData.append('created_by', albumData.artistId); // REQUIRED - who created it
-      
-      // Artist information (REQUIRED for proper attribution)
-      formData.append('main_artist', albumData.mainArtist); // REQUIRED
-      formData.append('featured_artists', JSON.stringify(albumData.featuredArtists || []));
-      
-      // Set artist_id to null since we're using main_artist name
-      formData.append('artist_id', ''); // Empty string instead of 'null'
-      
-      // Add optional album metadata with proper defaults
-      formData.append('description', albumData.description || '');
-      formData.append('release_date', albumData.releaseDate || new Date().toISOString().split('T')[0]);
-      formData.append('genres', JSON.stringify(albumData.genres || []));
-      formData.append('explicit', albumData.explicit ? 'true' : 'false');
-      formData.append('track_count', albumData.tracks.length.toString());
-      formData.append('is_published', 'false'); // Default to unpublished
-
-      // Add cover file if provided
+      // Step 1: Upload album cover if provided
+      let albumCoverUpload = null;
       if (albumData.coverFile) {
-        const coverFile = await this.createFileFromUri(
-          albumData.coverFile.uri,
-          albumData.coverFile.fileName || 'cover.jpg',
-          albumData.coverFile.mimeType || 'image/jpeg'
-        );
-        formData.append('cover', coverFile as any);
+        const coverFileName = albumData.coverFile.fileName || albumData.coverFile.name || `${albumData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
+        albumCoverUpload = await supabaseStorage.uploadImage(albumData.coverFile, coverFileName);
       }
 
-      // Add tracks with proper ordering
-      for (let i = 0; i < albumData.tracks.length; i++) {
-        const track = albumData.tracks[i];
-        
-        // Add REQUIRED track metadata
-        formData.append(`tracks[${i}][title]`, track.title); // REQUIRED
-        formData.append(`tracks[${i}][track_number]`, track.trackNumber.toString()); // REQUIRED
-        
-        // Add optional track metadata with proper defaults
-        formData.append(`tracks[${i}][lyrics]`, track.lyrics || '');
-        formData.append(`tracks[${i}][explicit]`, track.explicit ? 'true' : 'false');
-        formData.append(`tracks[${i}][duration]`, (track.duration || 180).toString());
-        formData.append(`tracks[${i}][position]`, i.toString()); // Upload order position
-        formData.append(`tracks[${i}][featuring_artists]`, JSON.stringify(track.featuringArtists || []));
-        formData.append(`tracks[${i}][is_published]`, 'false'); // Default to unpublished
+      // Step 2: Create album record
+      const albumRecord = {
+        title: albumData.title,
+        artist_name: albumData.mainArtist,
+        cover_url: albumCoverUpload?.url || null,
+        description: albumData.description || '',
+        release_date: albumData.releaseDate || new Date().toISOString().split('T')[0],
+        genres: albumData.genres,
+        explicit: albumData.explicit,
+        track_count: albumData.tracks.length,
+        is_published: false, // Admin approval required
+        created_by: session.user.id,
+        featuring_artists: albumData.featuredArtists,
+      };
 
-        // Add REQUIRED audio file for this track
-        const audioFile = await this.createFileFromUri(
-          track.audioFile.uri,
-          track.audioFile.name || `track-${track.trackNumber}.mp3`,
-          track.audioFile.mimeType || 'audio/mpeg'
-        );
-        formData.append(`tracks[${i}][audio]`, audioFile as any); // REQUIRED
+      const { data: album, error: albumError } = await supabase
+        .from('albums')
+        .insert(albumRecord)
+        .select()
+        .single();
+
+      if (albumError) {
+        // Clean up uploaded cover if album creation fails
+        if (albumCoverUpload) {
+          await this.cleanupFiles(null, albumCoverUpload.path);
+        }
+        throw new Error(`Album creation failed: ${albumError.message}`);
       }
 
-      // Set the auth token for the API service
-      apiService.setAuthToken(session.access_token);
+      // Step 3: Upload tracks
+      const uploadedTracks = [];
+      const uploadedFiles: string[] = [];
 
-      // Upload using the API service
-      const result = await apiService.createAlbum(formData);
-      
-      console.log('✅ Album upload successful:', result);
-      return result;
+      try {
+        for (let i = 0; i < albumData.tracks.length; i++) {
+          const track = albumData.tracks[i];
+          
+          // Upload audio file
+          const audioFileName = track.audioFile.name || `${track.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+          const audioUpload = await supabaseStorage.uploadAudio(track.audioFile, audioFileName);
+          uploadedFiles.push(audioUpload.path);
+
+          // Create track record
+          const trackData = {
+            title: track.title,
+            artist_name: albumData.mainArtist,
+            album_id: album.id,
+            audio_url: audioUpload.url,
+            cover_url: album.cover_url, // Use album cover for tracks
+            lyrics: track.lyrics || '',
+            duration: track.duration || 180,
+            genres: albumData.genres,
+            explicit: track.explicit,
+            track_number: track.trackNumber,
+            is_published: false, // Admin approval required
+            created_by: session.user.id,
+            featuring_artists: track.featuringArtists,
+          };
+
+          const { data: trackRecord, error: trackError } = await supabase
+            .from('tracks')
+            .insert(trackData)
+            .select()
+            .single();
+
+          if (trackError) {
+            throw new Error(`Track ${i + 1} creation failed: ${trackError.message}`);
+          }
+
+          uploadedTracks.push(trackRecord);
+        }
+
+        console.log('✅ Album upload successful:', album);
+        return { album, tracks: uploadedTracks };
+
+      } catch (error) {
+        // Clean up all uploaded files if any track fails
+        await this.cleanupFiles(...uploadedFiles, albumCoverUpload?.path);
+        
+        // Also delete the album record
+        await supabase.from('albums').delete().eq('id', album.id);
+        
+        throw error;
+      }
 
     } catch (error) {
       console.error('❌ Album upload failed:', error);
@@ -214,28 +225,7 @@ class UploadService {
   }
 
   /**
-   * Create a File object from URI for web compatibility
-   */
-  private async createFileFromUri(uri: string, name: string, type: string): Promise<File | any> {
-    try {
-      if (typeof window !== 'undefined' && window.File) {
-        // Web environment
-        const response = await fetch(uri);
-        const blob = await response.blob();
-        return new File([blob], name, { type });
-      } else {
-        // React Native environment
-        return { uri, name, type };
-      }
-    } catch (error) {
-      console.error('Error creating file from URI:', error);
-      throw new Error('Failed to process file for upload');
-    }
-  }
-
-  /**
-   * Check if user is authenticated and has upload permissions
-   * Currently restricted to admin users only to match backend API restrictions
+   * Check if user has upload permissions
    */
   async checkUploadPermissions(): Promise<boolean> {
     try {
@@ -245,10 +235,10 @@ class UploadService {
         return false;
       }
 
-      // Check if user has admin role - only admins can upload per backend restrictions
+      // Check if user has admin role or is a verified artist
       const { data: user, error } = await supabase
         .from('users')
-        .select('role')
+        .select('role, artist_verified')
         .eq('id', session.user.id)
         .single();
 
@@ -257,8 +247,8 @@ class UploadService {
         return false;
       }
 
-      // Only allow admins to upload (matching backend API restrictions)
-      return user.role === 'admin';
+      // Allow admins and verified artists to upload
+      return user.role === 'admin' || (user.role === 'artist' && user.artist_verified);
 
     } catch (error) {
       console.error('Error checking upload permissions:', error);
@@ -267,11 +257,27 @@ class UploadService {
   }
 
   /**
-   * Get upload progress (placeholder for future implementation)
+   * Clean up uploaded files in case of errors
    */
-  onUploadProgress(callback: (progress: number) => void) {
-    // This would be implemented with actual upload progress tracking
-    // For now, it's a placeholder for future enhancement
+  private async cleanupFiles(...filePaths: (string | null | undefined)[]): Promise<void> {
+    for (const filePath of filePaths) {
+      if (filePath) {
+        try {
+          // Determine bucket based on file path
+          const bucket = filePath.includes('covers/') ? 'images' : 'audio-files';
+          await supabaseStorage.deleteFile(bucket, filePath);
+        } catch (error) {
+          console.error('Error cleaning up file:', filePath, error);
+        }
+      }
+    }
+  }
+
+  /**
+   * Initialize storage buckets on app start
+   */
+  async initializeStorage(): Promise<void> {
+    await supabaseStorage.initializeBuckets();
   }
 }
 

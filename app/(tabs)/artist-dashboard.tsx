@@ -10,34 +10,38 @@ import {
   ActivityIndicator,
   Image,
   FlatList,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
-import { apiService } from '@/services/api';
-import { uploadService, SingleUploadData } from '@/services/uploadService';
+import { uploadService } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { Upload, Music, Image as ImageIcon, Play, Pause, Plus, X, Check, CircleAlert as AlertCircle, Clock } from 'lucide-react-native';
 
 interface UploadFormData {
   title: string;
+  mainArtist: string;
+  featuredArtists: string[];
   lyrics: string;
   duration: string;
   genres: string[];
   explicit: boolean;
   price: string;
+  description: string;
 }
+
+const GENRES = [
+  'Hip-Hop', 'R&B', 'Pop', 'Rock', 'Electronic', 'Jazz', 'Classical', 
+  'Country', 'Reggae', 'Blues', 'Folk', 'Indie', 'Alternative', 'Funk'
+];
 
 export default function ArtistDashboardScreen() {
   const { user } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
   
   // Artist profile state
-  const [artistProfile, setArtistProfile] = useState<any>(null);
   const [artistTracks, setArtistTracks] = useState<any[]>([]);
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
   const [isLoadingTracks, setIsLoadingTracks] = useState(false);
   
   // Upload form state
@@ -47,49 +51,26 @@ export default function ArtistDashboardScreen() {
   const [coverFile, setCoverFile] = useState<any>(null);
   const [formData, setFormData] = useState<UploadFormData>({
     title: '',
+    mainArtist: '',
+    featuredArtists: [],
     lyrics: '',
     duration: '',
     genres: [],
     explicit: false,
     price: '0',
+    description: '',
   });
-  const [newGenre, setNewGenre] = useState('');
+  const [newFeaturedArtist, setNewFeaturedArtist] = useState('');
 
   useEffect(() => {
-    loadArtistProfile();
+    loadArtistTracks();
+    // Initialize storage on component mount
+    uploadService.initializeStorage();
   }, []);
 
-  useEffect(() => {
-    if (artistProfile) {
-      loadArtistTracks();
-    }
-  }, [artistProfile]);
-
-  const loadArtistProfile = async () => {
-    try {
-      setIsLoadingProfile(true);
-      const profile = await apiService.getMyArtistProfile();
-      setArtistProfile(profile);
-    } catch (error) {
-      console.error('Error loading artist profile:', error);
-      // If no artist profile exists, we'll show a create profile option
-    } finally {
-      setIsLoadingProfile(false);
-    }
-  };
-
   const loadArtistTracks = async () => {
-    if (!artistProfile) return;
-    
-    try {
-      setIsLoadingTracks(true);
-      const tracks = await apiService.getArtistTracks(artistProfile.id);
-      setArtistTracks(tracks);
-    } catch (error) {
-      console.error('Error loading artist tracks:', error);
-    } finally {
-      setIsLoadingTracks(false);
-    }
+    // Mock data for now - replace with actual API call
+    setArtistTracks([]);
   };
 
   const pickAudioFile = async () => {
@@ -126,58 +107,70 @@ export default function ArtistDashboardScreen() {
     }
   };
 
-  const addGenre = () => {
-    if (newGenre.trim() && !formData.genres.includes(newGenre.trim())) {
+  const addFeaturedArtist = () => {
+    if (newFeaturedArtist.trim() && !formData.featuredArtists.includes(newFeaturedArtist.trim())) {
       setFormData(prev => ({
         ...prev,
-        genres: [...prev.genres, newGenre.trim()]
+        featuredArtists: [...prev.featuredArtists, newFeaturedArtist.trim()]
       }));
-      setNewGenre('');
+      setNewFeaturedArtist('');
     }
   };
 
-  const removeGenre = (genre: string) => {
+  const removeFeaturedArtist = (artist: string) => {
     setFormData(prev => ({
       ...prev,
-      genres: prev.genres.filter(g => g !== genre)
+      featuredArtists: prev.featuredArtists.filter(a => a !== artist)
+    }));
+  };
+
+  const toggleGenre = (genre: string) => {
+    setFormData(prev => ({
+      ...prev,
+      genres: prev.genres.includes(genre)
+        ? prev.genres.filter(g => g !== genre)
+        : [...prev.genres, genre]
     }));
   };
 
   const handleUpload = async () => {
-    if (!audioFile || !formData.title.trim()) {
-      Alert.alert('Error', 'Please provide at least a title and audio file');
+    if (!audioFile || !formData.title.trim() || !formData.mainArtist.trim()) {
+      Alert.alert('Error', 'Please provide title, main artist, and audio file');
       return;
     }
 
-    if (!artistProfile) {
-      Alert.alert('Error', 'Artist profile required to upload tracks');
-      return;
-    }
-
-    if (!artistProfile.is_verified) {
-      Alert.alert('Error', 'Your artist profile must be approved before you can upload tracks');
+    if (formData.genres.length === 0) {
+      Alert.alert('Error', 'Please select at least one genre');
       return;
     }
 
     try {
       setIsUploading(true);
 
-      // Prepare upload data using the centralized service
-      const uploadData: SingleUploadData = {
+      // Check permissions
+      const hasPermission = await uploadService.checkUploadPermissions();
+      if (!hasPermission) {
+        throw new Error('You do not have permission to upload content');
+      }
+
+      // Prepare upload data
+      const uploadData = {
         title: formData.title,
+        mainArtist: formData.mainArtist,
+        featuredArtists: formData.featuredArtists,
         lyrics: formData.lyrics,
         duration: parseInt(formData.duration) || 180,
         genres: formData.genres,
         explicit: formData.explicit,
         price: formData.price,
+        description: formData.description,
         audioFile: audioFile,
         coverFile: coverFile,
-        description: '', // Optional description
-        releaseDate: new Date().toISOString().split('T')[0], // Current date
-        artistId: artistProfile.id, // Add the required artist ID
+        artistId: user?.id || '',
+        releaseDate: new Date().toISOString().split('T')[0],
       };
 
-      // Upload using the centralized service
+      // Upload using Supabase
       await uploadService.uploadSingle(uploadData);
 
       Alert.alert('Success', 'Track uploaded successfully and is pending approval!');
@@ -185,11 +178,14 @@ export default function ArtistDashboardScreen() {
       // Reset form
       setFormData({
         title: '',
+        mainArtist: '',
+        featuredArtists: [],
         lyrics: '',
         duration: '',
         genres: [],
         explicit: false,
         price: '0',
+        description: '',
       });
       setAudioFile(null);
       setCoverFile(null);
@@ -200,19 +196,7 @@ export default function ArtistDashboardScreen() {
       
     } catch (error) {
       console.error('Upload error:', error);
-      
-      // Check if the error is due to invalid token
-      if (error instanceof Error && error.message === 'Invalid token') {
-        Alert.alert(
-          'Session Expired', 
-          'Your session has expired. Please log out and log back in to continue uploading tracks.',
-          [
-            { text: 'OK', style: 'default' }
-          ]
-        );
-      } else {
-        Alert.alert('Error', (error instanceof Error ? error.message : 'An unexpected error occurred') || 'Failed to upload track. Please try again.');
-      }
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to upload track');
     } finally {
       setIsUploading(false);
     }
@@ -265,47 +249,8 @@ export default function ArtistDashboardScreen() {
     </TouchableOpacity>
   );
 
-  if (isLoadingProfile) {
-    return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading artist dashboard...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  if (!artistProfile) {
-    return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <View style={styles.noProfileContainer}>
-          <AlertCircle color="#ef4444" size={64} />
-          <Text style={styles.noProfileTitle}>Artist Profile Required</Text>
-          <Text style={styles.noProfileText}>
-            You need to create an artist profile to upload music and access the artist dashboard.
-          </Text>
-          <TouchableOpacity style={styles.createProfileButton}>
-            <LinearGradient
-              colors={['#8b5cf6', '#a855f7']}
-              style={styles.createProfileGradient}
-            >
-              <Text style={styles.createProfileText}>Create Artist Profile</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  // Show pending approval message if artist is not verified
-  if (!artistProfile.is_verified) {
+  // Check if user is verified artist
+  if (user?.role !== 'artist' || !user?.artistVerified) {
     return (
       <LinearGradient
         colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -313,20 +258,10 @@ export default function ArtistDashboardScreen() {
       >
         <View style={styles.pendingContainer}>
           <Clock color="#f59e0b" size={64} />
-          <Text style={styles.pendingTitle}>Application Under Review</Text>
+          <Text style={styles.pendingTitle}>Artist Verification Required</Text>
           <Text style={styles.pendingText}>
-            Your artist application is currently being reviewed by our team. You'll be notified once your profile is approved and you can start uploading music.
+            Your artist account needs to be verified before you can upload music. Please wait for admin approval.
           </Text>
-          <View style={styles.pendingDetails}>
-            <Text style={styles.pendingDetailLabel}>Stage Name:</Text>
-            <Text style={styles.pendingDetailValue}>{artistProfile.stage_name}</Text>
-          </View>
-          {artistProfile.bio && (
-            <View style={styles.pendingDetails}>
-              <Text style={styles.pendingDetailLabel}>Bio:</Text>
-              <Text style={styles.pendingDetailValue}>{artistProfile.bio}</Text>
-            </View>
-          )}
         </View>
       </LinearGradient>
     );
@@ -340,7 +275,7 @@ export default function ArtistDashboardScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.title}>Artist Dashboard</Text>
-          <Text style={styles.subtitle}>Welcome back, {artistProfile.stage_name}</Text>
+          <Text style={styles.subtitle}>Welcome back, {user?.displayName}</Text>
         </View>
 
         {/* Stats Section */}
@@ -350,11 +285,11 @@ export default function ArtistDashboardScreen() {
             <Text style={styles.statLabel}>Tracks</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{artistProfile.total_plays || 0}</Text>
+            <Text style={styles.statValue}>0</Text>
             <Text style={styles.statLabel}>Total Plays</Text>
           </View>
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{artistProfile.monthly_listeners || 0}</Text>
+            <Text style={styles.statValue}>0</Text>
             <Text style={styles.statLabel}>Monthly Listeners</Text>
           </View>
         </View>
@@ -460,6 +395,69 @@ export default function ArtistDashboardScreen() {
                 />
               </View>
 
+              {/* Main Artist */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Main Artist *</Text>
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Enter main artist name"
+                  placeholderTextColor="#64748b"
+                  value={formData.mainArtist}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, mainArtist: text }))}
+                />
+              </View>
+
+              {/* Featured Artists */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Featured Artists</Text>
+                <View style={styles.featuredArtistInputContainer}>
+                  <TextInput
+                    style={styles.featuredArtistInput}
+                    placeholder="Add featured artist"
+                    placeholderTextColor="#64748b"
+                    value={newFeaturedArtist}
+                    onChangeText={setNewFeaturedArtist}
+                  />
+                  <TouchableOpacity style={styles.addFeaturedArtistButton} onPress={addFeaturedArtist}>
+                    <Plus color="#8b5cf6" size={20} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.featuredArtistsList}>
+                  {formData.featuredArtists.map((artist, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.featuredArtistTag}
+                      onPress={() => removeFeaturedArtist(artist)}
+                    >
+                      <Text style={styles.featuredArtistTagText}>{artist}</Text>
+                      <X color="#8b5cf6" size={16} />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Genres */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Genres *</Text>
+                <View style={styles.genreContainer}>
+                  {GENRES.map((genre) => (
+                    <TouchableOpacity
+                      key={genre}
+                      style={[
+                        styles.genreTag,
+                        formData.genres.includes(genre) && styles.genreTagSelected
+                      ]}
+                      onPress={() => toggleGenre(genre)}
+                    >
+                      <Text style={[
+                        styles.genreTagText,
+                        formData.genres.includes(genre) && styles.genreTagTextSelected
+                      ]}>{genre}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Lyrics */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Lyrics</Text>
@@ -487,35 +485,6 @@ export default function ArtistDashboardScreen() {
                 />
               </View>
 
-              {/* Genres */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Genres</Text>
-                <View style={styles.genreInputContainer}>
-                  <TextInput
-                    style={styles.genreInput}
-                    placeholder="Add genre"
-                    placeholderTextColor="#64748b"
-                    value={newGenre}
-                    onChangeText={setNewGenre}
-                  />
-                  <TouchableOpacity style={styles.addGenreButton} onPress={addGenre}>
-                    <Plus color="#8b5cf6" size={20} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.genreList}>
-                  {formData.genres.map((genre, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={styles.genreTag}
-                      onPress={() => removeGenre(genre)}
-                    >
-                      <Text style={styles.genreTagText}>{genre}</Text>
-                      <X color="#8b5cf6" size={16} />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
               {/* Price */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Price ($)</Text>
@@ -526,6 +495,20 @@ export default function ArtistDashboardScreen() {
                   value={formData.price}
                   onChangeText={(text) => setFormData(prev => ({ ...prev, price: text }))}
                   keyboardType="decimal-pad"
+                />
+              </View>
+
+              {/* Description */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description</Text>
+                <TextInput
+                  style={[styles.textInput, styles.textArea]}
+                  placeholder="Optional description"
+                  placeholderTextColor="#64748b"
+                  value={formData.description}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                  multiline
+                  numberOfLines={3}
                 />
               </View>
 
@@ -577,52 +560,6 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginTop: 16,
-  },
-  noProfileContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  noProfileTitle: {
-    fontSize: 24,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  noProfileText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  createProfileButton: {
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  createProfileGradient: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  createProfileText: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
   pendingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -642,26 +579,6 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 32,
-  },
-  pendingDetails: {
-    width: '100%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-  },
-  pendingDetailLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#8b5cf6',
-    marginBottom: 4,
-  },
-  pendingDetailValue: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    lineHeight: 22,
   },
   header: {
     paddingHorizontal: 24,
@@ -729,6 +646,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     marginLeft: 6,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    marginTop: 12,
   },
   trackItem: {
     flexDirection: 'row',
@@ -895,11 +822,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 12,
   },
-  genreInputContainer: {
+  featuredArtistInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  genreInput: {
+  featuredArtistInput: {
     flex: 1,
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
@@ -912,7 +839,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(139, 92, 246, 0.3)',
     marginRight: 12,
   },
-  addGenreButton: {
+  addFeaturedArtistButton: {
     width: 44,
     height: 44,
     borderRadius: 12,
@@ -922,13 +849,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.3)',
   },
-  genreList: {
+  featuredArtistsList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 12,
     gap: 8,
   },
-  genreTag: {
+  featuredArtistTag: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
@@ -938,11 +865,36 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.3)',
   },
-  genreTagText: {
+  featuredArtistTagText: {
     fontSize: 12,
     fontFamily: 'Inter-Medium',
     color: '#8b5cf6',
     marginRight: 6,
+  },
+  genreContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  genreTag: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  genreTagSelected: {
+    backgroundColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: '#8b5cf6',
+  },
+  genreTagText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#94a3b8',
+  },
+  genreTagTextSelected: {
+    color: '#8b5cf6',
   },
   checkboxContainer: {
     flexDirection: 'row',
