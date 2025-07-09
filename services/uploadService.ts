@@ -71,7 +71,7 @@ class UploadService {
       // Step 3: Create track record in database
       const trackData = {
         title: singleData.title,
-        artist_name: singleData.mainArtist,
+        artist_id: singleData.mainArtist,
         audio_url: audioUpload.url,
         cover_url: coverUpload?.url || null,
         lyrics: singleData.lyrics || '',
@@ -84,7 +84,7 @@ class UploadService {
         is_published: false, // Admin approval required
         track_number: 1,
         created_by: session.user.id,
-        featuring_artists: singleData.featuredArtists,
+        featured_artist_ids: singleData.featuredArtists,
       };
 
       const { data: track, error: trackError } = await supabase
@@ -136,7 +136,7 @@ class UploadService {
       // Step 2: Create album record
       const albumRecord = {
         title: albumData.title,
-        artist_name: albumData.mainArtist,
+        artist_id: albumData.mainArtist,
         cover_url: albumCoverUpload?.url || null,
         description: albumData.description || '',
         release_date: albumData.releaseDate || new Date().toISOString().split('T')[0],
@@ -145,7 +145,7 @@ class UploadService {
         track_count: albumData.tracks.length,
         is_published: false, // Admin approval required
         created_by: session.user.id,
-        featuring_artists: albumData.featuredArtists,
+        featured_artist_ids: albumData.featuredArtists,
       };
 
       const { data: album, error: albumError } = await supabase
@@ -178,7 +178,7 @@ class UploadService {
           // Create track record
           const trackData = {
             title: track.title,
-            artist_name: albumData.mainArtist,
+            artist_id: albumData.mainArtist,
             album_id: album.id,
             audio_url: audioUpload.url,
             cover_url: album.cover_url, // Use album cover for tracks
@@ -189,7 +189,7 @@ class UploadService {
             track_number: track.trackNumber,
             is_published: false, // Admin approval required
             created_by: session.user.id,
-            featuring_artists: track.featuringArtists,
+            featured_artist_ids: track.featuringArtists,
           };
 
           const { data: trackRecord, error: trackError } = await supabase

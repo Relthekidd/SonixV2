@@ -54,7 +54,7 @@ export default function AlbumDetailScreen() {
       const transformedTracks = albumData.tracks?.map((track: any, index: number) => ({
         id: track.id,
         title: track.title,
-        artist: albumData.artist_name || albumData.artist || 'Unknown Artist',
+        artist: albumData.artist_id || albumData.artist || 'Unknown Artist',
         album: albumData.title,
         duration: track.duration || 180,
         coverUrl: albumData.cover_url || 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -140,7 +140,7 @@ export default function AlbumDetailScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out "${album.title}" by ${album.artist_name}`,
+        message: `Check out "${album.title}" by ${album.artist_id}`,
         url: `https://sonix.app/album/${id}`,
       });
     } catch (error) {
@@ -268,7 +268,7 @@ export default function AlbumDetailScreen() {
           />
           
           <Text style={styles.albumTitle}>{album.title}</Text>
-          <Text style={styles.albumArtist}>{album.artist_name || album.artist}</Text>
+          <Text style={styles.albumArtist}>{album.artist_id || album.artist}</Text>
           
           {album.description && (
             <Text style={styles.albumDescription}>{album.description}</Text>

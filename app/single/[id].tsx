@@ -54,7 +54,7 @@ export default function SingleDetailScreen() {
       const transformedTrack = {
         id: singleData.id,
         title: singleData.title,
-        artist: singleData.artist_name || singleData.artist || 'Unknown Artist',
+        artist: singleData.artist_id || singleData.artist || 'Unknown Artist',
         album: singleData.album || 'Single',
         duration: singleData.duration || 180,
         coverUrl: singleData.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
@@ -135,7 +135,7 @@ export default function SingleDetailScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Check out "${single.title}" by ${single.artist_name}`,
+        message: `Check out "${single.title}" by ${single.artist_id}`,
         url: `https://sonix.app/single/${id}`,
       });
     } catch (error) {

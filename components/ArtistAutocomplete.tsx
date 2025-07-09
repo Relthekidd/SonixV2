@@ -6,14 +6,14 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  Dimensions,
 } from 'react-native';
 import { searchArtistsByName, ArtistData } from '@/services/artistService';
+import { supabase } from '@/lib/supabase'; // make sure this path is correct
 import { User, X } from 'lucide-react-native';
 
 interface ArtistAutocompleteProps {
   placeholder?: string;
-  onArtistSelect: (artistName: string) => void;
+  onArtistSelect: (artist: ArtistData) => void;
   onClear?: () => void;
   style?: any;
   disabled?: boolean;
@@ -39,19 +39,16 @@ export function ArtistAutocomplete({
   }, [initialValue]);
 
   useEffect(() => {
-    // Clear previous timeout
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    // Don't search for empty queries
     if (!query.trim()) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
 
-    // Debounce search
     searchTimeoutRef.current = setTimeout(async () => {
       setIsLoading(true);
       try {
@@ -76,7 +73,7 @@ export function ArtistAutocomplete({
   const handleArtistSelect = (artist: ArtistData) => {
     setQuery(artist.name);
     setShowSuggestions(false);
-    onArtistSelect(artist.name);
+    onArtistSelect(artist); // return full object
   };
 
   const handleClear = () => {
@@ -84,6 +81,27 @@ export function ArtistAutocomplete({
     setSuggestions([]);
     setShowSuggestions(false);
     onClear?.();
+  };
+
+  const handleCreateNewArtist = async () => {
+    const name = query.trim();
+    if (!name) return;
+
+    const { data, error } = await supabase
+      .from('artists')
+      .insert([{ name }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating artist:', error);
+      return;
+    }
+
+    setQuery(data.name);
+    setSuggestions([]);
+    setShowSuggestions(false);
+    onArtistSelect(data);
   };
 
   const renderSuggestionItem = ({ item }: { item: ArtistData }) => (
@@ -100,6 +118,10 @@ export function ArtistAutocomplete({
     </TouchableOpacity>
   );
 
+  const shouldOfferCreate =
+    query.length > 2 &&
+    !suggestions.some((a) => a.name.toLowerCase() === query.trim().toLowerCase());
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.inputContainer}>
@@ -111,22 +133,17 @@ export function ArtistAutocomplete({
           onChangeText={setQuery}
           editable={!disabled}
           onFocus={() => {
-            if (suggestions.length > 0) {
-              setShowSuggestions(true);
-            }
+            if (suggestions.length > 0) setShowSuggestions(true);
           }}
         />
         {query.length > 0 && (
-          <TouchableOpacity
-            style={styles.clearButton}
-            onPress={handleClear}
-          >
+          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
             <X color="#64748b" size={16} />
           </TouchableOpacity>
         )}
       </View>
 
-      {showSuggestions && suggestions.length > 0 && (
+      {(showSuggestions || shouldOfferCreate) && (
         <View style={styles.suggestionsContainer}>
           <FlatList
             data={suggestions}
@@ -136,6 +153,17 @@ export function ArtistAutocomplete({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           />
+
+          {shouldOfferCreate && !isLoading && (
+            <TouchableOpacity
+              style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
+              onPress={handleCreateNewArtist}
+            >
+              <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>
+                + Create “{query.trim()}”
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
 
