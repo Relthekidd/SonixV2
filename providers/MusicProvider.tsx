@@ -17,6 +17,7 @@ export interface Track {
   likeCount?: number;
   trackNumber?: number;
   lyrics?: string;
+  featuredArtists?: string[];
 }
 
 export interface Album {
