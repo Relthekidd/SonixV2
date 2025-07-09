@@ -14,6 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
+import { ArtistAutocomplete } from '@/components/ArtistAutocomplete';
 import { uploadService } from '@/services/uploadService';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -398,12 +399,11 @@ export default function ArtistDashboardScreen() {
               {/* Main Artist */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Main Artist *</Text>
-                <TextInput
-                  style={styles.textInput}
+                <ArtistAutocomplete
                   placeholder="Enter main artist name"
-                  placeholderTextColor="#64748b"
-                  value={formData.mainArtist}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, mainArtist: text }))}
+                  initialValue={formData.mainArtist}
+                  onArtistSelect={(name) => setFormData(prev => ({ ...prev, mainArtist: name }))}
+                  onClear={() => setFormData(prev => ({ ...prev, mainArtist: '' }))}
                 />
               </View>
 
@@ -413,7 +413,7 @@ export default function ArtistDashboardScreen() {
                 <View style={styles.featuredArtistInputContainer}>
                   <TextInput
                     style={styles.featuredArtistInput}
-                    placeholder="Add featured artist"
+                    placeholder="Add featured artist (press + to add)"
                     placeholderTextColor="#64748b"
                     value={newFeaturedArtist}
                     onChangeText={setNewFeaturedArtist}
@@ -429,6 +429,7 @@ export default function ArtistDashboardScreen() {
                       style={styles.featuredArtistTag}
                       onPress={() => removeFeaturedArtist(artist)}
                     >
+                      <User color="#8b5cf6" size={16} />
                       <Text style={styles.featuredArtistTagText}>{artist}</Text>
                       <X color="#8b5cf6" size={16} />
                     </TouchableOpacity>
@@ -858,18 +859,19 @@ const styles = StyleSheet.create({
   featuredArtistTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(139, 92, 246, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.3)',
+    gap: 4,
   },
   featuredArtistTagText: {
     fontSize: 12,
     fontFamily: 'Inter-Medium',
     color: '#8b5cf6',
-    marginRight: 6,
+    marginRight: 4,
   },
   genreContainer: {
     flexDirection: 'row',
