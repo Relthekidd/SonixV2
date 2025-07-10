@@ -80,7 +80,6 @@ class UploadService {
         explicit: singleData.explicit,
         description: singleData.description || '',
         release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
-        price: parseFloat(singleData.price || '0'),
         is_published: false, // Admin approval required
         track_number: 1,
         created_by: session.user.id,
