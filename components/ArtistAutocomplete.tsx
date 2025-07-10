@@ -88,16 +88,13 @@ export function ArtistAutocomplete({
 
   const handleCreateNewArtist = async () => {
     try {
-      console.log("🔧 Create New Artist button pressed");
       Keyboard.dismiss();
-      setTimeout(async () => {
-        const artist = await findOrCreateArtistByName(query);
-        if (!artist) return;
-        setQuery(artist.name);
-        setSuggestions([]);
-        setShowSuggestions(false);
-        onArtistSelect(artist);
-      }, 100);
+      const artist = await findOrCreateArtistByName(query);
+      if (!artist) return;
+      setQuery(artist.name);
+      setSuggestions([]);
+      setShowSuggestions(false);
+      onArtistSelect(artist);
     } catch (error) {
       console.error("Failed to create new artist:", error);
     }
@@ -153,16 +150,17 @@ export function ArtistAutocomplete({
                 style={styles.suggestionsList}
                 keyboardShouldPersistTaps="handled"
                 showsVerticalScrollIndicator={false}
+                ListFooterComponent={
+                  shouldOfferCreate && !isLoading ? (
+                    <TouchableOpacity
+                      style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
+                      onPress={handleCreateNewArtist}
+                    >
+                      <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>+ Create “{query.trim()}”</Text>
+                    </TouchableOpacity>
+                  ) : null
+                }
               />
-
-              {shouldOfferCreate && !isLoading && (
-                <TouchableOpacity
-                  style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
-                  onPress={handleCreateNewArtist}
-                >
-                  <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>+ Create “{query.trim()}”</Text>
-                </TouchableOpacity>
-              )}
             </View>
           )}
 
@@ -264,3 +262,4 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
 });
+
