@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { searchArtistsByName, findOrCreateArtistByName, ArtistData } from '@/services/artistService';
 import { User, X } from 'lucide-react-native';
@@ -72,7 +76,7 @@ export function ArtistAutocomplete({
   const handleArtistSelect = (artist: ArtistData) => {
     setQuery(artist.name);
     setShowSuggestions(false);
-    onArtistSelect(artist); // return full object
+    onArtistSelect(artist);
   };
 
   const handleClear = () => {
@@ -83,13 +87,20 @@ export function ArtistAutocomplete({
   };
 
   const handleCreateNewArtist = async () => {
-    const artist = await findOrCreateArtistByName(query);
-    if (!artist) return;
-
-    setQuery(artist.name);
-    setSuggestions([]);
-    setShowSuggestions(false);
-    onArtistSelect(artist);
+    try {
+      console.log("🔧 Create New Artist button pressed");
+      Keyboard.dismiss();
+      setTimeout(async () => {
+        const artist = await findOrCreateArtistByName(query);
+        if (!artist) return;
+        setQuery(artist.name);
+        setSuggestions([]);
+        setShowSuggestions(false);
+        onArtistSelect(artist);
+      }, 100);
+    } catch (error) {
+      console.error("Failed to create new artist:", error);
+    }
   };
 
   const renderSuggestionItem = ({ item }: { item: ArtistData }) => (
@@ -111,56 +122,58 @@ export function ArtistAutocomplete({
     !suggestions.some((a) => a.name.toLowerCase() === query.trim().toLowerCase());
 
   return (
-    <View style={[styles.container, style]}>
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder={placeholder}
-          placeholderTextColor="#64748b"
-          value={query}
-          onChangeText={setQuery}
-          editable={!disabled}
-          onFocus={() => {
-            if (suggestions.length > 0) setShowSuggestions(true);
-          }}
-        />
-        {query.length > 0 && (
-          <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
-            <X color="#64748b" size={16} />
-          </TouchableOpacity>
-        )}
-      </View>
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={[styles.container, style]}>
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              placeholder={placeholder}
+              placeholderTextColor="#64748b"
+              value={query}
+              onChangeText={setQuery}
+              editable={!disabled}
+              onFocus={() => {
+                if (suggestions.length > 0) setShowSuggestions(true);
+              }}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity style={styles.clearButton} onPress={handleClear}>
+                <X color="#64748b" size={16} />
+              </TouchableOpacity>
+            )}
+          </View>
 
-      {(showSuggestions || shouldOfferCreate) && (
-        <View style={styles.suggestionsContainer}>
-          <FlatList
-            data={suggestions}
-            renderItem={renderSuggestionItem}
-            keyExtractor={(item) => item.id}
-            style={styles.suggestionsList}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          />
+          {(showSuggestions || shouldOfferCreate) && (
+            <View style={styles.suggestionsContainer}>
+              <FlatList
+                data={suggestions}
+                renderItem={renderSuggestionItem}
+                keyExtractor={(item) => item.id}
+                style={styles.suggestionsList}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              />
 
-          {shouldOfferCreate && !isLoading && (
-            <TouchableOpacity
-              style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
-              onPress={handleCreateNewArtist}
-            >
-              <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>
-                + Create “{query.trim()}”
-              </Text>
-            </TouchableOpacity>
+              {shouldOfferCreate && !isLoading && (
+                <TouchableOpacity
+                  style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
+                  onPress={handleCreateNewArtist}
+                >
+                  <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>+ Create “{query.trim()}”</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <Text style={styles.loadingText}>Searching...</Text>
+            </View>
           )}
         </View>
-      )}
-
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Searching...</Text>
-        </View>
-      )}
-    </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
