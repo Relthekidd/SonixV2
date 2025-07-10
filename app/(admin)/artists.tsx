@@ -10,11 +10,14 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { supabase } from '@/providers/AuthProvider';
-import { ArrowLeft, Check, X, User, Mail, Calendar, FileText } from 'lucide-react-native';
+import { ArrowLeft, Check, X, User, Mail, Calendar, FileText, Image as ImageIcon } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { supabaseStorage } from '@/services/supabaseStorage';
 
 interface PendingArtist {
   id: string;
@@ -32,6 +35,71 @@ export default function AdminArtistsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [processingIds, setProcessingIds] = useState<Set<string>>(new Set());
+  const [newArtistName, setNewArtistName] = useState('');
+  const [newArtistBio, setNewArtistBio] = useState('');
+  const [newArtistImage, setNewArtistImage] = useState<any>(null);
+  const [creatingArtist, setCreatingArtist] = useState(false);
+
+  const pickArtistImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setNewArtistImage(result.assets[0]);
+      }
+    } catch (error) {
+      console.error('Error picking artist image:', error);
+      Alert.alert('Error', 'Failed to pick artist image');
+    }
+  };
+
+  const createArtist = async () => {
+    if (!newArtistName.trim()) {
+      Alert.alert('Error', 'Artist name is required');
+      return;
+    }
+
+    setCreatingArtist(true);
+    try {
+      let imageUrl: string | null = null;
+      if (newArtistImage) {
+        const fileName =
+          newArtistImage.fileName ||
+          newArtistImage.name ||
+          `${newArtistName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
+        const upload = await supabaseStorage.uploadImage(newArtistImage, fileName);
+        imageUrl = upload.url;
+      }
+
+      const { data, error } = await supabase
+        .from('artists')
+        .insert({ name: newArtistName.trim(), bio: newArtistBio || null, image_url: imageUrl })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Artist created successfully');
+
+      setNewArtistName('');
+      setNewArtistBio('');
+      setNewArtistImage(null);
+
+      if (data?.id) {
+        // router.push(`/artist/${data.id}`);
+      }
+    } catch (error) {
+      console.error('Error creating artist:', error);
+      Alert.alert('Error', 'Failed to create artist');
+    } finally {
+      setCreatingArtist(false);
+    }
+  };
 
   useEffect(() => {
     loadPendingArtists();
@@ -140,6 +208,65 @@ export default function AdminArtistsScreen() {
       day: 'numeric',
     });
   };
+
+  const renderCreateArtistForm = () => (
+    <View style={styles.createSection}>
+      <Text style={styles.sectionTitle}>Create New Artist</Text>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Name *</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Artist name"
+          placeholderTextColor="#64748b"
+          value={newArtistName}
+          onChangeText={setNewArtistName}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Bio</Text>
+        <TextInput
+          style={[styles.input, styles.textArea]}
+          placeholder="Optional bio"
+          placeholderTextColor="#64748b"
+          value={newArtistBio}
+          onChangeText={setNewArtistBio}
+          multiline
+          numberOfLines={3}
+        />
+      </View>
+
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Image</Text>
+        <TouchableOpacity
+          style={[styles.fileButton, newArtistImage && styles.fileButtonSelected]}
+          onPress={pickArtistImage}
+        >
+          <ImageIcon color={newArtistImage ? '#8b5cf6' : '#64748b'} size={20} />
+          <Text style={[styles.fileButtonText, newArtistImage && styles.fileButtonTextSelected]}>
+            {newArtistImage ? 'Image Selected' : 'Select Image'}
+          </Text>
+          {newArtistImage && <Check color="#8b5cf6" size={20} />}
+        </TouchableOpacity>
+        {newArtistImage && (
+          <Image source={{ uri: newArtistImage.uri }} style={styles.imagePreview} />
+        )}
+      </View>
+
+      <TouchableOpacity
+        style={[styles.createButton, creatingArtist && { opacity: 0.7 }]}
+        onPress={createArtist}
+        disabled={creatingArtist}
+      >
+        {creatingArtist ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.createButtonText}>Create Artist</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
 
   const renderArtistItem = ({ item }: { item: PendingArtist }) => {
     const isProcessing = processingIds.has(item.id);
@@ -258,6 +385,7 @@ export default function AdminArtistsScreen() {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
+        ListHeaderComponent={renderCreateArtistForm}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -448,5 +576,81 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#64748b',
     textAlign: 'center',
+  },
+  createSection: {
+    marginHorizontal: 24,
+    marginBottom: 32,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
+    marginBottom: 16,
+  },
+  formGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#ffffff',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  textArea: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  fileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    gap: 12,
+  },
+  fileButtonSelected: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    borderColor: '#8b5cf6',
+  },
+  fileButtonText: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#64748b',
+  },
+  fileButtonTextSelected: {
+    color: '#8b5cf6',
+  },
+  imagePreview: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  createButton: {
+    backgroundColor: '#8b5cf6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  createButtonText: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
   },
 });
