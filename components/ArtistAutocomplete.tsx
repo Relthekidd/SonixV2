@@ -7,8 +7,7 @@ import {
   FlatList,
   StyleSheet,
 } from 'react-native';
-import { searchArtistsByName, ArtistData } from '@/services/artistService';
-import { supabase } from '@/lib/supabase'; // make sure this path is correct
+import { searchArtistsByName, findOrCreateArtistByName, ArtistData } from '@/services/artistService';
 import { User, X } from 'lucide-react-native';
 
 interface ArtistAutocompleteProps {
@@ -84,24 +83,13 @@ export function ArtistAutocomplete({
   };
 
   const handleCreateNewArtist = async () => {
-    const name = query.trim();
-    if (!name) return;
+    const artist = await findOrCreateArtistByName(query);
+    if (!artist) return;
 
-    const { data, error } = await supabase
-      .from('artists')
-      .insert([{ name }])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error creating artist:', error);
-      return;
-    }
-
-    setQuery(data.name);
+    setQuery(artist.name);
     setSuggestions([]);
     setShowSuggestions(false);
-    onArtistSelect(data);
+    onArtistSelect(artist);
   };
 
   const renderSuggestionItem = ({ item }: { item: ArtistData }) => (
