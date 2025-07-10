@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
-import { searchArtistsByName } from '@/services/artistService';
+import { ArtistData } from '@/services/artistService';
 import { ArtistAutocomplete } from '@/components/ArtistAutocomplete';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -24,8 +24,8 @@ import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown, 
 interface UploadFormData {
   type: 'single' | 'album';
   title: string;
-  mainArtist: string;
-  featuredArtists: string[];
+  mainArtist: ArtistData | null;
+  featuredArtists: ArtistData[];
   releaseDate: string;
   coverFile: any;
   genres: string[];
@@ -41,7 +41,7 @@ interface Track {
   lyrics: string;
   explicit: boolean;
   trackNumber: number;
-  featuringArtists: string[];
+  featuredArtists: ArtistData[];
   duration: number;
 }
 
@@ -53,12 +53,11 @@ const GENRES = [
 export default function AdminUploadScreen() {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-  const [newFeaturedArtist, setNewFeaturedArtist] = useState('');
 
   const [formData, setFormData] = useState<UploadFormData>({
     type: 'single',
     title: '',
-    mainArtist: '',
+    mainArtist: null,
     featuredArtists: [],
     releaseDate: new Date().toISOString().split('T')[0],
     coverFile: null,
@@ -72,7 +71,7 @@ export default function AdminUploadScreen() {
       lyrics: '',
       explicit: false,
       trackNumber: 1,
-      featuringArtists: [],
+      featuredArtists: [],
       duration: 0,
     }],
   });
@@ -126,7 +125,7 @@ export default function AdminUploadScreen() {
       lyrics: '',
       explicit: false,
       trackNumber: formData.tracks.length + 1,
-      featuringArtists: [],
+      featuredArtists: [],
       duration: 0,
     };
     setFormData(prev => ({ ...prev, tracks: [...prev.tracks, newTrack] }));
@@ -172,37 +171,20 @@ export default function AdminUploadScreen() {
     }));
   };
 
-  const addFeaturedArtist = () => {
-    if (newFeaturedArtist.trim() && !formData.featuredArtists.includes(newFeaturedArtist.trim())) {
+  const addFeaturedArtist = (artist: ArtistData) => {
+    if (!formData.featuredArtists.some(a => a.id === artist.id)) {
       setFormData(prev => ({
         ...prev,
-        featuredArtists: [...prev.featuredArtists, newFeaturedArtist.trim()]
+        featuredArtists: [...prev.featuredArtists, artist],
       }));
-      setNewFeaturedArtist('');
     }
   };
 
-  const removeFeaturedArtist = (artist: string) => {
+  const removeFeaturedArtist = (artistId: string) => {
     setFormData(prev => ({
       ...prev,
-      featuredArtists: prev.featuredArtists.filter(a => a !== artist)
+      featuredArtists: prev.featuredArtists.filter(a => a.id !== artistId),
     }));
-  };
-
-  const addTrackFeaturedArtist = (trackIndex: number, artist: string) => {
-    if (artist.trim()) {
-      const updatedTracks = [...formData.tracks];
-      if (!updatedTracks[trackIndex].featuringArtists.includes(artist.trim())) {
-        updatedTracks[trackIndex].featuringArtists.push(artist.trim());
-        setFormData(prev => ({ ...prev, tracks: updatedTracks }));
-      }
-    }
-  };
-
-  const removeTrackFeaturedArtist = (trackIndex: number, artist: string) => {
-    const updatedTracks = [...formData.tracks];
-    updatedTracks[trackIndex].featuringArtists = updatedTracks[trackIndex].featuringArtists.filter(a => a !== artist);
-    setFormData(prev => ({ ...prev, tracks: updatedTracks }));
   };
 
   const validateForm = (): boolean => {
@@ -211,7 +193,7 @@ export default function AdminUploadScreen() {
       return false;
     }
 
-    if (!formData.mainArtist.trim()) {
+    if (!formData.mainArtist) {
       Alert.alert('Error', 'Main artist is required');
       return false;
     }
@@ -256,8 +238,8 @@ export default function AdminUploadScreen() {
           description: formData.description,
           releaseDate: formData.releaseDate,
           artistId: user?.id || '',
-          mainArtist: formData.mainArtist,
-          featuredArtists: formData.featuredArtists,
+          mainArtistId: formData.mainArtist!.id,
+          featuredArtistIds: formData.featuredArtists.map(a => a.id),
         };
 
         console.log('📀 Uploading single...');
@@ -271,8 +253,8 @@ export default function AdminUploadScreen() {
           genres: formData.genres,
           explicit: formData.explicit,
           artistId: user?.id || '',
-          mainArtist: formData.mainArtist,
-          featuredArtists: formData.featuredArtists,
+          mainArtistId: formData.mainArtist!.id,
+          featuredArtistIds: formData.featuredArtists.map(a => a.id),
           tracks: formData.tracks.map(track => ({
             title: track.title,
             audioFile: track.audioFile,
@@ -280,7 +262,7 @@ export default function AdminUploadScreen() {
             explicit: track.explicit,
             trackNumber: track.trackNumber,
             duration: track.duration || 180,
-            featuringArtists: track.featuringArtists,
+            featuredArtistIds: track.featuredArtists.map(a => a.id),
           })),
         };
 
@@ -305,7 +287,7 @@ export default function AdminUploadScreen() {
       setFormData({
         type: 'single',
         title: '',
-        mainArtist: '',
+        mainArtist: null,
         featuredArtists: [],
         releaseDate: new Date().toISOString().split('T')[0],
         coverFile: null,
@@ -319,7 +301,7 @@ export default function AdminUploadScreen() {
           lyrics: '',
           explicit: false,
           trackNumber: 1,
-          featuringArtists: [],
+          featuredArtists: [],
           duration: 0,
         }],
       });
@@ -420,36 +402,27 @@ export default function AdminUploadScreen() {
             <Text style={styles.label}>Main Artist *</Text>
             <ArtistAutocomplete
               placeholder="Enter main artist name"
-              initialValue={formData.mainArtist}
-              onArtistSelect={(name) => setFormData(prev => ({ ...prev, mainArtist: name }))}
-              onClear={() => setFormData(prev => ({ ...prev, mainArtist: '' }))}
+              initialValue={formData.mainArtist?.name || ''}
+              onArtistSelect={(artist) => setFormData(prev => ({ ...prev, mainArtist: artist }))}
+              onClear={() => setFormData(prev => ({ ...prev, mainArtist: null }))}
             />
           </View>
 
           <View style={styles.formGroup}>
             <Text style={styles.label}>Featured Artists</Text>
-            <View style={styles.featuredArtistInputContainer}>
-              <TextInput
-                style={styles.featuredArtistInput}
-                placeholder="Add featured artist (press + to add)"
-                placeholderTextColor="#64748b"
-                value={newFeaturedArtist}
-                onChangeText={setNewFeaturedArtist}
-              />
-              <TouchableOpacity style={styles.addFeaturedArtistButton} onPress={addFeaturedArtist}>
-                <Plus color="#8b5cf6" size={20} />
-              </TouchableOpacity>
-            </View>
+            <ArtistAutocomplete
+              placeholder="Add featured artist"
+              onArtistSelect={addFeaturedArtist}
+            />
             <View style={styles.featuredArtistsList}>
-              {formData.featuredArtists.map((artist, index) => (
+              {formData.featuredArtists.map((artist) => (
                 <TouchableOpacity
-                  key={index}
+                  key={artist.id}
                   style={styles.featuredArtistTag}
-                  onPress={() => removeFeaturedArtist(artist)} 
+                  onPress={() => removeFeaturedArtist(artist.id)}
                 >
                   <User color="#8b5cf6" size={16} />
-                  <User color="#8b5cf6" size={16} />
-                  <Text style={styles.featuredArtistTagText}>{artist}</Text>
+                  <Text style={styles.featuredArtistTagText}>{artist.name}</Text>
                   <X color="#8b5cf6" size={16} />
                 </TouchableOpacity>
               ))}
@@ -797,33 +770,6 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 8,
     marginTop: 12,
-  },
-  featuredArtistInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  featuredArtistInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#ffffff',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    marginRight: 12,
-  },
-  addFeaturedArtistButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   featuredArtistsList: {
     flexDirection: 'row',

@@ -13,8 +13,8 @@ export interface SingleUploadData {
   releaseDate?: string;
   price?: string;
   artistId: string;
-  mainArtist: string;
-  featuredArtists: string[];
+  mainArtistId: string;
+  featuredArtistIds: string[];
 }
 
 export interface AlbumUploadData {
@@ -25,8 +25,8 @@ export interface AlbumUploadData {
   genres: string[];
   explicit: boolean;
   artistId: string;
-  mainArtist: string;
-  featuredArtists: string[];
+  mainArtistId: string;
+  featuredArtistIds: string[];
   tracks: Array<{
     title: string;
     audioFile: any;
@@ -34,7 +34,7 @@ export interface AlbumUploadData {
     explicit: boolean;
     trackNumber: number;
     duration?: number;
-    featuringArtists: string[];
+    featuredArtistIds: string[];
   }>;
 }
 
@@ -71,7 +71,7 @@ class UploadService {
       // Step 3: Create track record in database
       const trackData = {
         title: singleData.title,
-        artist_id: singleData.mainArtist,
+        artist_id: singleData.mainArtistId,
         audio_url: audioUpload.url,
         cover_url: coverUpload?.url || null,
         lyrics: singleData.lyrics || '',
@@ -84,7 +84,7 @@ class UploadService {
         is_published: false, // Admin approval required
         track_number: 1,
         created_by: session.user.id,
-        featured_artist_ids: singleData.featuredArtists,
+        featured_artist_ids: singleData.featuredArtistIds,
       };
 
       const { data: track, error: trackError } = await supabase
@@ -136,7 +136,7 @@ class UploadService {
       // Step 2: Create album record
       const albumRecord = {
         title: albumData.title,
-        artist_id: albumData.mainArtist,
+        artist_id: albumData.mainArtistId,
         cover_url: albumCoverUpload?.url || null,
         description: albumData.description || '',
         release_date: albumData.releaseDate || new Date().toISOString().split('T')[0],
@@ -145,7 +145,7 @@ class UploadService {
         track_count: albumData.tracks.length,
         is_published: false, // Admin approval required
         created_by: session.user.id,
-        featured_artist_ids: albumData.featuredArtists,
+        featured_artist_ids: albumData.featuredArtistIds,
       };
 
       const { data: album, error: albumError } = await supabase
@@ -178,7 +178,7 @@ class UploadService {
           // Create track record
           const trackData = {
             title: track.title,
-            artist_id: albumData.mainArtist,
+            artist_id: albumData.mainArtistId,
             album_id: album.id,
             audio_url: audioUpload.url,
             cover_url: album.cover_url, // Use album cover for tracks
@@ -189,7 +189,7 @@ class UploadService {
             track_number: track.trackNumber,
             is_published: false, // Admin approval required
             created_by: session.user.id,
-            featured_artist_ids: track.featuringArtists,
+            featured_artist_ids: track.featuredArtistIds,
           };
 
           const { data: trackRecord, error: trackError } = await supabase
