@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Audio } from 'expo-av';
 import { supabase } from '@/providers/AuthProvider';
 import { useAuth } from './AuthProvider';
 
@@ -101,6 +102,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [newReleases, setNewReleases] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Audio playback refs
+  const soundRef = useRef<Audio.Sound | null>(null);
+  const positionUpdateRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -203,14 +208,83 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     console.log('▶️ playTrack called with URL:', track.audioUrl);
-    setCurrentTrack(track);
-    setIsPlaying(true);
-    setDuration(track.duration);
-    if (newQueue) setQueue(newQueue);
-    setRecentlyPlayed(prev => [track, ...prev.filter(t => t.id !== track.id)].slice(0, 10));
+    
+    try {
+      // Stop current sound if playing
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        soundRef.current = null;
+      }
+      
+      // Clear position update timer
+      if (positionUpdateRef.current) {
+        clearInterval(positionUpdateRef.current);
+        positionUpdateRef.current = null;
+      }
+      
+      // Create and load new sound
+      const { sound } = await Audio.createAsync(
+        { uri: track.audioUrl },
+        { shouldPlay: true, isLooping: false }
+      );
+      
+      soundRef.current = sound;
+      
+      // Set up playback status updates
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.isLoaded) {
+          setCurrentTime(status.positionMillis || 0);
+          setDuration(status.durationMillis || track.duration * 1000);
+          setIsPlaying(status.isPlaying || false);
+          
+          // Handle track completion
+          if (status.didJustFinish) {
+            nextTrack();
+          }
+        }
+      });
+      
+      // Start position updates
+      positionUpdateRef.current = setInterval(async () => {
+        if (soundRef.current) {
+          const status = await soundRef.current.getStatusAsync();
+          if (status.isLoaded) {
+            setCurrentTime(status.positionMillis || 0);
+          }
+        }
+      }, 1000);
+      
+      setCurrentTrack(track);
+      setIsPlaying(true);
+      if (newQueue) setQueue(newQueue);
+      setRecentlyPlayed(prev => [track, ...prev.filter(t => t.id !== track.id)].slice(0, 10));
+      
+      console.log('✅ Track loaded and playing:', track.title);
+    } catch (error) {
+      console.error('❌ Error playing track:', error);
+      setError('Failed to play track');
+      setIsPlaying(false);
+    }
   };
 
-  const pauseTrack = () => setIsPlaying(false);
+  const pauseTrack = async () => {
+    try {
+      if (soundRef.current) {
+        if (isPlaying) {
+          await soundRef.current.pauseAsync();
+          setIsPlaying(false);
+          console.log('⏸️ Track paused');
+        } else {
+          await soundRef.current.playAsync();
+          setIsPlaying(true);
+          console.log('▶️ Track resumed');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error pausing/resuming track:', error);
+    }
+  };
 
   const nextTrack = () => {
     if (queue.length > 0 && currentTrack) {

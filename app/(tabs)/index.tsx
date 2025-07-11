@@ -53,43 +53,62 @@ export default function HomeScreen() {
     }
   };
 
-  const renderTrackItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.trackItem}
-      onPress={() => handleTrackPress(item)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {item.artist}
-        </Text>
-        {item.playCount && (
-          <Text style={styles.trackStats}>
-            {item.playCount.toLocaleString()} plays
+  const renderTrackItem = ({ item }: { item: any }) => {
+    console.log('🖼️ Rendering track item:', item.title, 'Cover URL:', item.coverUrl);
+    
+    return (
+      <TouchableOpacity 
+        style={styles.trackItem}
+        onPress={() => handleTrackPress(item)}
+      >
+        <Image 
+          source={{ uri: item.coverUrl || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400' }} 
+          style={styles.trackCover}
+          onError={(error) => {
+            console.error('❌ Image load error for:', item.title, error.nativeEvent.error);
+          }}
+          onLoad={() => {
+            console.log('✅ Image loaded for:', item.title);
+          }}
+        />
+        <View style={styles.trackInfo}>
+          <Text style={styles.trackTitle} numberOfLines={1}>
+            {item.title}
           </Text>
-        )}
-      </View>
-      <TouchableOpacity style={styles.playButton}>
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
+          <Text style={styles.trackArtist} numberOfLines={1}>
+            {item.artist}
+          </Text>
+          {item.playCount && (
+            <Text style={styles.trackStats}>
+              {item.playCount.toLocaleString()} plays
+            </Text>
+          )}
+        </View>
+        <TouchableOpacity style={styles.playButton}>
+          {currentTrack?.id === item.id && isPlaying ? (
+            <Pause color="#8b5cf6" size={20} />
+          ) : (
+            <Play color="#8b5cf6" size={20} />
+          )}
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderAlbumItem = ({ item }: { item: any }) => (
     <TouchableOpacity style={styles.albumItem}>
-      <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
+      <Image 
+        source={{ uri: item.coverUrl || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400' }} 
+        style={styles.albumCover}
+        onError={(error) => {
+          console.error('❌ Album image load error for:', item.title, error.nativeEvent.error);
+        }}
+      />
       <Text style={styles.albumTitle} numberOfLines={1}>
         {item.title}
       </Text>
       <Text style={styles.albumArtist} numberOfLines={1}>
-        {item.artist} • {item.year}
+        {item.artist} • {item.year || '2024'}
       </Text>
     </TouchableOpacity>
   );
