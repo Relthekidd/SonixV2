@@ -319,7 +319,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           artist:artist_id ( id, name )
         `)
         .eq('is_published', true)
-        .or(`title.ilike.%${query}%,artist.name.ilike.%${query}%`)
+      .or(`title.ilike.%${query}%,artist.name.ilike.%${query}%`)
         .limit(50);
 
       if (error) {
