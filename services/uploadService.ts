@@ -43,69 +43,90 @@ class UploadService {
    * Upload a single track using Supabase Storage and Database
    */
   async uploadSingle(singleData: SingleUploadData): Promise<any> {
-    try {
-      // Get the current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        throw new Error('Failed to get authentication session');
-      }
-      
-      if (!session?.user) {
-        throw new Error('Not authenticated - please log in again');
-      }
+  try {
+    console.log('🧠 Full singleData:', singleData);
+    console.log('🧠 MainArtistId:', singleData.mainArtistId);
 
-      console.log('🎵 Uploading single with Supabase Storage...');
+    // Step 0: Validate artist existence (debugging FK errors)
+    const { data: artistData, error: artistError } = await supabase
+      .from('artists')
+      .select('id')
+      .eq('id', singleData.mainArtistId);
 
-      // Step 1: Upload audio file to Supabase Storage
-      const audioFileName = singleData.audioFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
-      const audioUpload = await supabaseStorage.uploadAudio(singleData.audioFile, audioFileName);
-
-      // Step 2: Upload cover image if provided
-      let coverUpload = null;
-      if (singleData.coverFile) {
-        const coverFileName = singleData.coverFile.fileName || singleData.coverFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
-        coverUpload = await supabaseStorage.uploadImage(singleData.coverFile, coverFileName);
-      }
-
-      // Step 3: Create track record in database
-      const trackData = {
-        title: singleData.title,
-        artist_id: singleData.mainArtistId,
-        audio_url: audioUpload.url,
-        cover_url: coverUpload?.url || null,
-        lyrics: singleData.lyrics || '',
-        duration: singleData.duration || 180,
-        genres: singleData.genres,
-        explicit: singleData.explicit,
-        description: singleData.description || '',
-        release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
-        is_published: false, // Admin approval required
-        track_number: 1,
-        created_by: session.user.id,
-        featured_artist_ids: singleData.featuredArtistIds,
-      };
-
-      const { data: track, error: trackError } = await supabase
-        .from('tracks')
-        .insert(trackData)
-        .select()
-        .single();
-
-      if (trackError) {
-        // Clean up uploaded files if database insert fails
-        await this.cleanupFiles(audioUpload.path, coverUpload?.path);
-        throw new Error(`Database error: ${trackError.message}`);
-      }
-
-      console.log('✅ Single upload successful:', track);
-      return track;
-
-    } catch (error) {
-      console.error('❌ Single upload failed:', error);
-      throw error;
+    if (artistError) {
+      console.error('❌ Error fetching artist:', artistError);
+    } else {
+      console.log('✅ Artist exists:', artistData.length > 0);
     }
+
+    // Step 1: Get session
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      throw new Error('Failed to get authentication session');
+    }
+
+    if (!session?.user) {
+      throw new Error('Not authenticated - please log in again');
+    }
+
+    console.log('🎵 Uploading single with Supabase Storage...');
+
+    // Step 2: Upload audio file
+    const audioFileName = singleData.audioFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+    const audioUpload = await supabaseStorage.uploadAudio(singleData.audioFile, audioFileName);
+    console.log('🎧 Audio uploaded:', audioUpload.url);
+
+    // Step 3: Upload cover (optional)
+    let coverUpload = null;
+    if (singleData.coverFile) {
+      const coverFileName =
+        singleData.coverFile.fileName || singleData.coverFile.name ||
+        `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
+      coverUpload = await supabaseStorage.uploadImage(singleData.coverFile, coverFileName);
+      console.log('🖼️ Cover uploaded:', coverUpload.url);
+    }
+
+    // Step 4: Create track in DB
+    const trackData = {
+      title: singleData.title,
+      artist_id: singleData.mainArtistId,
+      audio_url: audioUpload.url,
+      cover_url: coverUpload?.url || null,
+      lyrics: singleData.lyrics || '',
+      duration: singleData.duration || 180,
+      genres: singleData.genres,
+      explicit: singleData.explicit,
+      description: singleData.description || '',
+      release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
+      is_published: false,
+      track_number: 1,
+      created_by: session.user.id,
+      featured_artist_ids: singleData.featuredArtistIds,
+    };
+
+    console.log('📤 Inserting track data:', trackData);
+
+    const { data: track, error: trackError } = await supabase
+      .from('tracks')
+      .insert(trackData)
+      .select()
+      .single();
+
+    if (trackError) {
+      console.error('❌ Track insert error:', trackError);
+      await this.cleanupFiles(audioUpload.path, coverUpload?.path);
+      throw new Error(`Database error: ${trackError.message}`);
+    }
+
+    console.log('✅ Single upload successful:', track);
+    return track;
+
+  } catch (error) {
+    console.error('❌ Single upload failed:', error);
+    throw error;
   }
+}
 
   /**
    * Upload an album with multiple tracks
