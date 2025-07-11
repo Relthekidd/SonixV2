@@ -230,7 +230,7 @@ export default function ArtistDashboardScreen() {
             styles.trackStatus,
             { color: item.is_published ? '#10b981' : '#f59e0b' }
           ]}>
-            {item.is_published ? 'Published' : 'Pending Approval'}
+            {item.is_published ? 'Published' : 'Draft'}
           </Text>
           <Text style={styles.trackStats}>
             {item.play_count || 0} plays

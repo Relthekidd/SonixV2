@@ -54,7 +54,12 @@ export default function SingleDetailScreen() {
       const transformedTrack = {
         id: singleData.id,
         title: singleData.title,
-        artist: singleData.artist_id || singleData.artist || 'Unknown Artist',
+        artist:
+          singleData.artist?.name ||
+          singleData.artist_name ||
+          singleData.artist ||
+          singleData.artist_id ||
+          'Unknown Artist',
         album: singleData.album || 'Single',
         duration: singleData.duration || 180,
         coverUrl: singleData.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',

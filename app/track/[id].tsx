@@ -53,7 +53,12 @@ export default function TrackDetailScreen() {
   const transformTrack = (apiTrack: any) => ({
     id: apiTrack.id,
     title: apiTrack.title,
-    artist: apiTrack.artist_id || apiTrack.artist || 'Unknown Artist',
+    artist:
+      apiTrack.artist?.name ||
+      apiTrack.artist_name ||
+      apiTrack.artist ||
+      apiTrack.artist_id ||
+      'Unknown Artist',
     album: apiTrack.album || 'Unknown Album',
     duration: apiTrack.duration,
     coverUrl: apiTrack.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
