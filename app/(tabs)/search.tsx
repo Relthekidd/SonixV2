@@ -44,6 +44,7 @@ export default function SearchScreen() {
     playTrack, 
     pauseTrack,
     trendingTracks,
+    searchMusic,
     error 
   } = useMusic();
 
@@ -91,6 +92,8 @@ export default function SearchScreen() {
 
     setIsSearching(true);
     try {
+      console.log('🔍 Starting search for:', searchQuery);
+      
       // Search users
       const { data: usersData, error: usersError } = await supabase
         .rpc('search_users', { 
@@ -99,28 +102,25 @@ export default function SearchScreen() {
         });
 
       if (usersError) {
-        console.error('Error searching users:', usersError);
+        console.error('❌ Error searching users:', usersError);
       }
 
-      // For now, use mock data for other content types
-      // In a real app, you'd search tracks, albums, etc. from your database
-      const mockTracks = trendingTracks.filter(
-        track =>
-          (track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            track.artist.toLowerCase().includes(searchQuery.toLowerCase())) &&
-          track.is_published !== false // hide unpublished tracks
-      );
+      // Search tracks using the MusicProvider's search function
+      const musicResults = await searchMusic(searchQuery);
+      
+      console.log('🎵 Music search results:', musicResults);
+      console.log('👥 User search results:', usersData);
 
       setResults({
-        tracks: mockTracks,
-        albums: [],
-        singles: [],
+        tracks: musicResults.tracks || [],
+        albums: musicResults.albums || [],
+        singles: musicResults.singles || [],
         artists: [],
         users: usersData || [],
       });
       setSuggestions([]);
     } catch (error) {
-      console.error('Search error:', error);
+      console.error('❌ Search error:', error);
     } finally {
       setIsSearching(false);
     }

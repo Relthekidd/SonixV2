@@ -313,6 +313,126 @@ class UploadService {
   }
 
   /**
+   * Publish a track that's currently in draft/pending state
+   */
+  async publishTrack(trackId: string): Promise<any> {
+    try {
+      console.log('📤 Publishing track:', trackId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Check if user has permission to publish (admin or track owner)
+      const { data: track, error: trackError } = await supabase
+        .from('tracks')
+        .select('created_by, title')
+        .eq('id', trackId)
+        .single();
+
+      if (trackError) {
+        throw new Error('Track not found');
+      }
+
+      // Check if user is admin or owns the track
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || (user.role !== 'admin' && track.created_by !== session.user.id)) {
+        throw new Error('You do not have permission to publish this track');
+      }
+
+      // Update track to published status
+      const { data: updatedTrack, error: updateError } = await supabase
+        .from('tracks')
+        .update({ is_published: true })
+        .eq('id', trackId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error(`Failed to publish track: ${updateError.message}`);
+      }
+
+      console.log('✅ Track published successfully:', updatedTrack.title);
+      return updatedTrack;
+
+    } catch (error) {
+      console.error('❌ Track publishing failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unpublish a track (set back to draft)
+   */
+  async unpublishTrack(trackId: string): Promise<any> {
+    try {
+      console.log('📥 Unpublishing track:', trackId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Check if user has permission (admin only for unpublishing)
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || user.role !== 'admin') {
+        throw new Error('Only administrators can unpublish tracks');
+      }
+
+      // Update track to unpublished status
+      const { data: updatedTrack, error: updateError } = await supabase
+        .from('tracks')
+        .update({ is_published: false })
+        .eq('id', trackId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error(`Failed to unpublish track: ${updateError.message}`);
+      }
+
+      console.log('✅ Track unpublished successfully:', updatedTrack.title);
+      return updatedTrack;
+
+    } catch (error) {
+      console.error('❌ Track unpublishing failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Check if a track should be automatically published based on release date
+   */
+  isReadyForRelease(releaseDate: string): boolean {
+    const now = new Date();
+    const release = new Date(releaseDate);
+    return release <= now;
+  }
+
+  /**
    * Initialize storage buckets on app start
    */
   async initializeStorage(): Promise<void> {

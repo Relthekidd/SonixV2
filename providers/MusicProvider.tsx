@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/providers/AuthProvider';
 import { useAuth } from './AuthProvider';
 
 export interface Track {
@@ -113,7 +113,29 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     setError(null);
 
     try {
-      const { data: newTracks, error: tracksError } = await supabase
+      console.log('🎵 Loading initial data...');
+      
+      // Load trending tracks (most played/recent)
+      const { data: trendingData, error: trendingError } = await supabase
+        .from('tracks')
+        .select(`
+          id, title, duration, audio_url, cover_url, release_date,
+          genres, explicit,
+          artist:artist_id ( id, name )
+        `)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (trendingError) {
+        console.error('❌ Trending tracks error:', trendingError);
+        throw trendingError;
+      }
+
+      console.log('🎧 Raw trendingTracks:', trendingData);
+
+      // Load new releases (recent tracks)
+      const { data: newTracksData, error: newTracksError } = await supabase
         .from('tracks')
         .select(`
           id, title, duration, audio_url, cover_url, release_date,
@@ -124,25 +146,49 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         .order('release_date', { ascending: false })
         .limit(10);
 
-      if (tracksError) throw tracksError;
+      if (newTracksError) {
+        console.error('❌ New releases error:', newTracksError);
+        throw newTracksError;
+      }
 
-      console.log('🎧 Raw newTracks:', newTracks);
+      console.log('🆕 Raw newReleases:', newTracksData);
 
-      const formatted = newTracks.map((track: any) => ({
+      // Transform trending tracks
+      const formattedTrending = trendingData?.map((track: any) => ({
         id: track.id,
         title: track.title,
         artist: track.artist?.name || 'Unknown Artist',
         album: 'Single',
         duration: track.duration,
-        coverUrl: track.cover_url,
+        coverUrl: track.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
         audioUrl: track.audio_url,
         isLiked: false,
-        genre: track.genres?.[0] || 'Unknown',
+        genre: Array.isArray(track.genres) ? track.genres[0] : 'Unknown',
         releaseDate: track.release_date,
-      }));
+        playCount: 0,
+      })) || [];
 
-      console.log('🖼️ Formatted newReleases:', formatted);
-      setNewReleases(formatted);
+      // Transform new releases
+      const formattedNewReleases = newTracksData?.map((track: any) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist?.name || 'Unknown Artist',
+        album: 'Single',
+        duration: track.duration,
+        coverUrl: track.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+        audioUrl: track.audio_url,
+        isLiked: false,
+        genre: Array.isArray(track.genres) ? track.genres[0] : 'Unknown',
+        releaseDate: track.release_date,
+        playCount: 0,
+      })) || [];
+
+      console.log('🎯 Formatted trending tracks:', formattedTrending);
+      console.log('🖼️ Formatted new releases:', formattedNewReleases);
+      
+      setTrendingTracks(formattedTrending);
+      setNewReleases(formattedNewReleases);
+      
     } catch (err) {
       console.error('❌ Error loading initial data:', err);
       setError('Failed to load music data');
@@ -187,7 +233,53 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const addToPlaylist = async (playlistId: string, track: Track) => { /* unchanged */ };
   const removeFromPlaylist = async (playlistId: string, trackId: string) => { /* unchanged */ };
 
-  const searchMusic = async (query: string) => { /* unchanged */ };
+  const searchMusic = async (query: string) => {
+    try {
+      console.log('🔍 Searching for:', query);
+      
+      const { data: searchResults, error } = await supabase
+        .from('tracks')
+        .select(`
+          id, title, duration, audio_url, cover_url, release_date,
+          genres, explicit,
+          artist:artist_id ( id, name )
+        `)
+        .eq('is_published', true)
+        .or(`title.ilike.%${query}%,artist.name.ilike.%${query}%`)
+        .limit(50);
+
+      if (error) {
+        console.error('❌ Search error:', error);
+        throw error;
+      }
+
+      console.log('🎯 Search results:', searchResults);
+
+      const formattedTracks = searchResults?.map((track: any) => ({
+        id: track.id,
+        title: track.title,
+        artist: track.artist?.name || 'Unknown Artist',
+        album: 'Single',
+        duration: track.duration,
+        coverUrl: track.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+        audioUrl: track.audio_url,
+        isLiked: false,
+        genre: Array.isArray(track.genres) ? track.genres[0] : 'Unknown',
+        releaseDate: track.release_date,
+        playCount: 0,
+      })) || [];
+
+      return {
+        tracks: formattedTracks,
+        albums: [],
+        playlists: [],
+        singles: [],
+      };
+    } catch (error) {
+      console.error('❌ Search failed:', error);
+      return { tracks: [], albums: [], playlists: [], singles: [] };
+    }
+  };
 
   return (
     <MusicContext.Provider

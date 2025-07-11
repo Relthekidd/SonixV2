@@ -14,7 +14,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Music, Calendar, Play, Pause, Plus, Eye } from 'lucide-react-native';
+import { uploadService } from '@/services/uploadService';
+import { ArrowLeft, Music, Calendar, Play, Pause, Plus, Eye, Check, Clock, AlertCircle, Upload } from 'lucide-react-native';
 
 interface UploadedContent {
   id: string;
@@ -35,6 +36,7 @@ export default function AdminUploadsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'singles' | 'albums'>('all');
+  const [publishingTrack, setPublishingTrack] = useState<string | null>(null);
 
   useEffect(() => {
     loadUploads();
@@ -156,60 +158,154 @@ export default function AdminUploadsScreen() {
     }
   };
 
-  const renderUploadItem = ({ item }: { item: UploadedContent }) => (
-    <TouchableOpacity 
-      style={styles.uploadItem}
-      onPress={() => handleViewContent(item)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.uploadCover} />
+  const handlePublishTrack = async (trackId: string) => {
+    try {
+      setPublishingTrack(trackId);
+      console.log('📤 Publishing track:', trackId);
       
-      <View style={styles.uploadInfo}>
-        <View style={styles.uploadHeader}>
-          <Text style={styles.uploadTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <View style={[
-            styles.statusBadge,
-            { backgroundColor: item.isPublished ? '#10b981' : '#f59e0b' }
-          ]}>
-            <Text style={styles.statusText}>
-              {item.isPublished ? 'Published' : 'Draft'}
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.uploadArtist} numberOfLines={1}>
-          {item.artist}
-        </Text>
-        
-        <View style={styles.uploadMeta}>
-          <View style={styles.metaItem}>
-            <Music color="#94a3b8" size={14} />
-            <Text style={styles.metaText}>
-              {item.type === 'album' 
-                ? `${item.trackCount} tracks` 
-                : formatDuration(item.duration || 0)
-              }
-            </Text>
-          </View>
-          
-          <View style={styles.metaItem}>
-            <Calendar color="#94a3b8" size={14} />
-            <Text style={styles.metaText}>
-              {formatDate(item.createdAt)}
-            </Text>
-          </View>
-        </View>
-      </View>
+      await uploadService.publishTrack(trackId);
+      
+      // Update the local state
+      setUploads(prev => prev.map(upload => 
+        upload.id === trackId 
+          ? { ...upload, isPublished: true }
+          : upload
+      ));
+      
+      console.log('✅ Track published successfully');
+    } catch (error) {
+      console.error('❌ Failed to publish track:', error);
+      alert('Failed to publish track. Please try again.');
+    } finally {
+      setPublishingTrack(null);
+    }
+  };
 
+  const handleUnpublishTrack = async (trackId: string) => {
+    try {
+      setPublishingTrack(trackId);
+      console.log('📥 Unpublishing track:', trackId);
+      
+      await uploadService.unpublishTrack(trackId);
+      
+      // Update the local state
+      setUploads(prev => prev.map(upload => 
+        upload.id === trackId 
+          ? { ...upload, isPublished: false }
+          : upload
+      ));
+      
+      console.log('✅ Track unpublished successfully');
+    } catch (error) {
+      console.error('❌ Failed to unpublish track:', error);
+      alert('Failed to unpublish track. Please try again.');
+    } finally {
+      setPublishingTrack(null);
+    }
+  };
+
+  const getTrackStatus = (upload: UploadedContent) => {
+    if (upload.isPublished) {
+      return { text: 'Published', color: '#10b981', icon: Check };
+    }
+    
+    const now = new Date();
+    const releaseDate = new Date(upload.releaseDate);
+    
+    if (releaseDate > now) {
+      return { text: 'Scheduled', color: '#f59e0b', icon: Clock };
+    }
+    
+    return { text: 'Draft', color: '#64748b', icon: AlertCircle };
+  };
+
+  const renderUploadItem = ({ item }: { item: UploadedContent }) => {
+    const status = getTrackStatus(item);
+    const StatusIcon = status.icon;
+    const isPublishing = publishingTrack === item.id;
+    
+    return (
       <TouchableOpacity 
-        style={styles.viewButton}
+        style={styles.uploadItem}
         onPress={() => handleViewContent(item)}
       >
-        <Eye color="#8b5cf6" size={20} />
+        <Image source={{ uri: item.coverUrl }} style={styles.uploadCover} />
+        
+        <View style={styles.uploadInfo}>
+          <View style={styles.uploadHeader}>
+            <Text style={styles.uploadTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: status.color }
+            ]}>
+              <StatusIcon color="#ffffff" size={10} />
+              <Text style={styles.statusText}>
+                {status.text}
+              </Text>
+            </View>
+          </View>
+          
+          <Text style={styles.uploadArtist} numberOfLines={1}>
+            {item.artist}
+          </Text>
+          
+          <View style={styles.uploadMeta}>
+            <View style={styles.metaItem}>
+              <Music color="#94a3b8" size={14} />
+              <Text style={styles.metaText}>
+                {item.type === 'album' 
+                  ? `${item.trackCount} tracks` 
+                  : formatDuration(item.duration || 0)
+                }
+              </Text>
+            </View>
+            
+            <View style={styles.metaItem}>
+              <Calendar color="#94a3b8" size={14} />
+              <Text style={styles.metaText}>
+                {formatDate(item.createdAt)}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.uploadActions}>
+          {/* Publish/Unpublish button */}
+          {(item.type === 'single' || item.type === 'track') && (
+            <TouchableOpacity 
+              style={[
+                styles.actionButton,
+                { backgroundColor: item.isPublished ? '#ef4444' : '#10b981' }
+              ]}
+              onPress={() => item.isPublished ? handleUnpublishTrack(item.id) : handlePublishTrack(item.id)}
+              disabled={isPublishing}
+            >
+              {isPublishing ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Upload color="#ffffff" size={14} />
+                  <Text style={styles.actionButtonText}>
+                    {item.isPublished ? 'Unpublish' : 'Publish'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+          
+          {/* View button */}
+          <TouchableOpacity 
+            style={styles.viewButton}
+            onPress={() => handleViewContent(item)}
+          >
+            <Eye color="#8b5cf6" size={20} />
+          </TouchableOpacity>
+        </View>
       </TouchableOpacity>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const tabs = [
     { id: 'all', title: 'All', count: uploads.length },
@@ -474,9 +570,12 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
+    gap: 4,
   },
   statusText: {
     fontSize: 10,
@@ -503,6 +602,25 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
   },
+  uploadActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginLeft: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    gap: 4,
+  },
+  actionButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
+  },
   viewButton: {
     width: 40,
     height: 40,
@@ -510,7 +628,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(139, 92, 246, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 12,
   },
   emptyState: {
     alignItems: 'center',
