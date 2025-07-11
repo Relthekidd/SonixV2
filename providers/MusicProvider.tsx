@@ -1,5 +1,3 @@
-// MusicProvider.tsx — Refactored with Supabase-powered New Releases
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from './AuthProvider';
@@ -117,17 +115,23 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data: newTracks, error: tracksError } = await supabase
         .from('tracks')
-        .select('id, title, duration, audio_url, cover_url, release_date, artist_id, genres, explicit')
+        .select(`
+          id, title, duration, audio_url, cover_url, release_date,
+          genres, explicit,
+          artist:artist_id ( id, name )
+        `)
         .eq('is_published', true)
         .order('release_date', { ascending: false })
         .limit(10);
 
       if (tracksError) throw tracksError;
 
+      console.log('🎧 Raw newTracks:', newTracks);
+
       const formatted = newTracks.map((track: any) => ({
         id: track.id,
         title: track.title,
-        artist: track.artist_id, // Placeholder - should resolve to artist name
+        artist: track.artist?.name || 'Unknown Artist',
         album: 'Single',
         duration: track.duration,
         coverUrl: track.cover_url,
@@ -137,6 +141,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         releaseDate: track.release_date,
       }));
 
+      console.log('🖼️ Formatted newReleases:', formatted);
       setNewReleases(formatted);
     } catch (err) {
       console.error('❌ Error loading initial data:', err);
@@ -160,6 +165,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   const pauseTrack = () => setIsPlaying(false);
+
   const nextTrack = () => {
     if (queue.length > 0 && currentTrack) {
       const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
@@ -167,6 +173,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       playTrack(queue[nextIndex]);
     }
   };
+
   const previousTrack = () => {
     if (queue.length > 0 && currentTrack) {
       const currentIndex = queue.findIndex(track => track.id === currentTrack.id);
@@ -175,12 +182,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const toggleLike = async (trackId: string) => {/* unchanged */};
-  const createPlaylist = async (name: string, description: string) => {/* unchanged */};
-  const addToPlaylist = async (playlistId: string, track: Track) => {/* unchanged */};
-  const removeFromPlaylist = async (playlistId: string, trackId: string) => {/* unchanged */};
+  const toggleLike = async (trackId: string) => { /* unchanged */ };
+  const createPlaylist = async (name: string, description: string) => { /* unchanged */ };
+  const addToPlaylist = async (playlistId: string, track: Track) => { /* unchanged */ };
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => { /* unchanged */ };
 
-  const searchMusic = async (query: string) => {/* unchanged - needs Supabase replacement later */};
+  const searchMusic = async (query: string) => { /* unchanged */ };
 
   return (
     <MusicContext.Provider
