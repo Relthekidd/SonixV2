@@ -104,9 +104,11 @@ export default function SearchScreen() {
 
       // For now, use mock data for other content types
       // In a real app, you'd search tracks, albums, etc. from your database
-      const mockTracks = trendingTracks.filter(track =>
-        track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        track.artist.toLowerCase().includes(searchQuery.toLowerCase())
+      const mockTracks = trendingTracks.filter(
+        track =>
+          (track.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            track.artist.toLowerCase().includes(searchQuery.toLowerCase())) &&
+          track.is_published !== false // hide unpublished tracks
       );
 
       setResults({
@@ -146,9 +148,9 @@ export default function SearchScreen() {
   };
 
   const renderTrackItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.resultItem}
-      onPress={() => handleTrackPress(item)}
+      onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
       <View style={styles.resultInfo}>
@@ -159,7 +161,10 @@ export default function SearchScreen() {
           {item.artist} • Song
         </Text>
       </View>
-      <TouchableOpacity style={styles.playButton}>
+      <TouchableOpacity
+        style={styles.playButton}
+        onPress={() => handleTrackPress(item)}
+      >
         {currentTrack?.id === item.id && isPlaying ? (
           <Pause color="#8b5cf6" size={20} />
         ) : (

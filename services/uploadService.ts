@@ -70,6 +70,14 @@ class UploadService {
       throw new Error('Not authenticated - please log in again');
     }
 
+    // Check if uploader is an admin so we can auto publish
+    const { data: userRecord } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+    const isAdmin = userRecord?.role === 'admin';
+
     console.log('🎵 Uploading single with Supabase Storage...');
 
     // Step 2: Upload audio file
@@ -99,7 +107,8 @@ class UploadService {
       explicit: singleData.explicit,
       description: singleData.description || '',
       release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
-      is_published: false,
+      // Auto publish if the uploader is an admin
+      is_published: isAdmin,
       track_number: 1,
       created_by: session.user.id,
       featured_artist_ids: singleData.featuredArtistIds,
@@ -144,6 +153,14 @@ class UploadService {
         throw new Error('Not authenticated - please log in again');
       }
 
+      // Determine if uploader is an admin for auto publishing
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      const isAdmin = userRecord?.role === 'admin';
+
       console.log('💿 Uploading album with Supabase Storage...');
 
       // Step 1: Upload album cover if provided
@@ -163,7 +180,8 @@ class UploadService {
         genres: albumData.genres,
         explicit: albumData.explicit,
         track_count: albumData.tracks.length,
-        is_published: false, // Admin approval required
+        // Auto publish if the uploader is an admin
+        is_published: isAdmin,
         created_by: session.user.id,
         featured_artist_ids: albumData.featuredArtistIds,
       };
@@ -207,7 +225,8 @@ class UploadService {
             genres: albumData.genres,
             explicit: track.explicit,
             track_number: track.trackNumber,
-            is_published: false, // Admin approval required
+            // Auto publish track if the uploader is an admin
+            is_published: isAdmin,
             created_by: session.user.id,
             featured_artist_ids: track.featuredArtistIds,
           };

@@ -177,8 +177,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
+    // Debugging playback issues
+    console.log('▶️ playTrack called with URL:', track.audioUrl);
+
     setCurrentTrack(track);
     setIsPlaying(true);
+    console.log('📻 Now playing:', track.title);
     setDuration(track.duration);
     
     if (newQueue) {

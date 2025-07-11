@@ -51,7 +51,12 @@ export default function AdminUploadsScreen() {
           id: single.id,
           title: single.title,
           type: 'single' as const,
-          artist: single.artist_id || single.artist || 'Unknown Artist',
+          artist:
+            single.artist?.name ||
+            single.artist_name ||
+            single.artist ||
+            single.artist_id ||
+            'Unknown Artist',
           coverUrl: single.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
           releaseDate: single.release_date || single.created_at,
           duration: single.duration || 180,
@@ -62,7 +67,12 @@ export default function AdminUploadsScreen() {
           id: album.id,
           title: album.title,
           type: 'album' as const,
-          artist: album.artist_id || album.artist || 'Unknown Artist',
+          artist:
+            album.artist?.name ||
+            album.artist_name ||
+            album.artist ||
+            album.artist_id ||
+            'Unknown Artist',
           coverUrl: album.cover_url || 'https://images.pexels.com/photos/1699161/pexels-photo-1699161.jpeg?auto=compress&cs=tinysrgb&w=400',
           releaseDate: album.release_date || album.created_at,
           trackCount: album.track_count || album.tracks?.length || 0,
@@ -73,7 +83,12 @@ export default function AdminUploadsScreen() {
           id: track.id,
           title: track.title,
           type: 'track' as const,
-          artist: track.artist_id || track.artist || 'Unknown Artist',
+          artist:
+            track.artist?.name ||
+            track.artist_name ||
+            track.artist ||
+            track.artist_id ||
+            'Unknown Artist',
           coverUrl: track.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
           releaseDate: track.release_date || track.created_at,
           duration: track.duration || 180,
@@ -158,7 +173,7 @@ export default function AdminUploadsScreen() {
             { backgroundColor: item.isPublished ? '#10b981' : '#f59e0b' }
           ]}>
             <Text style={styles.statusText}>
-              {item.isPublished ? 'Published' : 'Pending'}
+              {item.isPublished ? 'Published' : 'Draft'}
             </Text>
           </View>
         </View>
