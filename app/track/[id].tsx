@@ -220,14 +220,14 @@ export default function TrackDetailScreen() {
           {track.playCount && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Plays:</Text>
-              <Text style={styles.detailText}>{track.playCount.toLocaleString()}</Text>
+              <Text style={styles.detailText}>{track.playCount?.toLocaleString() || '0'}</Text>
             </View>
           )}
           
           {track.likeCount && (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Likes:</Text>
-              <Text style={styles.detailText}>{track.likeCount.toLocaleString()}</Text>
+              <Text style={styles.detailText}>{track.likeCount?.toLocaleString() || '0'}</Text>
             </View>
           )}
         </View>

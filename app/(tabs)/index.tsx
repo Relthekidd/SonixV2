@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { Play, Pause, RefreshCw } from 'lucide-react-native';
+import { router } from 'expo-router';
 
 export default function HomeScreen() {
   const { user } = useAuth();
@@ -51,6 +52,9 @@ export default function HomeScreen() {
     } else {
       playTrack(track, trendingTracks);
     }
+    
+    // Navigate to track detail page
+    router.push(`/track/${track.id}`);
   };
 
   const renderTrackItem = ({ item }: { item: any }) => {
@@ -80,7 +84,7 @@ export default function HomeScreen() {
           </Text>
           {item.playCount && (
             <Text style={styles.trackStats}>
-              {item.playCount.toLocaleString()} plays
+              {item.playCount?.toLocaleString() || '0'} plays
             </Text>
           )}
         </View>

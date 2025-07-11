@@ -240,7 +240,7 @@ export default function SingleDetailScreen() {
             {track.playCount && (
               <View style={styles.metaItem}>
                 <Music color="#94a3b8" size={16} />
-                <Text style={styles.metaText}>{track.playCount.toLocaleString()} plays</Text>
+                <Text style={styles.metaText}>{track.playCount?.toLocaleString() || '0'} plays</Text>
               </View>
             )}
           </View>
