@@ -264,6 +264,262 @@ class UploadService {
   }
 
   /**
+   * Delete an album completely (both from database and storage)
+   */
+  async deleteAlbum(albumId: string): Promise<void> {
+    try {
+      console.log('🗑️ Deleting album:', albumId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Fetch album info first to get file paths and check permissions
+      const { data: album, error: albumError } = await supabase
+        .from('albums')
+        .select('cover_url, title, created_by')
+        .eq('id', albumId)
+        .single();
+
+      if (albumError || !album) {
+        console.error('Album not found or error fetching album:', albumError);
+        throw new Error('Album not found');
+      }
+
+      // Check if user has permission to delete (admin or album owner)
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || (user.role !== 'admin' && album.created_by !== session.user.id)) {
+        throw new Error('You do not have permission to delete this album');
+      }
+
+      // Fetch all tracks belonging to this album
+      const { data: tracks, error: tracksError } = await supabase
+        .from('tracks')
+        .select('id, audio_url, cover_url')
+        .eq('album_id', albumId);
+
+      if (tracksError) {
+        console.error('Error fetching album tracks:', tracksError);
+        throw new Error('Failed to fetch album tracks');
+      }
+
+      // Delete all track files from storage
+      const filesToDelete: string[] = [];
+      
+      if (tracks) {
+        for (const track of tracks) {
+          // Extract audio file path
+          const audioPath = this.extractPathFromUrl(track.audio_url);
+          if (audioPath) {
+            filesToDelete.push(audioPath);
+          }
+          
+          // Extract cover file path (if different from album cover)
+          if (track.cover_url && track.cover_url !== album.cover_url) {
+            const coverPath = this.extractPathFromUrl(track.cover_url);
+            if (coverPath) {
+              filesToDelete.push(coverPath);
+            }
+          }
+        }
+      }
+
+      // Extract album cover path
+      if (album.cover_url) {
+        const albumCoverPath = this.extractPathFromUrl(album.cover_url);
+        if (albumCoverPath) {
+          filesToDelete.push(albumCoverPath);
+        }
+      }
+
+      // Delete all files from storage
+      for (const filePath of filesToDelete) {
+        try {
+          const bucket = filePath.includes('covers/') ? 'images' : 'audio-files';
+          await supabaseStorage.deleteFile(bucket, filePath);
+          console.log('✅ File deleted:', filePath);
+        } catch (error) {
+          console.error('Error deleting file:', filePath, error);
+          // Continue with deletion even if some files fail
+        }
+      }
+
+      // Delete all tracks belonging to this album
+      const { error: deleteTracksError } = await supabase
+        .from('tracks')
+        .delete()
+        .eq('album_id', albumId);
+
+      if (deleteTracksError) {
+        console.error('Failed to delete album tracks:', deleteTracksError);
+        throw new Error('Failed to delete album tracks');
+      }
+
+      // Delete album record from database
+      const { error: deleteAlbumError } = await supabase
+        .from('albums')
+        .delete()
+        .eq('id', albumId);
+
+      if (deleteAlbumError) {
+        console.error('Failed to delete album record:', deleteAlbumError);
+        throw new Error('Failed to delete album record');
+      }
+
+      console.log('✅ Album deleted successfully:', album.title);
+
+    } catch (error) {
+      console.error('❌ Album deletion failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Publish an album that's currently in draft/pending state
+   */
+  async publishAlbum(albumId: string): Promise<any> {
+    try {
+      console.log('📤 Publishing album:', albumId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Check if user has permission to publish (admin or album owner)
+      const { data: album, error: albumError } = await supabase
+        .from('albums')
+        .select('created_by, title')
+        .eq('id', albumId)
+        .single();
+
+      if (albumError) {
+        throw new Error('Album not found');
+      }
+
+      // Check if user is admin or owns the album
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || (user.role !== 'admin' && album.created_by !== session.user.id)) {
+        throw new Error('You do not have permission to publish this album');
+      }
+
+      // Update album to published status
+      const { data: updatedAlbum, error: updateError } = await supabase
+        .from('albums')
+        .update({ is_published: true })
+        .eq('id', albumId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error(`Failed to publish album: ${updateError.message}`);
+      }
+
+      // Also publish all tracks in the album
+      const { error: publishTracksError } = await supabase
+        .from('tracks')
+        .update({ is_published: true })
+        .eq('album_id', albumId);
+
+      if (publishTracksError) {
+        console.error('Warning: Failed to publish all tracks in album:', publishTracksError);
+        // Don't throw error here, album is already published
+      }
+
+      console.log('✅ Album published successfully:', updatedAlbum.title);
+      return updatedAlbum;
+
+    } catch (error) {
+      console.error('❌ Album publishing failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Unpublish an album (set back to draft)
+   */
+  async unpublishAlbum(albumId: string): Promise<any> {
+    try {
+      console.log('📥 Unpublishing album:', albumId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Check if user has permission (admin only for unpublishing)
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || user.role !== 'admin') {
+        throw new Error('Only administrators can unpublish albums');
+      }
+
+      // Update album to unpublished status
+      const { data: updatedAlbum, error: updateError } = await supabase
+        .from('albums')
+        .update({ is_published: false })
+        .eq('id', albumId)
+        .select()
+        .single();
+
+      if (updateError) {
+        throw new Error(`Failed to unpublish album: ${updateError.message}`);
+      }
+
+      // Also unpublish all tracks in the album
+      const { error: unpublishTracksError } = await supabase
+        .from('tracks')
+        .update({ is_published: false })
+        .eq('album_id', albumId);
+
+      if (unpublishTracksError) {
+        console.error('Warning: Failed to unpublish all tracks in album:', unpublishTracksError);
+        // Don't throw error here, album is already unpublished
+      }
+
+      console.log('✅ Album unpublished successfully:', updatedAlbum.title);
+      return updatedAlbum;
+
+    } catch (error) {
+      console.error('❌ Album unpublishing failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Check if user has upload permissions
    */
   async checkUploadPermissions(): Promise<boolean> {
