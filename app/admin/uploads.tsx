@@ -9,13 +9,14 @@ import {
   FlatList,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { apiService } from '@/services/api';
 import { uploadService } from '@/services/uploadService';
-import { ArrowLeft, Music, Calendar, Play, Pause, Plus, Eye, Check, Clock, AlertCircle, Upload } from 'lucide-react-native';
+import { ArrowLeft, Music, Calendar, Play, Pause, Plus, Eye, Check, Clock, AlertCircle, Upload, Trash2, MoreVertical } from 'lucide-react-native';
 
 interface UploadedContent {
   id: string;
@@ -37,6 +38,8 @@ export default function AdminUploadsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'singles' | 'albums'>('all');
   const [publishingTrack, setPublishingTrack] = useState<string | null>(null);
+  const [deletingTrack, setDeletingTrack] = useState<string | null>(null);
+  const [showActionsFor, setShowActionsFor] = useState<string | null>(null);
 
   useEffect(() => {
     loadUploads();
@@ -173,11 +176,13 @@ export default function AdminUploadsScreen() {
       ));
       
       console.log('✅ Track published successfully');
+      Alert.alert('Success', 'Track published successfully! It will now appear in the app.');
     } catch (error) {
       console.error('❌ Failed to publish track:', error);
-      alert('Failed to publish track. Please try again.');
+      Alert.alert('Error', 'Failed to publish track. Please try again.');
     } finally {
       setPublishingTrack(null);
+      setShowActionsFor(null);
     }
   };
 
@@ -196,12 +201,53 @@ export default function AdminUploadsScreen() {
       ));
       
       console.log('✅ Track unpublished successfully');
+      Alert.alert('Success', 'Track unpublished successfully! It will no longer appear in the app.');
     } catch (error) {
       console.error('❌ Failed to unpublish track:', error);
-      alert('Failed to unpublish track. Please try again.');
+      Alert.alert('Error', 'Failed to unpublish track. Please try again.');
     } finally {
       setPublishingTrack(null);
+      setShowActionsFor(null);
     }
+  };
+
+  const handleDeleteTrack = async (upload: UploadedContent) => {
+    const contentType = upload.type === 'single' ? 'single' : upload.type === 'album' ? 'album' : 'track';
+    
+    Alert.alert(
+      'Delete Content',
+      `Are you sure you want to delete "${upload.title}"? This action cannot be undone.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeletingTrack(upload.id);
+              console.log(`🗑️ Deleting ${contentType}:`, upload.id);
+              
+              await uploadService.deleteContent(upload.id, upload.type);
+              
+              // Remove from local state
+              setUploads(prev => prev.filter(item => item.id !== upload.id));
+              
+              console.log(`✅ ${contentType} deleted successfully`);
+              Alert.alert('Success', `${contentType.charAt(0).toUpperCase() + contentType.slice(1)} deleted successfully!`);
+            } catch (error) {
+              console.error(`❌ Failed to delete ${contentType}:`, error);
+              Alert.alert('Error', `Failed to delete ${contentType}. Please try again.`);
+            } finally {
+              setDeletingTrack(null);
+              setShowActionsFor(null);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const getTrackStatus = (upload: UploadedContent) => {
@@ -219,10 +265,16 @@ export default function AdminUploadsScreen() {
     return { text: 'Draft', color: '#64748b', icon: AlertCircle };
   };
 
+  const toggleActions = (itemId: string) => {
+    setShowActionsFor(showActionsFor === itemId ? null : itemId);
+  };
+
   const renderUploadItem = ({ item }: { item: UploadedContent }) => {
     const status = getTrackStatus(item);
     const StatusIcon = status.icon;
     const isPublishing = publishingTrack === item.id;
+    const isDeleting = deletingTrack === item.id;
+    const showActions = showActionsFor === item.id;
     
     return (
       <TouchableOpacity 
@@ -272,36 +324,64 @@ export default function AdminUploadsScreen() {
         </View>
 
         <View style={styles.uploadActions}>
-          {/* Publish/Unpublish button */}
-          {(item.type === 'single' || item.type === 'track') && (
-            <TouchableOpacity 
-              style={[
-                styles.actionButton,
-                { backgroundColor: item.isPublished ? '#ef4444' : '#10b981' }
-              ]}
-              onPress={() => item.isPublished ? handleUnpublishTrack(item.id) : handlePublishTrack(item.id)}
-              disabled={isPublishing}
-            >
-              {isPublishing ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <>
-                  <Upload color="#ffffff" size={14} />
-                  <Text style={styles.actionButtonText}>
+          {/* Actions Menu Button */}
+          <TouchableOpacity 
+            style={[styles.menuButton, showActions && styles.menuButtonActive]}
+            onPress={() => toggleActions(item.id)}
+          >
+            <MoreVertical color={showActions ? "#8b5cf6" : "#94a3b8"} size={20} />
+          </TouchableOpacity>
+          
+          {/* Actions Menu */}
+          {showActions && (
+            <View style={styles.actionsMenu}>
+              {/* View Action */}
+              <TouchableOpacity 
+                style={styles.actionMenuItem}
+                onPress={() => {
+                  handleViewContent(item);
+                  setShowActionsFor(null);
+                }}
+              >
+                <Eye color="#8b5cf6" size={16} />
+                <Text style={styles.actionMenuText}>View</Text>
+              </TouchableOpacity>
+              
+              {/* Publish/Unpublish Action */}
+              {(item.type === 'single' || item.type === 'track') && (
+                <TouchableOpacity 
+                  style={styles.actionMenuItem}
+                  onPress={() => item.isPublished ? handleUnpublishTrack(item.id) : handlePublishTrack(item.id)}
+                  disabled={isPublishing}
+                >
+                  {isPublishing ? (
+                    <ActivityIndicator size="small" color="#8b5cf6" />
+                  ) : (
+                    <Upload color={item.isPublished ? "#f59e0b" : "#10b981"} size={16} />
+                  )}
+                  <Text style={[styles.actionMenuText, { color: item.isPublished ? "#f59e0b" : "#10b981" }]}>
                     {item.isPublished ? 'Unpublish' : 'Publish'}
                   </Text>
-                </>
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>
+              
+              {/* Delete Action */}
+              <TouchableOpacity 
+                style={styles.actionMenuItem}
+                onPress={() => handleDeleteTrack(item)}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <ActivityIndicator size="small" color="#ef4444" />
+                ) : (
+                  <Trash2 color="#ef4444" size={16} />
+                )}
+                <Text style={[styles.actionMenuText, { color: '#ef4444' }]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
           )}
-          
-          {/* View button */}
-          <TouchableOpacity 
-            style={styles.viewButton}
-            onPress={() => handleViewContent(item)}
-          >
-            <Eye color="#8b5cf6" size={20} />
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -546,6 +626,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.1)',
+    position: 'relative',
   },
   uploadCover: {
     width: 60,
@@ -603,31 +684,44 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
   uploadActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    position: 'relative',
     marginLeft: 12,
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 4,
-  },
-  actionButtonText: {
-    fontSize: 12,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
-  viewButton: {
+  menuButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  menuButtonActive: {
+    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+  },
+  actionsMenu: {
+    position: 'absolute',
+    top: 45,
+    right: 0,
+    backgroundColor: 'rgba(26, 26, 46, 0.95)',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+    minWidth: 120,
+    zIndex: 1000,
+  },
+  actionMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  actionMenuText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Medium',
+    color: '#ffffff',
   },
   emptyState: {
     alignItems: 'center',
