@@ -311,6 +311,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('🔍 Searching for:', query);
       
+      // Search tracks by title or get artist IDs that match the query
       const { data: searchResults, error } = await supabase
         .from('tracks')
         .select(`
@@ -319,17 +320,55 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           artist:artist_id ( id, name )
         `)
         .eq('is_published', true)
-      .or(`title.ilike.%${query}%,artist.name.ilike.%${query}%`)
+        .or(`title.ilike.%${query}%`)
         .limit(50);
+
+      // Also search for artists that match the query
+      const { data: artistResults, error: artistError } = await supabase
+        .from('artists')
+        .select('id')
+        .ilike('name', `%${query}%`);
+
+      if (artistError) {
+        console.error('❌ Artist search error:', artistError);
+      }
+
+      // Get tracks by matching artist IDs
+      let artistTracks = [];
+      if (artistResults && artistResults.length > 0) {
+        const artistIds = artistResults.map(artist => artist.id);
+        const { data: tracksByArtist, error: tracksByArtistError } = await supabase
+          .from('tracks')
+          .select(`
+            id, title, duration, audio_url, cover_url, release_date,
+            genres, explicit,
+            artist:artist_id ( id, name )
+          `)
+          .eq('is_published', true)
+          .in('artist_id', artistIds)
+          .limit(50);
+
+        if (tracksByArtistError) {
+          console.error('❌ Tracks by artist search error:', tracksByArtistError);
+        } else {
+          artistTracks = tracksByArtist || [];
+        }
+      }
+
+      // Combine and deduplicate results
+      const allTracks = [...(searchResults || []), ...artistTracks];
+      const uniqueTracks = allTracks.filter((track, index, self) => 
+        index === self.findIndex(t => t.id === track.id)
+      );
 
       if (error) {
         console.error('❌ Search error:', error);
         throw error;
       }
 
-      console.log('🎯 Search results:', searchResults);
+      console.log('🎯 Search results:', uniqueTracks);
 
-      const formattedTracks = searchResults?.map((track: any) => ({
+      const formattedTracks = uniqueTracks?.map((track: any) => ({
         id: track.id,
         title: track.title,
         artist: track.artist?.name || 'Unknown Artist',
