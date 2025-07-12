@@ -112,8 +112,8 @@ export default function HomeScreen() {
         {item.title}
       </Text>
       <Text style={styles.albumArtist} numberOfLines={1}>
-        {item.artist} <Text>•</Text> {item.year || '2024'}
-      </Text>
+  <Text>{item.artist}</Text> <Text>•</Text> <Text>{item.year || '2024'}</Text>
+</Text>
     </TouchableOpacity>
   );
 
