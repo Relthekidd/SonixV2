@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Audio, AudioStatus } from 'expo-audio';
+import { useAudioPlayer, AudioSource } from 'expo-audio';
 import { supabase } from '@/providers/AuthProvider';
 import { useAuth } from './AuthProvider';
 
@@ -103,25 +103,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Audio playback refs - Updated for expo-audio
-  const playerRef = useRef<Audio.Player | null>(null);
+  // Audio player using expo-audio hooks
+  const [currentAudioSource, setCurrentAudioSource] = useState<AudioSource | null>(null);
+  const player = useAudioPlayer(currentAudioSource);
   const positionUpdateRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Initialize audio session
+  // Audio session is automatically handled by expo-audio
   useEffect(() => {
-    const initializeAudio = async () => {
-      try {
-        await Audio.setAudioModeAsync({
-          playsInSilentModeIOS: true,
-          staysActiveInBackground: true,
-        });
-        console.log('✅ Audio session initialized');
-      } catch (error) {
-        console.error('❌ Error initializing audio session:', error);
-      }
-    };
-
-    initializeAudio();
+    console.log('✅ Audio session initialized (handled by expo-audio)');
   }, []);
 
   useEffect(() => {
@@ -130,13 +119,40 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
-  // Cleanup audio when component unmounts
+  // Set up player event listeners
+  useEffect(() => {
+    if (!player) return;
+
+    const updatePosition = () => {
+      setCurrentTime(player.currentTime * 1000); // Convert to milliseconds
+      setDuration(player.duration * 1000); // Convert to milliseconds
+      setIsPlaying(player.playing);
+    };
+
+    // Update position every second
+    positionUpdateRef.current = setInterval(updatePosition, 1000);
+
+    // Handle track completion
+    const handlePlaybackEnd = () => {
+      nextTrack();
+    };
+
+    // Listen for playback events
+    player.addListener('playbackStatusUpdate', updatePosition);
+    player.addListener('playbackEnd', handlePlaybackEnd);
+
+    return () => {
+      if (positionUpdateRef.current) {
+        clearInterval(positionUpdateRef.current);
+      }
+      player.removeListener('playbackStatusUpdate', updatePosition);
+      player.removeListener('playbackEnd', handlePlaybackEnd);
+    };
+  }, [player]);
+
+  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      if (playerRef.current) {
-        playerRef.current.remove();
-        playerRef.current = null;
-      }
       if (positionUpdateRef.current) {
         clearInterval(positionUpdateRef.current);
         positionUpdateRef.current = null;
@@ -241,53 +257,15 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     console.log('▶️ playTrack called with URL:', track.audioUrl);
     
     try {
-      // Stop current player if playing
-      if (playerRef.current) {
-        await playerRef.current.remove();
-        playerRef.current = null;
-      }
+      // Set the new audio source - this will automatically load and prepare the track
+      setCurrentAudioSource({ uri: track.audioUrl });
       
-      // Clear position update timer
-      if (positionUpdateRef.current) {
-        clearInterval(positionUpdateRef.current);
-        positionUpdateRef.current = null;
-      }
-      
-      // Create new player with expo-audio
-      const player = new Audio.Player(track.audioUrl);
-      playerRef.current = player;
-      
-      // Set up event listeners
-      player.addListener('playbackStatusUpdate', (status: AudioStatus) => {
-        if (status.isLoaded) {
-          setCurrentTime(status.positionMillis || 0);
-          setDuration(status.durationMillis || track.duration * 1000);
-          setIsPlaying(status.isPlaying || false);
-          
-          // Handle track completion
-          if (status.didJustFinish) {
-            nextTrack();
-          }
+      // Wait a moment for the player to load the new source
+      setTimeout(() => {
+        if (player) {
+          player.play();
         }
-      });
-      
-      // Load and play
-      await player.load();
-      await player.play();
-      
-      // Start position updates
-      positionUpdateRef.current = setInterval(async () => {
-        if (playerRef.current) {
-          try {
-            const status = await playerRef.current.getStatusAsync();
-            if (status.isLoaded) {
-              setCurrentTime(status.positionMillis || 0);
-            }
-          } catch (error) {
-            console.error('❌ Error getting playback status:', error);
-          }
-        }
-      }, 1000);
+      }, 100);
       
       setCurrentTrack(track);
       setIsPlaying(true);
@@ -304,13 +282,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   const pauseTrack = async () => {
     try {
-      if (playerRef.current) {
-        if (isPlaying) {
-          await playerRef.current.pause();
+      if (player) {
+        if (player.playing) {
+          player.pause();
           setIsPlaying(false);
           console.log('⏸️ Track paused');
         } else {
-          await playerRef.current.play();
+          player.play();
           setIsPlaying(true);
           console.log('▶️ Track resumed');
         }
