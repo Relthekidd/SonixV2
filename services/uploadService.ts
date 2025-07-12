@@ -424,6 +424,108 @@ class UploadService {
   }
 
   /**
+   * Delete a track completely (both from database and storage)
+   */
+  async deleteTrack(trackId: string): Promise<void> {
+    try {
+      console.log('🗑️ Deleting track:', trackId);
+      
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+      
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Fetch track info first to get file paths
+      const { data: track, error: trackError } = await supabase
+        .from('tracks')
+        .select('audio_url, cover_url, title, created_by')
+        .eq('id', trackId)
+        .single();
+
+      if (trackError || !track) {
+        console.error('Track not found or error fetching track:', trackError);
+        throw new Error('Track not found');
+      }
+
+      // Check if user has permission to delete (admin or track owner)
+      const { data: user } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+
+      if (!user || (user.role !== 'admin' && track.created_by !== session.user.id)) {
+        throw new Error('You do not have permission to delete this track');
+      }
+
+      // Extract file paths from URLs
+      const audioPath = this.extractPathFromUrl(track.audio_url);
+      const coverPath = track.cover_url ? this.extractPathFromUrl(track.cover_url) : null;
+
+      // Delete files from storage
+      if (audioPath) {
+        try {
+          await supabaseStorage.deleteFile('audio-files', audioPath);
+          console.log('✅ Audio file deleted:', audioPath);
+        } catch (error) {
+          console.error('Error deleting audio file:', error);
+          // Continue with deletion even if file deletion fails
+        }
+      }
+
+      if (coverPath) {
+        try {
+          await supabaseStorage.deleteFile('images', coverPath);
+          console.log('✅ Cover file deleted:', coverPath);
+        } catch (error) {
+          console.error('Error deleting cover file:', error);
+          // Continue with deletion even if file deletion fails
+        }
+      }
+
+      // Delete track record from database
+      const { error: deleteError } = await supabase
+        .from('tracks')
+        .delete()
+        .eq('id', trackId);
+
+      if (deleteError) {
+        console.error('Failed to delete track record:', deleteError);
+        throw new Error('Failed to delete track record');
+      }
+
+      console.log('✅ Track deleted successfully:', track.title);
+
+    } catch (error) {
+      console.error('❌ Track deletion failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Helper function to extract the path from a Supabase storage URL
+   */
+  private extractPathFromUrl(url: string): string | null {
+    try {
+      const u = new URL(url);
+      const parts = u.pathname.split('/');
+      // Supabase URLs look like: https://xyz.supabase.co/storage/v1/object/public/bucket_name/path/to/file.ext
+      const publicIndex = parts.indexOf('public');
+      if (publicIndex === -1) return null;
+      // Skip 'public' and bucket_name segments to get the actual file path
+      return parts.slice(publicIndex + 2).join('/');
+    } catch {
+      return null;
+    }
+  }
+}
+  /**
    * Check if a track should be automatically published based on release date
    */
   isReadyForRelease(releaseDate: string): boolean {
