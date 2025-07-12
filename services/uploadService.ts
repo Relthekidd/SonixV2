@@ -528,11 +528,11 @@ class UploadService {
   /**
    * Check if a track should be automatically published based on release date
    */
-  isReadyForRelease(releaseDate: string): boolean {
-    const now = new Date();
-    const release = new Date(releaseDate);
-    return release <= now;
-  }
+ isReadyForRelease(releaseDate) {
+  const now = new Date();
+  const release = new Date(releaseDate);
+  return release <= now;
+}
 
   /**
    * Initialize storage buckets on app start
