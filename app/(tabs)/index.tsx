@@ -242,4 +242,4 @@ const styles = StyleSheet.create({
     trendingTracks = [],
     newReleases = [],
     recentlyPlayed = [],
-    … } = useMusic();
+     } = useMusic();
