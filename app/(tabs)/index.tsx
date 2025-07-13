@@ -237,7 +237,7 @@ const styles = StyleSheet.create({
 
 **Key Changes**  
 - **Destructure with defaults**:  
-  ```ts
+  ```;ts
   const {
     trendingTracks = [],
     newReleases = [],
