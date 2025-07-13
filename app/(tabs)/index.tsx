@@ -19,9 +19,9 @@ import { router } from 'expo-router';
 export default function HomeScreen() {
   const { user } = useAuth();
   const { 
-    trendingTracks, 
-    newReleases, 
-    recentlyPlayed, 
+    trendingTracks = [], 
+    newReleases = [], 
+    recentlyPlayed = [], 
     currentTrack, 
     isPlaying, 
     playTrack, 
@@ -29,7 +29,7 @@ export default function HomeScreen() {
     isLoading,
     error,
     refreshData
-  } = useMusic();
+   } = useMusic();
 
   const [refreshing, setRefreshing] = React.useState(false);
 
