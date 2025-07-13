@@ -802,7 +802,7 @@ class UploadService {
   /**
    * Delete an album and all associated tracks and storage files
    */
-  async deleteAlbum(albumId: string): Promise<void> {
+  async deleteAlbum(albumId) {
     try {
       console.log('🗑️ Deleting album:', albumId);
 
