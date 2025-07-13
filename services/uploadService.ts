@@ -841,12 +841,12 @@ class UploadService {
   }
 
   /**
-   * Check if a track should be automatically published based on release date
-   */
-  isReadyForRelease(releaseDate) {
-    const now = new Date();
-    const release = new Date(releaseDate);
-    return release <= now;
-  }
+ * Check if a track should be automatically published based on release date
+ */
+isReadyForRelease(releaseDate) {
+  const now = new Date();
+  const release = new Date(releaseDate);
+  return release <= now;
+}
 
 export const uploadService = new UploadService();
