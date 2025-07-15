@@ -50,6 +50,24 @@ class UploadService {
     if (!data.mainArtistId) throw new Error('Main artist is required');
   }
 
+  private async checkAuthAndRole(): Promise<{ userId: string; isAdmin: boolean }> {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    if (error || !user) {
+      throw new Error('User not authenticated');
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    return {
+      userId: user.id,
+      isAdmin: profile?.role === 'admin'
+    };
+  }
+
   private validateAlbum(data: AlbumUploadData) {
     if (!data.title.trim()) throw new Error('Album title is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
@@ -103,6 +121,20 @@ class UploadService {
     const id = uuidv4(); // Changed from crypto.randomUUID()
 
     try {
+      // Debug: Check current user and profile
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('Current user:', user?.id);
+      
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user?.id)
+        .single();
+      console.log('User profile:', profile);
+      console.log('User role:', profile?.role);
+      console.log('Data.artistId (created_by):', data.artistId);
+      console.log('Match created_by?', user?.id === data.artistId);
+
       const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, id, 'singles');
 
