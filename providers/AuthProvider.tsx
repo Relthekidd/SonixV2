@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { createClient, Session, User } from '@supabase/supabase-js';
+import { createClient, Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
 
@@ -48,7 +48,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load user profile from "profiles" table
   const loadUserProfile = useCallback(async (userId: string) => {
     try {
       const { data, error } = await supabase
@@ -69,7 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
       setSession(data.session);
-      apiService.setAuthToken(data.session?.access_token || null);
+      // Always provide a string to setAuthToken
+      apiService.setAuthToken(data.session?.access_token ?? '');
       if (data.user) await loadUserProfile(data.user.id);
     } catch (err) {
       console.error('Login error:', err);
@@ -92,7 +92,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
         if (data.user) {
-          // insert profile record
           const profile: Profile = {
             id: data.user.id,
             email,
@@ -121,7 +120,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
       setUser(null);
       setSession(null);
-      apiService.setAuthToken(null);
+      // Clear token on logout
+      apiService.setAuthToken('');
     } catch (err) {
       console.error('Logout error:', err);
       throw err;
@@ -130,23 +130,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const updateProfile = useCallback(async (updates: Partial<Profile>) => {
-    setIsLoading(true);
-    try {
-      if (!user) throw new Error('No user to update');
-      const { data, error } = await supabase
-        .from('profiles')
-        .update(updates)
-        .eq('id', user.id);
-      if (error) throw error;
-      setUser(prev => (prev ? { ...prev, ...updates } : prev));
-    } catch (err) {
-      console.error('Update profile error:', err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user]);
+  const updateProfile = useCallback(
+    async (updates: Partial<Profile>) => {
+      setIsLoading(true);
+      try {
+        if (!user) throw new Error('No user to update');
+        const { error } = await supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', user.id);
+        if (error) throw error;
+        setUser(prev => (prev ? { ...prev, ...updates } : prev));
+      } catch (err) {
+        console.error('Update profile error:', err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [user]
+  );
 
   const resetPassword = useCallback(async (email: string) => {
     setIsLoading(true);
@@ -164,6 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const resendConfirmation = useCallback(async (email: string) => {
     setIsLoading(true);
     try {
+      // Trigger sign-up for resend
       const { error } = await supabase.auth.signUp({ email, password: '' });
       if (error) console.warn('Resend confirmation warning:', error.message);
     } catch (err) {
@@ -173,13 +177,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Set unauthorized handler and session listener
   useEffect(() => {
-    apiService.setOnUnauthorizedCallback?.(logout);
+    // Register unauthorized callback
+    apiService.setOnUnauthorizedCallback(logout);
 
+    // Initial session load
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      apiService.setAuthToken(session?.access_token || null);
+      apiService.setAuthToken(session?.access_token ?? '');
       if (session?.user) {
         loadUserProfile(session.user.id).finally(() => setIsLoading(false));
       } else {
@@ -187,9 +192,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
+    // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      apiService.setAuthToken(session?.access_token || null);
+      apiService.setAuthToken(session?.access_token ?? '');
       if (event === 'SIGNED_IN' && session?.user) {
         loadUserProfile(session.user.id);
       } else if (event === 'SIGNED_OUT') {
@@ -202,7 +208,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       subscription.unsubscribe();
-      apiService.setOnUnauthorizedCallback?.(null);
+      // Remove callback on cleanup
+      apiService.setOnUnauthorizedCallback(() => {});
     };
   }, [logout, loadUserProfile]);
 

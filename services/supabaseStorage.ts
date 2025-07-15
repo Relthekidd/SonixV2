@@ -1,90 +1,68 @@
-// services/supabaseStorage.ts
+import { supabase } from './supabase';
 
-import { supabase } from '@/providers/AuthProvider';
-
-export async function uploadImage(
-  file: { uri: string },
-  fileName: string
-): Promise<{ url: string; path: string }> {
-  // 1. Fetch the file as a Blob
+/**
+ * Upload a file to Supabase Storage and return its public URL
+ */
+async function uploadFile(
+  file: { uri: string; name?: string; type?: string },
+  path: string,
+  bucket: string = 'audio-files'
+): Promise<{ url: string }> {
+  // Fetch the file URI as a blob (React Native)
   const response = await fetch(file.uri);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch image blob: ${response.status}`);
-  }
   const blob = await response.blob();
 
-  // 2. Build a storage path
-  const path = `covers/${Date.now()}_${fileName}`;
-
-  // 3. Upload to the 'images' bucket
-  const { data, error } = await supabase.storage
-    .from('images')
+  // Upload to Supabase Storage
+  const { error: uploadError } = await supabase.storage
+    .from(bucket)
     .upload(path, blob, {
-      contentType: blob.type,
+      cacheControl: '3600',
       upsert: false,
+      contentType: file.type,
     });
-  if (error) {
-    console.error('Supabase storage upload error:', error);
-    throw error;
+  if (uploadError) {
+    throw new Error(`Upload failed: ${uploadError.message}`);
   }
 
-  // 4. Generate a public URL (no error returned by getPublicUrl)
-  const { data: publicData } = supabase.storage
-    .from('images')
-    .getPublicUrl(path);
-  if (!publicData || !publicData.publicUrl) {
-    throw new Error('Failed to retrieve public URL for image');
+  // Retrieve public URL (no error returned)
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+  const publicUrl = data.publicUrl;
+  if (!publicUrl) {
+    throw new Error(`Failed to get public URL for path: ${path}`);
   }
 
-  return { url: publicData.publicUrl, path: data.path };
+  return { url: publicUrl };
 }
 
+/**
+ * Upload an audio file to the default bucket
+ */
 export async function uploadAudio(
-  file: { uri: string },
-  fileName: string
-): Promise<{ url: string; path: string }> {
-  // 1. Fetch the file as a Blob
-  const response = await fetch(file.uri);
-  if (!response.ok) {
-    throw new Error(`Failed to fetch audio blob: ${response.status}`);
-  }
-  const blob = await response.blob();
-
-  // 2. Build a storage path
-  const path = `audio/${Date.now()}_${fileName}`;
-
-  // 3. Upload to the 'audio' bucket
-  const { data, error } = await supabase.storage
-    .from('audio')
-    .upload(path, blob, {
-      contentType: blob.type,
-      upsert: false,
-    });
-  if (error) {
-    console.error('Supabase storage upload error:', error);
-    throw error;
-  }
-
-  // 4. Generate a public URL
-  const { data: publicData } = supabase.storage
-    .from('audio')
-    .getPublicUrl(path);
-  if (!publicData || !publicData.publicUrl) {
-    throw new Error('Failed to retrieve public URL for audio');
-  }
-
-  return { url: publicData.publicUrl, path: data.path };
+  file: { uri: string; name?: string; type?: string },
+  path: string
+): Promise<{ url: string }> {
+  return uploadFile(file, path, 'audio-files');
 }
 
+/**
+ * Upload an image file to the default bucket
+ */
+export async function uploadImage(
+  file: { uri: string; name?: string; type?: string },
+  path: string
+): Promise<{ url: string }> {
+  return uploadFile(file, path, 'audio-files');
+}
+
+/**
+ * Delete a file from Supabase Storage
+ */
 export async function deleteFile(
   path: string,
-  bucket: string
+  bucket: string = 'audio-files'
 ): Promise<void> {
-  const { error } = await supabase.storage
-    .from(bucket)
-    .remove([path]);
+  const { error } = await supabase.storage.from(bucket).remove([path]);
   if (error) {
-    console.error('Supabase delete file error:', error);
-    throw error;
+    throw new Error(`Failed to delete file: ${error.message}`);
   }
 }
