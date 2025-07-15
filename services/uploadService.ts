@@ -46,11 +46,25 @@ class UploadService {
     if (file instanceof Blob) {
       return file;
     }
-    
+
     // Handle React Native file objects with URI
     if (file.uri) {
-      const response = await fetch(file.uri);
-      return await response.blob();
+      const uri = file.uri.startsWith('file://') || file.uri.startsWith('content://')
+        ? file.uri
+        : `file://${file.uri}`;
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch file data: ${response.status}`);
+      }
+      const blob = await response.blob();
+      console.log('📏 Fetched file blob size:', blob.size);
+      if (blob.size === 0) {
+        throw new Error('Fetched file is empty');
+      }
+      if ((file.type || file.mimeType) && blob.type !== (file.type || file.mimeType)) {
+        return blob.slice(0, blob.size, file.type || file.mimeType);
+      }
+      return blob;
     }
     
     // Handle file objects with data
