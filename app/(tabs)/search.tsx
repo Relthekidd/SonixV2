@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
-import { supabase } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
 import { Search, Play, Pause, Music, User, Disc, Users, Lock, Globe } from 'lucide-react-native';
 
@@ -93,30 +92,17 @@ export default function SearchScreen() {
     setIsSearching(true);
     try {
       console.log('🔍 Starting search for:', searchQuery);
-      
-      // Search users
-      const { data: usersData, error: usersError } = await supabase
-        .rpc('search_users', { 
-          search_query: searchQuery, 
-          limit_count: 20 
-        });
 
-      if (usersError) {
-        console.error('❌ Error searching users:', usersError);
-      }
-
-      // Search tracks using the MusicProvider's search function
       const musicResults = await searchMusic(searchQuery);
-      
+
       console.log('🎵 Music search results:', musicResults);
-      console.log('👥 User search results:', usersData);
 
       setResults({
         tracks: musicResults.tracks || [],
         albums: musicResults.albums || [],
         singles: musicResults.singles || [],
-        artists: [],
-        users: usersData || [],
+        artists: musicResults.artists || [],
+        users: musicResults.users || [],
       });
       setSuggestions([]);
     } catch (error) {
