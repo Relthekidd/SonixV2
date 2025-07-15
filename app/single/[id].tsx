@@ -13,7 +13,6 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic } from '@/providers/MusicProvider';
-import { supabase } from '@/providers/AuthProvider';
 import { Screen } from 'expo-router';
 import { apiService } from '@/services/api';
 import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, Plus, Calendar, Music, Clock, MoveVertical as MoreVertical } from 'lucide-react-native';
@@ -60,56 +59,50 @@ export default function SingleDetailScreen() {
   }, [id]);
 
 const loadSingleDetails = async () => {
-    setIsLoading(true);
-    setError(null);
+  setIsLoading(true);
+  setError(null);
 
-    try {
-      const { data: singleData, error } = await supabase
-        .from('tracks')
-        .select(`id, title, artist:artist_id, artist_name, album, duration, cover_url, audio_url, genres, release_date, play_count, like_count, lyrics, description`)
-        .eq('id', id)
-        .single();
+  try {
+    // Singles endpoint is not available yet, fallback to tracks
+    const singleData = await apiService.getTrackById(id!);
+    setSingle(singleData);
 
-      if (error) throw error;
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      // For now, use the tracks endpoint to get single data
-      // Replace with actual singles endpoint when available
-      const singleData = await apiService.getTrackById(id!);
-      setSingle(singleData);
-      
-      // Transform track for playback
-      const transformedTrack = {
-        id: singleData.id,
-        title: singleData.title,
-        artist:
-          singleData.artist?.name ||
-          singleData.artist_name ||
-          singleData.artist ||
-          singleData.artist_id ||
-          'Unknown Artist',
-        album: singleData.album || 'Single',
-        duration: singleData.duration || 180,
-        coverUrl: singleData.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-        audioUrl: singleData.audio_url,
-        isLiked: likedSongs.some(liked => liked.id === singleData.id),
-        genre: Array.isArray(singleData.genres) ? singleData.genres[0] : singleData.genre || 'Unknown',
-        releaseDate: singleData.release_date || singleData.created_at || new Date().toISOString(),
-        playCount: singleData.play_count,
-        likeCount: singleData.like_count,
-        lyrics: singleData.lyrics,
-      };
-      
-      setTrack(transformedTrack);
-    } catch (err) {
-      console.error('Error loading single details:', err);
-      setError('Failed to load single details');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    const transformedTrack = {
+      id: singleData.id,
+      title: singleData.title,
+      artist:
+        singleData.artist?.name ||
+        singleData.artist_name ||
+        singleData.artist ||
+        singleData.artist_id ||
+        'Unknown Artist',
+      album: singleData.album || 'Single',
+      duration: singleData.duration || 180,
+      coverUrl:
+        singleData.cover_url ||
+        'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+      audioUrl: singleData.audio_url,
+      isLiked: likedSongs.some(liked => liked.id === singleData.id),
+      genre: Array.isArray(singleData.genres)
+        ? singleData.genres[0]
+        : singleData.genre || 'Unknown',
+      releaseDate:
+        singleData.release_date ||
+        singleData.created_at ||
+        new Date().toISOString(),
+      playCount: singleData.play_count,
+      likeCount: singleData.like_count,
+      lyrics: singleData.lyrics,
+    };
+
+    setTrack(transformedTrack);
+  } catch (err) {
+    console.error('Error loading single details:', err);
+    setError('Failed to load single details');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   const handlePlayPause = () => {
     if (!track) return;
@@ -343,6 +336,7 @@ return (
 
     </LinearGradient>
     </Screen>
+  );
 }
 
 const styles = StyleSheet.create({
