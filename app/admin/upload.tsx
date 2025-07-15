@@ -304,7 +304,73 @@ export default function AdminUploadScreen() {
       colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
-      {/* … rest of your JSX unchanged … */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ArrowLeft color="#fff" size={20} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Upload Music</Text>
+        <View style={{ width: 44 }} />
+      </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.label}>Title</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Track or album title"
+            placeholderTextColor="#64748b"
+            value={formData.title}
+            onChangeText={t => setFormData(prev => ({ ...prev, title: t }))}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Main Artist</Text>
+          <ArtistAutocomplete
+            onArtistSelect={artist => setFormData(prev => ({ ...prev, mainArtist: artist }))}
+            initialValue={formData.mainArtist?.name || ''}
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.label}>Cover Image</Text>
+          <TouchableOpacity style={styles.fileButton} onPress={pickCoverImage}>
+            <Text style={styles.fileButtonText}>{formData.coverFile ? 'Change Cover' : 'Select Cover'}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {formData.tracks.map((track, idx) => (
+          <View key={track.id} style={styles.trackSection}>
+            <Text style={styles.label}>Track {idx + 1} Title</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Track title"
+              placeholderTextColor="#64748b"
+              value={track.title}
+              onChangeText={t => updateTrack(idx, 'title', t)}
+            />
+            <TouchableOpacity style={styles.fileButton} onPress={() => pickAudioFile(idx)}>
+              <Text style={styles.fileButtonText}>{track.audioFile ? 'Change Audio' : 'Select Audio'}</Text>
+            </TouchableOpacity>
+            {formData.tracks.length > 1 && (
+              <TouchableOpacity onPress={() => removeTrack(idx)} style={styles.removeButton}>
+                <Text style={styles.removeButtonText}>Remove Track</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+
+        <TouchableOpacity style={styles.addTrackButton} onPress={addTrack}>
+          <Text style={styles.addTrackButtonText}>Add Track</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isUploading}>
+          {isUploading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitText}>Upload</Text>
+          )}
+        </TouchableOpacity>
+      </ScrollView>
     </LinearGradient>
   );
 }
@@ -326,5 +392,42 @@ const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   errorText: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#ef4444', textAlign: 'center' },
-  // …plus all your existing style entries (section, formGroup, labels, buttons, etc.) unchanged…
+  content: { padding: 20 },
+  section: { marginBottom: 20 },
+  label: { color: '#fff', marginBottom: 6, fontFamily: 'Inter-SemiBold' },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    color: '#fff',
+    fontFamily: 'Inter-Regular',
+  },
+  fileButton: {
+    backgroundColor: 'rgba(139,92,246,0.2)',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  fileButtonText: { color: '#8b5cf6', fontFamily: 'Inter-SemiBold' },
+  trackSection: { marginBottom: 20 },
+  removeButton: { marginTop: 8, alignSelf: 'flex-end' },
+  removeButtonText: { color: '#ef4444' },
+  addTrackButton: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  addTrackButtonText: { color: '#fff', fontFamily: 'Inter-SemiBold' },
+  submitButton: {
+    backgroundColor: '#8b5cf6',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  submitText: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
 });
