@@ -140,28 +140,26 @@ export function ArtistAutocomplete({
               </TouchableOpacity>
             )}
           </View>
-
           {(showSuggestions || shouldOfferCreate) && (
-            <View style={styles.suggestionsContainer}>
-              <FlatList
-                data={suggestions}
-                renderItem={renderSuggestionItem}
-                keyExtractor={(item) => item.id}
-                style={styles.suggestionsList}
-                keyboardShouldPersistTaps="handled"
-                showsVerticalScrollIndicator={false}
-                ListFooterComponent={
-                  shouldOfferCreate && !isLoading ? (
-                    <TouchableOpacity
-                      style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
-                      onPress={handleCreateNewArtist}
-                    >
-                      <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>+ Create “{query.trim()}”</Text>
-                    </TouchableOpacity>
-                  ) : null
-                }
-              />
-            </View>
+            <FlatList
+              data={suggestions}
+              renderItem={renderSuggestionItem}
+              keyExtractor={(item) => item.id}
+              style={styles.suggestionsList}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              ListFooterComponent={
+                shouldOfferCreate && !isLoading ? (
+                  <TouchableOpacity
+                    style={[styles.suggestionItem, { backgroundColor: 'rgba(139, 92, 246, 0.05)' }]}
+                    onPress={handleCreateNewArtist}
+                  >
+                    <Text style={[styles.suggestionText, { color: '#8b5cf6' }]}>+ Create “{query.trim()}”</Text>
+                  </TouchableOpacity>
+                ) : null
+              }
+            />
+          )}
           )}
 
           {isLoading && (

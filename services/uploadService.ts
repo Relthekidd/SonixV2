@@ -40,102 +40,198 @@ export interface AlbumUploadData {
 
 class UploadService {
   /**
+   * Convert React Native file/URI to Blob for Supabase upload
+   */
+  private async convertToBlob(file: any): Promise<Blob> {
+    if (file instanceof Blob) {
+      return file;
+    }
+    
+    // Handle React Native file objects with URI
+    if (file.uri) {
+      const response = await fetch(file.uri);
+      return await response.blob();
+    }
+    
+    // Handle file objects with data
+    if (file.data) {
+      const byteCharacters = atob(file.data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      return new Blob([byteArray], { type: file.type || 'application/octet-stream' });
+    }
+    
+    throw new Error('Unsupported file format');
+  }
+
+  /**
    * Upload a single track using Supabase Storage and Database
    */
   async uploadSingle(singleData: SingleUploadData): Promise<any> {
-  try {
-    console.log('🧠 Full singleData:', singleData);
-    console.log('🧠 MainArtistId:', singleData.mainArtistId);
+    let audioData: any = null;
+    let coverData: any = null;
+    
+    try {
+      console.log('🧠 Full singleData:', singleData);
+      console.log('🧠 MainArtistId:', singleData.mainArtistId);
 
-    // Step 0: Validate artist existence (debugging FK errors)
-    const { data: artistData, error: artistError } = await supabase
-      .from('artists')
-      .select('id')
-      .eq('id', singleData.mainArtistId);
+      // Step 0: Validate artist existence (debugging FK errors)
+      const { data: artistData, error: artistError } = await supabase
+        .from('artists')
+        .select('id')
+        .eq('id', singleData.mainArtistId);
 
-    if (artistError) {
-      console.error('❌ Error fetching artist:', artistError);
-    } else {
-      console.log('✅ Artist exists:', artistData.length > 0);
+      if (artistError) {
+        console.error('❌ Error fetching artist:', artistError);
+      } else {
+        console.log('✅ Artist exists:', artistData.length > 0);
+      }
+
+      // Step 1: Get session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error('Failed to get authentication session');
+      }
+
+      if (!session?.user) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      // Check if uploader is an admin so we can auto publish
+      const { data: userRecord } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', session.user.id)
+        .single();
+      const isAdmin = userRecord?.role === 'admin';
+
+      console.log('🎵 Uploading single with Supabase Storage...');
+
+      // Step 2: Upload audio file using Supabase client directly
+      const audioFileName = singleData.audioFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
+      const audioBlob = await this.convertToBlob(singleData.audioFile);
+      
+      const { data: audioUploadData, error: audioError } = await supabase
+        .storage
+        .from('audio-files')
+        .upload(`tracks/${audioFileName}`, audioBlob, { upsert: false });
+      
+      if (audioError) {
+        console.error('❌ Audio upload error:', audioError);
+        throw new Error(`Audio upload failed: ${audioError.message}`);
+      }
+      
+      audioData = audioUploadData;
+      const audioUrl = supabase
+        .storage
+        .from('audio-files')
+        .getPublicUrl(audioData.path)
+        .data.publicUrl;
+      
+      console.log('🎧 Audio uploaded:', audioUrl);
+
+      // Step 3: Upload cover (optional) using Supabase client directly
+      let coverUrl = null;
+      if (singleData.coverFile) {
+        const coverFileName =
+          singleData.coverFile.fileName || singleData.coverFile.name ||
+          `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
+        
+        const coverBlob = await this.convertToBlob(singleData.coverFile);
+        
+        const { data: coverUploadData, error: coverError } = await supabase
+          .storage
+          .from('images')
+          .upload(`covers/${coverFileName}`, coverBlob, { upsert: false });
+        
+        if (coverError) {
+          console.error('❌ Cover upload error:', coverError);
+          // Clean up audio file if cover upload fails
+          await supabase.storage.from('audio-files').remove([audioData.path]);
+          throw new Error(`Cover upload failed: ${coverError.message}`);
+        }
+        
+        coverData = coverUploadData;
+        coverUrl = supabase
+          .storage
+          .from('images')
+          .getPublicUrl(coverData.path)
+          .data.publicUrl;
+        
+        console.log('🖼️ Cover uploaded:', coverUrl);
+      }
+
+      // Step 4: Create track in DB
+      const trackData = {
+        title: singleData.title,
+        artist_id: singleData.mainArtistId,
+        audio_url: audioUrl,
+        cover_url: coverUrl,
+        lyrics: singleData.lyrics || '',
+        duration: singleData.duration || 180,
+        genres: singleData.genres,
+        explicit: singleData.explicit,
+        description: singleData.description || '',
+        release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
+        // Auto publish if the uploader is an admin
+        is_published: isAdmin,
+        track_number: 1,
+        created_by: session.user.id,
+        featured_artist_ids: singleData.featuredArtistIds,
+      };
+
+      console.log('📤 Inserting track data:', trackData);
+
+      const { data: track, error: trackError } = await supabase
+        .from('tracks')
+        .insert(trackData)
+        .select()
+        .single();
+
+      if (trackError) {
+        console.error('❌ Track insert error:', trackError);
+        // Clean up uploaded files if database insert fails
+        await this.cleanupDirectFiles(audioData?.path, coverData?.path);
+        throw new Error(`Database error: ${trackError.message}`);
+      }
+
+      console.log('✅ Single upload successful:', track);
+      return track;
+
+    } catch (error) {
+      console.error('❌ Single upload failed:', error);
+      // Clean up any partially uploaded files
+      await this.cleanupDirectFiles(audioData?.path, coverData?.path);
+      throw error;
+    }
+  }  
+  
+  /**
+   * Clean up uploaded files directly using Supabase storage if needed
+   */
+  private async cleanupDirectFiles(audioPath?: string, coverPath?: string): Promise<void> {
+    if (audioPath) {
+      try {
+        await supabase.storage.from('audio-files').remove([audioPath]);
+        console.log('✅ Audio file cleaned up:', audioPath);
+      } catch (cleanupError) {
+        console.error('Audio cleanup failed:', cleanupError);
+      }
     }
 
-    // Step 1: Get session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-    if (sessionError) {
-      throw new Error('Failed to get authentication session');
+    if (coverPath) {
+      try {
+        await supabase.storage.from('images').remove([coverPath]);
+        console.log('✅ Cover file cleaned up:', coverPath);
+      } catch (cleanupError) {
+        console.error('Cover cleanup failed:', cleanupError);
+      }
     }
-
-    if (!session?.user) {
-      throw new Error('Not authenticated - please log in again');
-    }
-
-    // Check if uploader is an admin so we can auto publish
-    const { data: userRecord } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', session.user.id)
-      .single();
-    const isAdmin = userRecord?.role === 'admin';
-
-    console.log('🎵 Uploading single with Supabase Storage...');
-
-    // Step 2: Upload audio file
-    const audioFileName = singleData.audioFile.name || `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}.mp3`;
-    const audioUpload = await supabaseStorage.uploadAudio(singleData.audioFile, audioFileName);
-    console.log('🎧 Audio uploaded:', audioUpload.url);
-
-    // Step 3: Upload cover (optional)
-    let coverUpload = null;
-    if (singleData.coverFile) {
-      const coverFileName =
-        singleData.coverFile.fileName || singleData.coverFile.name ||
-        `${singleData.title.replace(/[^a-zA-Z0-9]/g, '_')}_cover.jpg`;
-      coverUpload = await supabaseStorage.uploadImage(singleData.coverFile, coverFileName);
-      console.log('🖼️ Cover uploaded:', coverUpload.url);
-    }
-
-    // Step 4: Create track in DB
-    const trackData = {
-      title: singleData.title,
-      artist_id: singleData.mainArtistId,
-      audio_url: audioUpload.url,
-      cover_url: coverUpload?.url || null,
-      lyrics: singleData.lyrics || '',
-      duration: singleData.duration || 180,
-      genres: singleData.genres,
-      explicit: singleData.explicit,
-      description: singleData.description || '',
-      release_date: singleData.releaseDate || new Date().toISOString().split('T')[0],
-      // Auto publish if the uploader is an admin
-      is_published: isAdmin,
-      track_number: 1,
-      created_by: session.user.id,
-      featured_artist_ids: singleData.featuredArtistIds,
-    };
-
-    console.log('📤 Inserting track data:', trackData);
-
-    const { data: track, error: trackError } = await supabase
-      .from('tracks')
-      .insert(trackData)
-      .select()
-      .single();
-
-    if (trackError) {
-      console.error('❌ Track insert error:', trackError);
-      await this.cleanupFiles(audioUpload.path, coverUpload?.path);
-      throw new Error(`Database error: ${trackError.message}`);
-    }
-
-    console.log('✅ Single upload successful:', track);
-    return track;
-
-  } catch (error) {
-    console.error('❌ Single upload failed:', error);
-    throw error;
-  }
-}
+  }  
 
   /**
    * Upload an album with multiple tracks

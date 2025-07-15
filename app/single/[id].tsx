@@ -13,10 +13,29 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic } from '@/providers/MusicProvider';
+import { supabase } from '@/providers/AuthProvider';
+import { Screen } from 'expo-router';
 import { apiService } from '@/services/api';
 import { ArrowLeft, Play, Pause, Heart, Share as ShareIcon, Plus, Calendar, Music, Clock, MoveVertical as MoreVertical } from 'lucide-react-native';
 
 export default function SingleDetailScreen() {
+  interface Single {
+    id: string;
+    title: string;
+    artist: string;
+    album: string;
+    duration: number;
+    coverUrl: string;
+    audioUrl?: string;
+    isLiked: boolean;
+    genre: string;
+    releaseDate: string;
+    playCount?: number;
+    likeCount?: number;
+    lyrics?: string;
+    description?: string;
+    genres?: string[];
+  }
   const { id } = useLocalSearchParams<{ id: string }>();
   const [single, setSingle] = useState<any>(null);
   const [track, setTrack] = useState<any>(null);
@@ -40,7 +59,18 @@ export default function SingleDetailScreen() {
     }
   }, [id]);
 
-  const loadSingleDetails = async () => {
+const loadSingleDetails = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data: singleData, error } = await supabase
+        .from('tracks')
+        .select(`id, title, artist:artist_id, artist_name, album, duration, cover_url, audio_url, genres, release_date, play_count, like_count, lyrics, description`)
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
     setIsLoading(true);
     setError(null);
     
@@ -192,7 +222,8 @@ export default function SingleDetailScreen() {
     );
   }
 
-  return (
+return (
+    <Screen>
     <LinearGradient
       colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
@@ -309,8 +340,9 @@ export default function SingleDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
     </LinearGradient>
-  );
+    </Screen>
 }
 
 const styles = StyleSheet.create({

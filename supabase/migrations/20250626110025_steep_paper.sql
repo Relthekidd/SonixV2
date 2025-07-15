@@ -485,7 +485,7 @@ BEGIN
         jsonb_build_object(
           'id', a.id,
           'name', a.name,
-          'avatar_url', a.avatar_url,
+          'avatar_url', COALESCE(a.avatar_url, ''),
           'play_count', uta.play_count
         ) ORDER BY uta.play_count DESC
       ) as artists
@@ -561,12 +561,12 @@ BEGIN
           'id', t.id,
           'title', t.title,
           'artist', COALESCE(a.name, 'Unknown Artist'),
-          'play_count', t.play_count
-        ) ORDER BY t.play_count DESC
+          'play_count', COALESCE(t.play_count, 0)
+        ) ORDER BY COALESCE(t.play_count, 0) DESC
       )
       FROM tracks t
       LEFT JOIN artists a ON t.artist_id = a.id
-      WHERE t.play_count > 0
+      WHERE COALESCE(t.play_count, 0) > 0
       LIMIT 10
     ) as top_tracks,
     (
@@ -574,12 +574,12 @@ BEGIN
         jsonb_build_object(
           'id', a.id,
           'name', a.name,
-          'total_plays', a.total_plays,
-          'monthly_listeners', a.monthly_listeners
-        ) ORDER BY a.total_plays DESC
+          'total_plays', COALESCE(a.total_plays, 0),
+          'monthly_listeners', COALESCE(a.monthly_listeners, 0)
+        ) ORDER BY COALESCE(a.total_plays, 0) DESC
       )
       FROM artists a
-      WHERE a.total_plays > 0
+      WHERE COALESCE(a.total_plays, 0) > 0
       LIMIT 10
     ) as top_artists,
     (
