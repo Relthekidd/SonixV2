@@ -395,7 +395,7 @@ export default function AdminUploadsScreen() {
 
   const filteredUploads = getFilteredUploads();
 
-  if (user?.role !== 'admin') {
+  if (user?.role === undefined || user?.role !== 'admin') {
     return (
       <LinearGradient
         colors={['#1a1a2e', '#16213e', '#0f3460']}

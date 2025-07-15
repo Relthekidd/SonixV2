@@ -31,11 +31,14 @@ export function ArtistAutocomplete({
   disabled = false,
   initialValue = '',
 }: ArtistAutocompleteProps) {
-  const [query, setQuery] = useState(initialValue);
+  // Initialize with provided initialValue
+  const [query, setQuery] = useState<string>(initialValue);
   const [suggestions, setSuggestions] = useState<ArtistData[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
+
+  // Use a nullable ref to debounce searches
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     setQuery(initialValue);
@@ -116,7 +119,7 @@ export function ArtistAutocomplete({
 
   const shouldOfferCreate =
     query.length > 2 &&
-    !suggestions.some((a) => a.name.toLowerCase() === query.trim().toLowerCase());
+    !suggestions.some(a => a.name.toLowerCase() === query.trim().toLowerCase());
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -140,11 +143,12 @@ export function ArtistAutocomplete({
               </TouchableOpacity>
             )}
           </View>
+
           {(showSuggestions || shouldOfferCreate) && (
             <FlatList
               data={suggestions}
               renderItem={renderSuggestionItem}
-              keyExtractor={(item) => item.id}
+              keyExtractor={item => item.id}
               style={styles.suggestionsList}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -159,7 +163,6 @@ export function ArtistAutocomplete({
                 ) : null
               }
             />
-          )}
           )}
 
           {isLoading && (
@@ -197,23 +200,6 @@ const styles = StyleSheet.create({
   clearButton: {
     padding: 4,
     marginLeft: 8,
-  },
-  suggestionsContainer: {
-    position: 'absolute',
-    top: 60,
-    left: 0,
-    right: 0,
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    maxHeight: 200,
-    zIndex: 1001,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
   },
   suggestionsList: {
     maxHeight: 200,
@@ -260,4 +246,3 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
   },
 });
-
