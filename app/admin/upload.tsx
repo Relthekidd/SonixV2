@@ -52,7 +52,7 @@ const GENRES = [
 ];
 
 export default function AdminUploadScreen() {
-  const { user } = useAuth();
+  const { user, userId, hasUser } = useAuth(); // ✅ Get userId and hasUser
   const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState<UploadFormData>({
     type: 'single',
@@ -139,7 +139,14 @@ export default function AdminUploadScreen() {
   };
 
   const handleSubmit = async () => {
+    // ✅ Guard against submitting before user is loaded
+    if (!hasUser || !userId) {
+      Alert.alert('Hold up', 'Still loading your account info.');
+      return;
+    }
+
     if (!validateForm()) return;
+    
     setIsUploading(true);
     try {
       if (formData.type === 'single') {
@@ -154,7 +161,7 @@ export default function AdminUploadScreen() {
           audioFile: t.audioFile,
           description: formData.description,
           releaseDate: formData.releaseDate,
-          artistId: user?.id || '',
+          artistId: userId, // ✅ Use userId from auth instead of user?.id
           mainArtistId: formData.mainArtist!.id,
           featuredArtistIds: formData.featuredArtists.map(a => a.id),
         });
@@ -166,13 +173,17 @@ export default function AdminUploadScreen() {
           coverFile: formData.coverFile,
           genres: formData.genres,
           explicit: formData.explicit,
-          artistId: user?.id || '',
+          artistId: userId, // ✅ Use userId from auth instead of user?.id
           mainArtistId: formData.mainArtist!.id,
           featuredArtistIds: formData.featuredArtists.map(a => a.id),
           tracks: formData.tracks.map((t, idx) => ({
-            title: t.title.trim(), lyrics: t.lyrics, duration: t.duration,
-            explicit: t.explicit, trackNumber: idx+1,
-            featuredArtistIds: t.featuredArtists.map(a => a.id), audioFile: t.audioFile
+            title: t.title.trim(), 
+            lyrics: t.lyrics, 
+            duration: t.duration,
+            explicit: t.explicit, 
+            trackNumber: idx+1,
+            featuredArtistIds: t.featuredArtists.map(a => a.id), 
+            audioFile: t.audioFile
           })),
         });
       }
@@ -184,12 +195,24 @@ export default function AdminUploadScreen() {
     }
   };
 
-  // only admin may upload
+  // ✅ Guard against accessing screen before user is loaded
+  if (!hasUser) {
+    return (
+      <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#8b5cf6" />
+          <Text style={styles.loadingText}>Loading your account...</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
+
+  // ✅ Only admin may upload
   if ((user?.role as any) !== 'admin') {
     return (
       <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
         <View style={styles.center}>
-          <Text style={styles.error}>Access denied.</Text>
+          <Text style={styles.error}>Access denied. Admin privileges required.</Text>
         </View>
       </LinearGradient>
     );
@@ -334,7 +357,8 @@ export default function AdminUploadScreen() {
 const styles = StyleSheet.create({
   container: { flex:1 },
   center: { flex:1, justifyContent:'center', alignItems:'center' },
-  error: { color:'#ef4444', fontSize:18 },
+  error: { color:'#ef4444', fontSize:18, textAlign:'center', paddingHorizontal:20 },
+  loadingText: { color:'#fff', marginTop:16, fontSize:16 },
   header: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:48, paddingBottom:16 },
   backBtn:{ padding:8 },
   headerTitle:{ fontSize:20, color:'#fff' },

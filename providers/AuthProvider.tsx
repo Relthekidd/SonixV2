@@ -27,6 +27,9 @@ type AuthContextType = {
   user: Profile | null;
   session: Session | null;
   isLoading: boolean;
+  // ✅ Added hasUser and userId properties
+  hasUser: boolean;
+  userId: string | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (
     email: string,
@@ -47,6 +50,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ Computed properties for hasUser and userId
+  const hasUser = !isLoading && user !== null && session !== null;
+  const userId = session?.user?.id || null;
 
   const loadUserProfile = useCallback(async (userId: string) => {
     try {
@@ -215,7 +222,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, isLoading, login, signup, logout, updateProfile, resetPassword, resendConfirmation }}
+      value={{ 
+        user, 
+        session, 
+        isLoading, 
+        hasUser, // ✅ Added hasUser
+        userId,  // ✅ Added userId
+        login, 
+        signup, 
+        logout, 
+        updateProfile, 
+        resetPassword, 
+        resendConfirmation 
+      }}
     >
       {children}
     </AuthContext.Provider>
