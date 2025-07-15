@@ -179,7 +179,9 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       if (newErr) throw newErr;
 
       const fmt = (arr: any[]) =>
-        arr.map(t => ({
+        arr
+          .filter((t) => !t.is_deleted && !t.deleted_at)
+          .map(t => ({
           id: t.id,
           title: t.title,
           artist: t.artist?.name ?? 'Unknown',
@@ -208,8 +210,69 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   const searchMusic = async (query: string) => {
-    // implementation omitted for brevity
-    return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+    const term = `%${query}%`;
+    try {
+      const [
+        { data: trackData, error: trackErr },
+        { data: albumData, error: albumErr },
+        { data: artistData, error: artistErr },
+        { data: userData, error: userErr },
+      ] = await Promise.all([
+        supabase
+          .from('tracks')
+          .select(
+            'id, title, duration, audio_url, cover_url, release_date, genres, artist:artist_id (id, name)'
+          )
+          .ilike('title', term)
+          .or('is_deleted.eq.false,deleted_at.is.null'),
+        supabase
+          .from('albums')
+          .select('id, title, cover_url, release_date, artist:artist_id (id, name)')
+          .ilike('title', term)
+          .or('is_deleted.eq.false,deleted_at.is.null'),
+        supabase
+          .from('artists')
+          .select('id, name, avatar_url')
+          .ilike('name', term)
+          .or('is_deleted.eq.false,deleted_at.is.null'),
+        supabase
+          .from('profiles')
+          .select('id, display_name, profile_picture_url')
+          .ilike('display_name', term)
+          .eq('is_private', false),
+      ]);
+
+      if (trackErr || albumErr || artistErr || userErr) {
+        console.error('Search error:', trackErr || albumErr || artistErr || userErr);
+      }
+
+      const fmtTrack = (arr: any[]) =>
+        (arr || [])
+          .filter((t) => !t.is_deleted && !t.deleted_at)
+          .map((t) => ({
+            id: t.id,
+            title: t.title,
+            artist: t.artist?.name ?? 'Unknown',
+            album: t.album ?? 'Single',
+            duration: t.duration,
+            coverUrl: t.cover_url ?? '',
+            audioUrl: t.audio_url,
+            isLiked: false,
+            genre: Array.isArray(t.genres) ? t.genres[0] : 'Unknown',
+            releaseDate: t.release_date,
+          }));
+
+      return {
+        tracks: fmtTrack(trackData ?? []),
+        albums: (albumData || []).filter((a) => !a.is_deleted && !a.deleted_at),
+        singles: [],
+        artists: (artistData || []).filter((a) => !a.is_deleted && !a.deleted_at),
+        users: userData || [],
+      };
+    } catch (e) {
+      console.error('Search failed:', e);
+      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+    }
   };
 
   return (

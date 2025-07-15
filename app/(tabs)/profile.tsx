@@ -17,6 +17,8 @@ import { useAuth, supabase } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import { CreditCard as Edit3, Settings, LogOut, User, Mail, Eye, EyeOff, Camera, Save, X, Users, Music, Heart, Calendar, Lock, Globe, Play, Pause } from 'lucide-react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { uploadImage } from '@/services/supabaseStorage';
 
 interface UserProfile {
   id: string;
@@ -42,6 +44,7 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [avatarFile, setAvatarFile] = useState<any>(null);
   const [editedProfile, setEditedProfile] = useState({
     displayName: user?.displayName || '',
     firstName: user?.firstName || '',
@@ -89,14 +92,40 @@ export default function ProfileScreen() {
     }
   };
 
+  const pickAvatar = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setAvatarFile(result.assets[0]);
+      }
+    } catch (err) {
+      console.error('Error picking avatar:', err);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
   const handleSaveProfile = async () => {
     try {
+      let avatarUrl: string | undefined = profile?.profile_picture_url;
+      if (avatarFile && user) {
+        const ext = avatarFile.name?.split('.').pop() || 'jpg';
+        const path = `images/avatars/${user.id}.${ext}`;
+        const { url } = await uploadImage(avatarFile, path);
+        avatarUrl = url;
+      }
+
       await updateProfile({
         displayName: editedProfile.displayName,
         firstName: editedProfile.firstName,
         lastName: editedProfile.lastName,
         bio: editedProfile.bio,
         isPrivate: editedProfile.isPrivate,
+        profile_picture_url: avatarUrl,
       });
 
       // Update status if changed
@@ -107,6 +136,7 @@ export default function ProfileScreen() {
       }
 
       setIsEditing(false);
+      setAvatarFile(null);
       await loadUserProfile();
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
@@ -213,14 +243,18 @@ export default function ProfileScreen() {
 
         <View style={styles.profileSection}>
           <View style={styles.avatarContainer}>
-            <Image 
-              source={{ 
-                uri: profile?.profile_picture_url || user?.profilePictureUrl || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
-              }} 
-              style={styles.avatar} 
+            <Image
+              source={{
+                uri:
+                  avatarFile?.uri ||
+                  profile?.profile_picture_url ||
+                  user?.profilePictureUrl ||
+                  'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400'
+              }}
+              style={styles.avatar}
             />
             {isEditing && (
-              <TouchableOpacity style={styles.cameraButton}>
+              <TouchableOpacity style={styles.cameraButton} onPress={pickAvatar}>
                 <Camera color="#ffffff" size={20} />
               </TouchableOpacity>
             )}

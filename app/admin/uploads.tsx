@@ -301,7 +301,7 @@ const styles = StyleSheet.create({
   activeTabBadgeText: { color: '#fff' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#94a3b8', marginTop: 8 },
-  listContainer: { padding: 16 },
+  listContainer: { padding: 16, paddingBottom: 120 },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16 },
   emptyText: { color: '#94a3b8', marginTop: 8 },
   emptySubtext: { color: '#64748b', marginTop: 4 },
