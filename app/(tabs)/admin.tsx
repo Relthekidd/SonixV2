@@ -154,22 +154,20 @@ export default function AdminScreen() {
     }
   }, []);
 
-  if (user?.role !== 'admin') {
-    return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <View style={styles.errorContainer}>
-          <Shield color="#ef4444" size={64} />
-          <Text style={styles.errorTitle}>Access Denied</Text>
-          <Text style={styles.errorText}>
-            You don't have permission to access this area.
-          </Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+   // ——— HERE’S THE FIXED CHECK ———
+    if ((user?.role as string) !== 'admin') {
+      return (
+        <LinearGradient
+          colors={['#1a1a2e', '#16213e', '#0f3460']}
+          style={styles.container}
+        >
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>Access denied. Admin only.</Text>
+          </View>
+        </LinearGradient>
+      );
+    }
+  
 
   const adminOptions = [
     {

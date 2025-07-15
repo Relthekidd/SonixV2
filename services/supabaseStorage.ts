@@ -35,7 +35,7 @@ async function uploadFile(
 }
 
 /**
- * Upload an audio file to the default bucket
+ * Upload an audio file to the default audio bucket
  */
 export async function uploadAudio(
   file: { uri: string; name?: string; type?: string },
@@ -45,13 +45,13 @@ export async function uploadAudio(
 }
 
 /**
- * Upload an image file to the default bucket
+ * Upload an image file to the default images bucket
  */
 export async function uploadImage(
   file: { uri: string; name?: string; type?: string },
   path: string
 ): Promise<{ url: string }> {
-  return uploadFile(file, path, 'audio-files');
+  return uploadFile(file, path, 'images');
 }
 
 /**
