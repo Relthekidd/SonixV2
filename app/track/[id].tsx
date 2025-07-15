@@ -78,10 +78,11 @@ export default function TrackDetailScreen() {
           singleData.artist_name ||
           singleData.artist ||
           'Unknown Artist',
-        album: singleData.album || 'Single',
+        album: singleData.album?.title || singleData.album || 'Single',
         duration: singleData.duration || 180,
         coverUrl:
           singleData.cover_url ||
+          singleData.album?.cover_url ||
           'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
         audioUrl: singleData.audio_url || '',
         isLiked: false,

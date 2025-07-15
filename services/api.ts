@@ -27,21 +27,48 @@ export class ApiService {
       { data: albums, error: aErr },
       { data: tracks, error: tErr }
     ] = await Promise.all([
-      supabase.from('singles').select('*, artist:profiles(name)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('albums').select('*, artist:profiles(name), track_count:tracks(id,count)').order('created_at', { ascending: false }).limit(50),
-      supabase.from('tracks').select('*, artist:profiles(name), cover_url:albums!inner(cover_url)').order('created_at', { ascending: false }).limit(50),
+      supabase
+        .from('singles')
+        .select('*, artist:profiles(name)')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('albums')
+        .select('*, artist:profiles(name), track_count:tracks(id,count)')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('tracks')
+        .select('*, artist:profiles(name), cover_url:albums!inner(cover_url)')
+        .order('created_at', { ascending: false })
+        .limit(50),
     ]);
 
     if (sErr || aErr || tErr) throw new Error('Failed to load recent uploads');
-    return { singles: singles || [], albums: albums || [], tracks: tracks || [] };
+
+    const filterDeleted = (arr: any[] | null | undefined) =>
+      (arr || []).filter((r) => !r?.is_deleted && !r?.deleted_at);
+
+    return {
+      singles: filterDeleted(singles),
+      albums: filterDeleted(albums),
+      tracks: filterDeleted(tracks),
+    };
   }
 
   /**
    * Fetch a single track by its ID
    */
   async getTrackById(id: string) {
-    const { data, error } = await supabase.from('tracks').select('*').eq('id', id).single();
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*, artist:artist_id(id,name), album:album_id(id, cover_url, title)')
+      .eq('id', id)
+      .maybeSingle();
     if (error) throw error;
+    if (!data || data.is_deleted || data.deleted_at) {
+      throw new Error('Track not found');
+    }
     return data;
   }
 
