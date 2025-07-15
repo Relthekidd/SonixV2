@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,34 @@ import {
   Alert,
   ActivityIndicator,
   FlatList,
+  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth, supabase } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import { CreditCard as Edit3, Settings, LogOut, User, Mail, Eye, EyeOff, Camera, Save, X, Users, Music, Heart, Calendar, Lock, Globe, Play, Pause } from 'lucide-react-native';
+import { 
+  Edit3, 
+  Settings, 
+  LogOut, 
+  User, 
+  Mail, 
+  Eye, 
+  EyeOff, 
+  Camera, 
+  Save, 
+  X, 
+  Users, 
+  Music, 
+  Heart, 
+  Calendar, 
+  Lock, 
+  Globe, 
+  Play, 
+  Pause,
+  Check,
+  AlertCircle
+} from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { uploadImage } from '@/services/supabaseStorage';
 
@@ -36,29 +58,72 @@ interface UserProfile {
   status_text?: string;
   pinned_content_type?: string;
   pinned_content_id?: string;
+  profile_completed?: boolean;
+}
+
+interface ProfileFormData {
+  displayName: string;
+  firstName: string;
+  lastName: string;
+  bio: string;
+  isPrivate: boolean;
+  statusText: string;
 }
 
 export default function ProfileScreen() {
   const { user, logout, updateProfile } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
+  
+  // State management
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [avatarFile, setAvatarFile] = useState<any>(null);
-  const [editedProfile, setEditedProfile] = useState({
-    displayName: user?.displayName || '',
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    bio: user?.bio || '',
-    isPrivate: user?.isPrivate || false,
+  const [showSetupPrompt, setShowSetupPrompt] = useState(false);
+  
+  // Form state
+  const [formData, setFormData] = useState<ProfileFormData>({
+    displayName: '',
+    firstName: '',
+    lastName: '',
+    bio: '',
+    isPrivate: false,
     statusText: '',
   });
 
+  // Validation state
+  const [formErrors, setFormErrors] = useState<Partial<ProfileFormData>>({});
+
+  // Initialize form data when user or profile changes
+  useEffect(() => {
+    if (user && profile) {
+      setFormData({
+        displayName: profile.display_name || user.displayName || '',
+        firstName: profile.first_name || user.firstName || '',
+        lastName: profile.last_name || user.lastName || '',
+        bio: profile.bio || user.bio || '',
+        isPrivate: profile.is_private || user.isPrivate || false,
+        statusText: profile.status_text || '',
+      });
+    }
+  }, [user, profile]);
+
+  // Load profile data
   useEffect(() => {
     if (user) {
       loadUserProfile();
     }
   }, [user]);
+
+  // Check if profile setup is needed
+  useEffect(() => {
+    if (profile && !isLoading) {
+      const needsSetup = !profile.display_name || !profile.bio;
+      setShowSetupPrompt(needsSetup);
+    }
+  }, [profile, isLoading]);
 
   const loadUserProfile = async () => {
     if (!user) return;
@@ -71,24 +136,95 @@ export default function ProfileScreen() {
 
       if (error) {
         console.error('Error loading profile:', error);
+        Alert.alert('Error', 'Failed to load profile data');
         return;
       }
 
       if (data && data.length > 0) {
         setProfile(data[0]);
-        setEditedProfile({
-          displayName: data[0].display_name || '',
-          firstName: data[0].first_name || '',
-          lastName: data[0].last_name || '',
-          bio: data[0].bio || '',
-          isPrivate: data[0].is_private || false,
-          statusText: data[0].status_text || '',
-        });
+      } else {
+        // Create initial profile if doesn't exist
+        await createInitialProfile();
       }
     } catch (error) {
       console.error('Error loading profile:', error);
+      Alert.alert('Error', 'Failed to load profile data');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const createInitialProfile = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: user.id,
+            display_name: user.displayName || user.email?.split('@')[0] || 'User',
+            first_name: user.firstName || '',
+            last_name: user.lastName || '',
+            bio: '',
+            is_private: false,
+            profile_completed: false,
+          }
+        ])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error creating profile:', error);
+        return;
+      }
+
+      // Reload profile after creation
+      await loadUserProfile();
+    } catch (error) {
+      console.error('Error creating initial profile:', error);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    await loadUserProfile();
+    setIsRefreshing(false);
+  }, []);
+
+  const validateForm = (): boolean => {
+    const errors: Partial<ProfileFormData> = {};
+
+    if (!formData.displayName.trim()) {
+      errors.displayName = 'Display name is required';
+    } else if (formData.displayName.length < 2) {
+      errors.displayName = 'Display name must be at least 2 characters';
+    }
+
+    if (formData.bio.length > 500) {
+      errors.bio = 'Bio must be less than 500 characters';
+    }
+
+    if (formData.statusText.length > 200) {
+      errors.statusText = 'Status must be less than 200 characters';
+    }
+
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const updateFormData = (field: keyof ProfileFormData, value: string | boolean) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+    
+    // Clear error for this field
+    if (formErrors[field]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [field]: undefined
+      }));
     }
   };
 
@@ -100,6 +236,7 @@ export default function ProfileScreen() {
         aspect: [1, 1],
         quality: 0.8,
       });
+      
       if (!result.canceled && result.assets[0]) {
         setAvatarFile(result.assets[0]);
       }
@@ -110,8 +247,17 @@ export default function ProfileScreen() {
   };
 
   const handleSaveProfile = async () => {
+    if (!validateForm()) {
+      Alert.alert('Validation Error', 'Please fix the errors in the form');
+      return;
+    }
+
     try {
+      setIsSaving(true);
+      
       let avatarUrl: string | undefined = profile?.profile_picture_url;
+      
+      // Upload avatar if changed
       if (avatarFile && user) {
         const ext = avatarFile.name?.split('.').pop() || 'jpg';
         const path = `images/avatars/${user.id}.${ext}`;
@@ -119,29 +265,51 @@ export default function ProfileScreen() {
         avatarUrl = url;
       }
 
+      // Update profile in Supabase
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          display_name: formData.displayName,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          bio: formData.bio,
+          is_private: formData.isPrivate,
+          profile_picture_url: avatarUrl,
+          status_text: formData.statusText || null,
+          profile_completed: true,
+        })
+        .eq('id', user?.id);
+
+      if (profileError) {
+        console.error('Error updating profile:', profileError);
+        Alert.alert('Error', 'Failed to update profile');
+        return;
+      }
+
+      // Update auth provider with new data
       await updateProfile({
-        displayName: editedProfile.displayName,
-        firstName: editedProfile.firstName,
-        lastName: editedProfile.lastName,
-        bio: editedProfile.bio,
-        isPrivate: editedProfile.isPrivate,
+        displayName: formData.displayName,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        bio: formData.bio,
+        isPrivate: formData.isPrivate,
         profile_picture_url: avatarUrl,
       });
 
-      // Update status if changed
-      if (editedProfile.statusText !== profile?.status_text) {
-        await supabase.rpc('update_user_status', {
-          status_text: editedProfile.statusText || null,
-        });
-      }
-
+      // Reset states
       setIsEditing(false);
       setAvatarFile(null);
+      setShowSetupPrompt(false);
+      
+      // Reload profile
       await loadUserProfile();
+      
       Alert.alert('Success', 'Profile updated successfully!');
     } catch (error) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -208,6 +376,55 @@ export default function ProfileScreen() {
     </TouchableOpacity>
   );
 
+  const renderSetupPrompt = () => (
+    <View style={styles.setupPrompt}>
+      <View style={styles.setupPromptContent}>
+        <AlertCircle color="#f59e0b" size={24} />
+        <Text style={styles.setupPromptTitle}>Complete Your Profile</Text>
+        <Text style={styles.setupPromptText}>
+          Add a display name and bio to help others discover you
+        </Text>
+        <TouchableOpacity
+          style={styles.setupPromptButton}
+          onPress={() => setIsEditing(true)}
+        >
+          <LinearGradient
+            colors={['#8b5cf6', '#a855f7']}
+            style={styles.setupPromptButtonGradient}
+          >
+            <Text style={styles.setupPromptButtonText}>Complete Setup</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  const renderFormField = (
+    field: keyof ProfileFormData,
+    placeholder: string,
+    icon?: React.ReactNode,
+    multiline = false,
+    numberOfLines = 1
+  ) => (
+    <View style={styles.fieldContainer}>
+      <View style={[styles.inputContainer, formErrors[field] && styles.inputError]}>
+        {icon && <View style={styles.inputIcon}>{icon}</View>}
+        <TextInput
+          style={[styles.input, multiline && styles.multilineInput]}
+          placeholder={placeholder}
+          placeholderTextColor="#64748b"
+          value={formData[field] as string}
+          onChangeText={(text) => updateFormData(field, text)}
+          multiline={multiline}
+          numberOfLines={numberOfLines}
+        />
+      </View>
+      {formErrors[field] && (
+        <Text style={styles.errorText}>{formErrors[field]}</Text>
+      )}
+    </View>
+  );
+
   if (isLoading) {
     return (
       <LinearGradient
@@ -227,11 +444,31 @@ export default function ProfileScreen() {
       colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            colors={['#8b5cf6']}
+            tintColor="#8b5cf6"
+          />
+        }
+      >
+        {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.headerButton}
-            onPress={() => setIsEditing(!isEditing)}
+            onPress={() => {
+              if (isEditing) {
+                setIsEditing(false);
+                setAvatarFile(null);
+                setFormErrors({});
+              } else {
+                setIsEditing(true);
+              }
+            }}
           >
             {isEditing ? (
               <X color="#ffffff" size={24} />
@@ -241,7 +478,12 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Setup Prompt */}
+        {showSetupPrompt && !isEditing && renderSetupPrompt()}
+
+        {/* Profile Section */}
         <View style={styles.profileSection}>
+          {/* Avatar */}
           <View style={styles.avatarContainer}>
             <Image
               source={{
@@ -260,77 +502,42 @@ export default function ProfileScreen() {
             )}
           </View>
 
+          {/* Profile Content */}
           {isEditing ? (
             <View style={styles.editForm}>
-              <View style={styles.inputContainer}>
-                <User color="#8b5cf6" size={20} style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Display Name"
-                  placeholderTextColor="#64748b"
-                  value={editedProfile.displayName}
-                  onChangeText={(text) => setEditedProfile(prev => ({ ...prev, displayName: text }))}
-                />
-              </View>
+              {/* Display Name */}
+              {renderFormField('displayName', 'Display Name', <User color="#8b5cf6" size={20} />)}
 
+              {/* First and Last Name */}
               <View style={styles.nameRow}>
-                <View style={[styles.inputContainer, styles.nameInput]}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="First Name"
-                    placeholderTextColor="#64748b"
-                    value={editedProfile.firstName}
-                    onChangeText={(text) => setEditedProfile(prev => ({ ...prev, firstName: text }))}
-                  />
+                <View style={styles.nameInput}>
+                  {renderFormField('firstName', 'First Name')}
                 </View>
-                <View style={[styles.inputContainer, styles.nameInput]}>
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Last Name"
-                    placeholderTextColor="#64748b"
-                    value={editedProfile.lastName}
-                    onChangeText={(text) => setEditedProfile(prev => ({ ...prev, lastName: text }))}
-                  />
+                <View style={styles.nameInput}>
+                  {renderFormField('lastName', 'Last Name')}
                 </View>
               </View>
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={[styles.input, styles.bioInput]}
-                  placeholder="Bio"
-                  placeholderTextColor="#64748b"
-                  value={editedProfile.bio}
-                  onChangeText={(text) => setEditedProfile(prev => ({ ...prev, bio: text }))}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
+              {/* Bio */}
+              {renderFormField('bio', 'Tell us about yourself...', undefined, true, 3)}
 
-              <View style={styles.inputContainer}>
-                <TextInput
-                  style={[styles.input, styles.bioInput]}
-                  placeholder="Status (What's on your mind?)"
-                  placeholderTextColor="#64748b"
-                  value={editedProfile.statusText}
-                  onChangeText={(text) => setEditedProfile(prev => ({ ...prev, statusText: text }))}
-                  multiline
-                  numberOfLines={2}
-                />
-              </View>
+              {/* Status */}
+              {renderFormField('statusText', "What's on your mind?", undefined, true, 2)}
 
+              {/* Privacy Toggle */}
               <View style={styles.switchContainer}>
                 <View style={styles.switchInfo}>
-                  {editedProfile.isPrivate ? (
+                  {formData.isPrivate ? (
                     <Lock color="#8b5cf6" size={20} />
                   ) : (
                     <Globe color="#8b5cf6" size={20} />
                   )}
                   <View style={styles.switchTextContainer}>
                     <Text style={styles.switchLabel}>
-                      {editedProfile.isPrivate ? 'Private Profile' : 'Public Profile'}
+                      {formData.isPrivate ? 'Private Profile' : 'Public Profile'}
                     </Text>
                     <Text style={styles.switchDescription}>
-                      {editedProfile.isPrivate 
+                      {formData.isPrivate 
                         ? 'Require approval for followers' 
                         : 'Anyone can follow you'
                       }
@@ -338,33 +545,42 @@ export default function ProfileScreen() {
                   </View>
                 </View>
                 <Switch
-                  value={editedProfile.isPrivate}
-                  onValueChange={(value) => setEditedProfile(prev => ({ ...prev, isPrivate: value }))}
+                  value={formData.isPrivate}
+                  onValueChange={(value) => updateFormData('isPrivate', value)}
                   trackColor={{ false: '#374151', true: '#8b5cf6' }}
-                  thumbColor={editedProfile.isPrivate ? '#ffffff' : '#9ca3af'}
+                  thumbColor={formData.isPrivate ? '#ffffff' : '#9ca3af'}
                 />
               </View>
 
+              {/* Save Button */}
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
                 onPress={handleSaveProfile}
+                disabled={isSaving}
               >
                 <LinearGradient
-                  colors={['#8b5cf6', '#a855f7']}
+                  colors={isSaving ? ['#6b7280', '#6b7280'] : ['#8b5cf6', '#a855f7']}
                   style={styles.saveButtonGradient}
                 >
-                  <Save color="#ffffff" size={20} style={styles.saveIcon} />
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                  {isSaving ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Save color="#ffffff" size={20} style={styles.saveIcon} />
+                  )}
+                  <Text style={styles.saveButtonText}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </Text>
                 </LinearGradient>
               </TouchableOpacity>
             </View>
           ) : (
             <>
-              <Text style={styles.displayName}>{profile?.display_name}</Text>
+              {/* Display Info */}
+              <Text style={styles.displayName}>{profile?.display_name || 'User'}</Text>
               <Text style={styles.email}>{user?.email}</Text>
               {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
-              {/* Status Section */}
+              {/* Status */}
               {profile?.status_text && (
                 <View style={styles.statusContainer}>
                   <Text style={styles.statusText}>{profile.status_text}</Text>
@@ -397,7 +613,9 @@ export default function ProfileScreen() {
                   <Text style={styles.statLabel}>Following</Text>
                 </View>
                 <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{user?.role === 'admin' ? 'Admin' : user?.role === 'artist' ? 'Artist' : 'Listener'}</Text>
+                  <Text style={styles.statValue}>
+                    {user?.role === 'artist' ? 'Artist' : 'Listener'}
+                  </Text>
                   <Text style={styles.statLabel}>Role</Text>
                 </View>
               </View>
@@ -416,6 +634,7 @@ export default function ProfileScreen() {
           )}
         </View>
 
+        {/* Content Sections - Only show when not editing */}
         {!isEditing && (
           <>
             {/* Top Artists */}
@@ -513,6 +732,46 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  setupPrompt: {
+    marginHorizontal: 24,
+    marginBottom: 24,
+    borderRadius: 16,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  setupPromptContent: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  setupPromptTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#f59e0b',
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  setupPromptText: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#cbd5e1',
+    textAlign: 'center',
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  setupPromptButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  setupPromptButtonGradient: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  setupPromptButtonText: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
   },
   profileSection: {
     alignItems: 'center',
@@ -629,6 +888,9 @@ const styles = StyleSheet.create({
   nameInput: {
     flex: 1,
   },
+  fieldContainer: {
+    width: '100%',
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -639,6 +901,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(139, 92, 246, 0.3)',
   },
+  inputError: {
+    borderColor: '#ef4444',
+  },
   inputIcon: {
     marginRight: 12,
   },
@@ -648,9 +913,17 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#ffffff',
   },
-  bioInput: {
+  multilineInput: {
     paddingVertical: 12,
     minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  errorText: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#ef4444',
+    marginTop: 4,
+    marginLeft: 4,
   },
   switchContainer: {
     flexDirection: 'row',
@@ -662,74 +935,78 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 12,
+        gap: 12,
   },
   switchTextContainer: {
+    marginLeft: 12,
     flex: 1,
   },
   switchLabel: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    fontFamily: 'Inter-Medium',
     color: '#ffffff',
-    marginBottom: 2,
   },
   switchDescription: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
+    color: '#cbd5e1',
   },
   saveButton: {
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginTop: 8,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
   },
   saveButtonGradient: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 16,
-  },
-  saveIcon: {
-    marginRight: 8,
+    justifyContent: 'center',
+    paddingVertical: 14,
   },
   saveButtonText: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
+    marginLeft: 8,
+  },
+  saveIcon: {
+    marginRight: 4,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 24,
+    paddingHorizontal: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontFamily: 'Poppins-SemiBold',
     color: '#ffffff',
-    marginBottom: 16,
-    paddingHorizontal: 24,
+    marginBottom: 12,
   },
   horizontalList: {
-    paddingHorizontal: 24,
+    gap: 16,
   },
   topArtistItem: {
+    width: 100,
     alignItems: 'center',
     marginRight: 16,
-    width: 80,
   },
   topArtistAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 2,
+    borderColor: '#8b5cf6',
     marginBottom: 8,
   },
   topArtistName: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: 'Inter-Medium',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: 4,
   },
   topArtistPlays: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
     textAlign: 'center',
@@ -737,80 +1014,71 @@ const styles = StyleSheet.create({
   topTrackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    marginBottom: 12,
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginHorizontal: 24,
-    marginBottom: 8,
     borderRadius: 12,
+    padding: 12,
   },
   topTrackRank: {
+    width: 24,
     fontSize: 16,
     fontFamily: 'Inter-Bold',
-    color: '#8b5cf6',
-    width: 24,
+    color: '#ffffff',
+    marginRight: 12,
     textAlign: 'center',
   },
   topTrackCover: {
-    width: 40,
-    height: 40,
-    borderRadius: 6,
-    marginLeft: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    marginRight: 12,
   },
   topTrackInfo: {
     flex: 1,
-    marginLeft: 12,
   },
   topTrackTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
-    marginBottom: 2,
   },
   topTrackArtist: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#cbd5e1',
+  },
+  topTrackPlays: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
-    marginBottom: 2,
-  },
-  topTrackPlays: {
-    fontSize: 10,
-    fontFamily: 'Inter-Regular',
-    color: '#64748b',
   },
   topTrackPlayButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingHorizontal: 8,
   },
   menuSection: {
     paddingHorizontal: 24,
+    marginTop: 16,
   },
   menuItem: {
     backgroundColor: 'rgba(255, 255, 255, 0.05)',
     borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     marginBottom: 12,
-    overflow: 'hidden',
   },
   menuItemContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    gap: 12,
   },
   menuItemText: {
     fontSize: 16,
-    fontFamily: 'Inter-Medium',
+    fontFamily: 'Inter-Regular',
     color: '#ffffff',
-    marginLeft: 16,
   },
   logoutText: {
     color: '#ef4444',
   },
   bottomPadding: {
-    height: 120,
+    height: 60,
   },
 });
