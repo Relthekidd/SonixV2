@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Image,
   Platform,
+  Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
@@ -19,7 +20,18 @@ import { ArtistAutocomplete } from '@/components/ArtistAutocomplete';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
-import { Upload, Music, Image as ImageIcon, Plus, X, Check, ArrowUp, ArrowDown, ArrowLeft, User } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
+
+interface Track {
+  id: string;
+  title: string;
+  audioFile: any;
+  lyrics: string;
+  explicit: boolean;
+  duration: number;
+  description?: string;
+  featuredArtists: ArtistData[];
+}
 
 interface UploadFormData {
   type: 'single' | 'album';
@@ -34,26 +46,14 @@ interface UploadFormData {
   tracks: Track[];
 }
 
-interface Track {
-  id: string;
-  title: string;
-  audioFile: any;
-  lyrics: string;
-  explicit: boolean;
-  trackNumber: number;
-  featuredArtists: ArtistData[];
-  duration: number;
-}
-
 const GENRES = [
-  'Hip-Hop', 'R&B', 'Pop', 'Rock', 'Electronic', 'Jazz', 'Classical',
-  'Country', 'Reggae', 'Blues', 'Folk', 'Indie', 'Alternative', 'Funk'
+  'Hip-Hop','R&B','Pop','Rock','Electronic','Jazz','Classical',
+  'Country','Reggae','Blues','Folk','Indie','Alternative','Funk'
 ];
 
 export default function AdminUploadScreen() {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
-
   const [formData, setFormData] = useState<UploadFormData>({
     type: 'single',
     title: '',
@@ -65,91 +65,55 @@ export default function AdminUploadScreen() {
     explicit: false,
     description: '',
     tracks: [{
-      id: '1',
-      title: '',
-      audioFile: null,
-      lyrics: '',
-      explicit: false,
-      trackNumber: 1,
-      featuredArtists: [],
-      duration: 0,
+      id: '1', title: '', audioFile: null, lyrics: '', explicit: false,
+      duration: 0, description: '', featuredArtists: []
     }],
   });
 
   useEffect(() => {
-    // Initialize storage on component mount
     uploadService.initializeStorage();
   }, []);
 
   const pickCoverImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setFormData(prev => ({ ...prev, coverFile: result.assets[0] }));
-      }
-    } catch (error) {
-      console.error('Error picking cover image:', error);
-      Alert.alert('Error', 'Failed to pick cover image');
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1,1],
+      quality: 0.8,
+    });
+    if (!res.canceled && res.assets[0]) {
+      setFormData(prev => ({ ...prev, coverFile: res.assets[0] }));
     }
   };
 
-  const pickAudioFile = async (trackIndex: number) => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'audio/*',
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        const updatedTracks = [...formData.tracks];
-        updatedTracks[trackIndex].audioFile = result.assets[0];
-        setFormData(prev => ({ ...prev, tracks: updatedTracks }));
-      }
-    } catch (error) {
-      console.error('Error picking audio file:', error);
-      Alert.alert('Error', 'Failed to pick audio file');
+  const pickAudioFile = async (index: number) => {
+    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
+    if (!res.canceled && res.assets[0]) {
+      const tracks = [...formData.tracks];
+      tracks[index].audioFile = res.assets[0];
+      setFormData(prev => ({ ...prev, tracks }));
     }
+  };
+
+  const updateTrack = (index: number, field: keyof Track, value: any) => {
+    const tracks = [...formData.tracks];
+    (tracks[index] as any)[field] = value;
+    setFormData(prev => ({ ...prev, tracks }));
   };
 
   const addTrack = () => {
-    const newTrack: Track = {
-      id: Date.now().toString(),
-      title: '',
-      audioFile: null,
-      lyrics: '',
-      explicit: false,
-      trackNumber: formData.tracks.length + 1,
-      featuredArtists: [],
-      duration: 0,
-    };
-    setFormData(prev => ({ ...prev, tracks: [...prev.tracks, newTrack] }));
+    setFormData(prev => ({
+      ...prev,
+      type: 'album',
+      tracks: [
+        ...prev.tracks,
+        { id: Date.now().toString(), title: '', audioFile: null, lyrics: '', explicit: false, duration: 0, description: '', featuredArtists: [] }
+      ]
+    }));
   };
 
-  const removeTrack = (trackIndex: number) => {
-    if (formData.tracks.length > 1) {
-      const updatedTracks = formData.tracks.filter((_, index) => index !== trackIndex);
-      const renumbered = updatedTracks.map((t, i) => ({ ...t, trackNumber: i + 1 }));
-      setFormData(prev => ({ ...prev, tracks: renumbered }));
-    }
-  };
-
-  const moveTrack = (idx: number, dir: 'up' | 'down') => {
-    const tracks = [...formData.tracks];
-    const newIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= tracks.length) return;
-    [tracks[idx], tracks[newIdx]] = [tracks[newIdx], tracks[idx]];
-    setFormData(prev => ({ ...prev, tracks: tracks.map((t, i) => ({ ...t, trackNumber: i + 1 })) }));
-  };
-
-  const updateTrack = (idx: number, field: keyof Track, value: any) => {
-    const tracks = [...formData.tracks];
-    tracks[idx] = { ...tracks[idx], [field]: value };
+  const removeTrack = (index: number) => {
+    const tracks = formData.tracks.filter((_, i) => i !== index);
     setFormData(prev => ({ ...prev, tracks }));
   };
 
@@ -162,45 +126,14 @@ export default function AdminUploadScreen() {
     }));
   };
 
-  const addFeaturedArtist = (artist: ArtistData) => {
-    setFormData(prev => ({
-      ...prev,
-      featuredArtists: prev.featuredArtists.some(a => a.id === artist.id)
-        ? prev.featuredArtists
-        : [...prev.featuredArtists, artist]
-    }));
-  };
-
-  const removeFeaturedArtist = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      featuredArtists: prev.featuredArtists.filter(a => a.id !== id)
-    }));
-  };
-
   const validateForm = (): boolean => {
-    if (!formData.title.trim()) {
-      Alert.alert('Error', 'Title is required');
-      return false;
-    }
-    if (!formData.mainArtist) {
-      Alert.alert('Error', 'Main artist is required');
-      return false;
-    }
-    if (!formData.genres.length) {
-      Alert.alert('Error', 'At least one genre is required');
-      return false;
-    }
+    if (!formData.title.trim()) { Alert.alert('Error','Title is required'); return false; }
+    if (!formData.mainArtist) { Alert.alert('Error','Main artist is required'); return false; }
+    if (!formData.genres.length) { Alert.alert('Error','At least one genre is required'); return false; }
     for (let i = 0; i < formData.tracks.length; i++) {
       const t = formData.tracks[i];
-      if (!t.title.trim()) {
-        Alert.alert('Error', `Track ${i + 1} title is required`);
-        return false;
-      }
-      if (!t.audioFile) {
-        Alert.alert('Error', `Track ${i + 1} audio file is required`);
-        return false;
-      }
+      if (!t.title.trim()) { Alert.alert('Error', `Track ${i+1} title is required`); return false; }
+      if (!t.audioFile) { Alert.alert('Error', `Track ${i+1} audio is required`); return false; }
     }
     return true;
   };
@@ -208,12 +141,10 @@ export default function AdminUploadScreen() {
   const handleSubmit = async () => {
     if (!validateForm()) return;
     setIsUploading(true);
-
     try {
-      console.log('🚀 Starting upload...');
       if (formData.type === 'single') {
         const t = formData.tracks[0];
-        const payload: SingleUploadData = {
+        await uploadService.uploadSingle({
           title: formData.title.trim(),
           lyrics: t.lyrics,
           duration: t.duration,
@@ -226,10 +157,9 @@ export default function AdminUploadScreen() {
           artistId: user?.id || '',
           mainArtistId: formData.mainArtist!.id,
           featuredArtistIds: formData.featuredArtists.map(a => a.id),
-        };
-        await uploadService.uploadSingle(payload);
+        });
       } else {
-        const albumPayload: AlbumUploadData = {
+        await uploadService.uploadAlbum({
           title: formData.title.trim(),
           description: formData.description,
           releaseDate: formData.releaseDate,
@@ -239,136 +169,162 @@ export default function AdminUploadScreen() {
           artistId: user?.id || '',
           mainArtistId: formData.mainArtist!.id,
           featuredArtistIds: formData.featuredArtists.map(a => a.id),
-          tracks: formData.tracks.map(t => ({
-            title: t.title.trim(),
-            lyrics: t.lyrics,
-            duration: t.duration,
-            explicit: t.explicit,
-            trackNumber: t.trackNumber,
-            featuredArtistIds: t.featuredArtists.map(a => a.id),
-            audioFile: t.audioFile,
-          }))
-        };
-        await uploadService.uploadAlbum(albumPayload);
+          tracks: formData.tracks.map((t, idx) => ({
+            title: t.title.trim(), lyrics: t.lyrics, duration: t.duration,
+            explicit: t.explicit, trackNumber: idx+1,
+            featuredArtistIds: t.featuredArtists.map(a => a.id), audioFile: t.audioFile
+          })),
+        });
       }
-
-      Alert.alert('Success', `${formData.type === 'single' ? 'Single' : 'Album'} uploaded!`, [
-        { text: 'View', onPress: () => router.push('/admin/uploads') }
-      ]);
-      // reset
-      setFormData({
-        type: 'single',
-        title: '',
-        mainArtist: null,
-        featuredArtists: [],
-        releaseDate: new Date().toISOString().split('T')[0],
-        coverFile: null,
-        genres: [],
-        explicit: false,
-        description: '',
-        tracks: [{
-          id: '1',
-          title: '',
-          audioFile: null,
-          lyrics: '',
-          explicit: false,
-          trackNumber: 1,
-          featuredArtists: [],
-          duration: 0,
-        }],
-      });
+      Alert.alert('Success','Upload complete', [{ text: 'View uploads', onPress: () => router.push('/admin/uploads') }]);
     } catch (err) {
-      console.error('❌ Upload failed:', err);
       Alert.alert('Error', (err as Error).message || 'Upload failed');
     } finally {
       setIsUploading(false);
     }
   };
 
-  // ——— HERE’S THE FIXED CHECK ———
-  if ((user?.role as string) !== 'admin') {
+  // only admin may upload
+  if ((user?.role as any) !== 'admin') {
     return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Access denied. Admin only.</Text>
+      <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
+        <View style={styles.center}>
+          <Text style={styles.error}>Access denied.</Text>
         </View>
       </LinearGradient>
     );
   }
 
   return (
-    <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
-      style={styles.container}
-    >
+    <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft color="#fff" size={20} />
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.title}>Upload Music</Text>
-        <View style={{ width: 44 }} />
+        <Text style={styles.headerTitle}>Upload Music</Text>
+        <TouchableOpacity onPress={() => router.push('/admin/uploads')} style={styles.viewBtn}>
+          <Text style={styles.viewText}>View Uploads</Text>
+        </TouchableOpacity>
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* Title */}
         <View style={styles.section}>
           <Text style={styles.label}>Title</Text>
           <TextInput
             style={styles.input}
-            placeholder="Track or album title"
+            placeholder="Enter title"
             placeholderTextColor="#64748b"
             value={formData.title}
-            onChangeText={t => setFormData(prev => ({ ...prev, title: t }))}
+            onChangeText={t => setFormData(p => ({...p,title:t}))}
           />
         </View>
 
+        {/* Main Artist */}
         <View style={styles.section}>
           <Text style={styles.label}>Main Artist</Text>
           <ArtistAutocomplete
-            onArtistSelect={artist => setFormData(prev => ({ ...prev, mainArtist: artist }))}
-            initialValue={formData.mainArtist?.name || ''}
+            onArtistSelect={a => setFormData(p=>({...p,mainArtist:a}))}
+            initialValue={formData.mainArtist?.name||''}
           />
         </View>
 
+        {/* Genres */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Genres</Text>
+          <View style={styles.tags}>
+            {GENRES.map(g => (
+              <TouchableOpacity
+                key={g}
+                style={[styles.tag, formData.genres.includes(g)&&styles.tagSel]}
+                onPress={()=>toggleGenre(g)}
+              >
+                <Text style={[styles.tagText, formData.genres.includes(g)&&styles.tagTextSel]}> {g} </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {/* Cover */}
         <View style={styles.section}>
           <Text style={styles.label}>Cover Image</Text>
-          <TouchableOpacity style={styles.fileButton} onPress={pickCoverImage}>
-            <Text style={styles.fileButtonText}>{formData.coverFile ? 'Change Cover' : 'Select Cover'}</Text>
+          <TouchableOpacity style={styles.fileBtn} onPress={pickCoverImage}>
+            <Text style={styles.fileText}>{formData.coverFile?'Change':'Select'} Cover</Text>
           </TouchableOpacity>
         </View>
 
+        {/* Tracks */}
         {formData.tracks.map((track, idx) => (
           <View key={track.id} style={styles.trackSection}>
-            <Text style={styles.label}>Track {idx + 1} Title</Text>
+            <Text style={styles.label}>Track {idx+1} Title</Text>
             <TextInput
               style={styles.input}
               placeholder="Track title"
               placeholderTextColor="#64748b"
               value={track.title}
-              onChangeText={t => updateTrack(idx, 'title', t)}
+              onChangeText={t=>updateTrack(idx,'title',t)}
             />
-            <TouchableOpacity style={styles.fileButton} onPress={() => pickAudioFile(idx)}>
-              <Text style={styles.fileButtonText}>{track.audioFile ? 'Change Audio' : 'Select Audio'}</Text>
+            <Text style={styles.label}>Lyrics (optional)</Text>
+            <TextInput
+              style={[styles.input,styles.textArea]}
+              placeholder="Lyrics"
+              placeholderTextColor="#64748b"
+              multiline
+              numberOfLines={3}
+              value={track.lyrics}
+              onChangeText={t=>updateTrack(idx,'lyrics',t)}
+            />
+            <Text style={styles.label}>Explicit?</Text>
+            <Switch value={track.explicit} onValueChange={v=>updateTrack(idx,'explicit',v)} />
+            <Text style={styles.label}>Duration (sec)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. 180"
+              placeholderTextColor="#64748b"
+              keyboardType="numeric"
+              value={track.duration.toString()}
+              onChangeText={t=>updateTrack(idx,'duration',parseInt(t)||0)}
+            />
+            <Text style={styles.label}>Description (optional)</Text>
+            <TextInput
+              style={[styles.input,styles.textArea]}
+              placeholder="Description"
+              placeholderTextColor="#64748b"
+              multiline
+              numberOfLines={2}
+              value={track.description||''}
+              onChangeText={t=>updateTrack(idx,'description',t)}
+            />
+            <Text style={styles.label}>Featured Artists</Text>
+            <ArtistAutocomplete
+              placeholder="Add artist"
+              onArtistSelect={a=>{
+                const tks=[...formData.tracks];
+                if(!tks[idx].featuredArtists.find(x=>x.id===a.id)) tks[idx].featuredArtists.push(a);
+                setFormData(p=>({...p,tracks:tks}));
+              }}
+              initialValue=""
+            />
+            <Text style={styles.label}>Audio File</Text>
+            <TouchableOpacity style={styles.fileBtn} onPress={()=>pickAudioFile(idx)}>
+              <Text style={styles.fileText}>{track.audioFile?'Change':'Select'} Audio</Text>
             </TouchableOpacity>
-            {formData.tracks.length > 1 && (
-              <TouchableOpacity onPress={() => removeTrack(idx)} style={styles.removeButton}>
-                <Text style={styles.removeButtonText}>Remove Track</Text>
+            {formData.tracks.length>1 && (
+              <TouchableOpacity style={styles.removeBtn} onPress={()=>removeTrack(idx)}>
+                <Text style={styles.removeText}>Remove Track</Text>
               </TouchableOpacity>
             )}
           </View>
         ))}
 
-        <TouchableOpacity style={styles.addTrackButton} onPress={addTrack}>
-          <Text style={styles.addTrackButtonText}>Add Track</Text>
+        {/* Add Track Button */}
+        <TouchableOpacity style={styles.addBtn} onPress={addTrack}>
+          <Text style={styles.addText}>Add Track</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit} disabled={isUploading}>
-          {isUploading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitText}>Upload</Text>
-          )}
+        {/* Submit */}
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isUploading}>
+          {isUploading ? <ActivityIndicator color="#fff"/> : <Text style={styles.submitText}>Upload</Text>}
         </TouchableOpacity>
       </ScrollView>
     </LinearGradient>
@@ -376,58 +332,31 @@ export default function AdminUploadScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 20,
-  },
-  backButton: { width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: '#fff' },
-  uploadsButton: {
-    backgroundColor: 'rgba(139,92,246,0.2)',
-    paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8,
-    borderWidth: 1, borderColor: 'rgba(139,92,246,0.3)',
-  },
-  uploadsButtonText: { fontSize: 12, fontFamily: 'Inter-SemiBold', color: '#8b5cf6' },
-  scrollView: { flex: 1 },
-  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
-  errorText: { fontSize: 18, fontFamily: 'Inter-SemiBold', color: '#ef4444', textAlign: 'center' },
-  content: { padding: 20 },
-  section: { marginBottom: 20 },
-  label: { color: '#fff', marginBottom: 6, fontFamily: 'Inter-SemiBold' },
-  input: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
-    color: '#fff',
-    fontFamily: 'Inter-Regular',
-  },
-  fileButton: {
-    backgroundColor: 'rgba(139,92,246,0.2)',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  fileButtonText: { color: '#8b5cf6', fontFamily: 'Inter-SemiBold' },
-  trackSection: { marginBottom: 20 },
-  removeButton: { marginTop: 8, alignSelf: 'flex-end' },
-  removeButtonText: { color: '#ef4444' },
-  addTrackButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  addTrackButtonText: { color: '#fff', fontFamily: 'Inter-SemiBold' },
-  submitButton: {
-    backgroundColor: '#8b5cf6',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  submitText: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
+  container: { flex:1 },
+  center: { flex:1, justifyContent:'center', alignItems:'center' },
+  error: { color:'#ef4444', fontSize:18 },
+  header: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:48, paddingBottom:16 },
+  backBtn:{ padding:8 },
+  headerTitle:{ fontSize:20, color:'#fff' },
+  viewBtn:{ padding:8 },
+  viewText:{ color:'#8b5cf6' },
+  content:{ padding:16 },
+  section:{ marginBottom:16 },
+  label:{ color:'#fff', marginBottom:4 },
+  input:{ backgroundColor:'rgba(255,255,255,0.1)', borderRadius:8, paddingHorizontal:12, paddingVertical:Platform.OS==='ios'?12:8, color:'#fff', marginBottom:8 },
+  textArea:{ minHeight:60, textAlignVertical:'top', marginBottom:8 },
+  tags:{ flexDirection:'row', flexWrap:'wrap', marginBottom:8 },
+  tag:{ paddingHorizontal:12, paddingVertical:6, borderRadius:16, backgroundColor:'rgba(255,255,255,0.1)', marginRight:8, marginBottom:8 },
+  tagSel:{ backgroundColor:'rgba(139,92,246,0.3)' },
+  tagText:{ color:'#94a3b8' },
+  tagTextSel:{ color:'#8b5cf6' },
+  fileBtn:{ backgroundColor:'rgba(139,92,246,0.2)', padding:12, borderRadius:8, alignItems:'center', marginBottom:8 },
+  fileText:{ color:'#8b5cf6' },
+  trackSection:{ borderWidth:1, borderColor:'rgba(255,255,255,0.1)', borderRadius:8, padding:12, marginBottom:16 },
+  removeBtn:{ alignSelf:'flex-end', padding:4 },
+  removeText:{ color:'#ef4444' },
+  addBtn:{ backgroundColor:'rgba(255,255,255,0.1)', padding:12, borderRadius:8, alignItems:'center', marginBottom:16 },
+  addText:{ color:'#fff' },
+  submitBtn:{ backgroundColor:'#8b5cf6', padding:16, borderRadius:8, alignItems:'center', marginBottom:32 },
+  submitText:{ color:'#fff', fontSize:16 },
 });
