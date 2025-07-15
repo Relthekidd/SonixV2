@@ -1,4 +1,5 @@
 import 'react-native-get-random-values';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from './supabase';
 import { uploadAudio, uploadImage, deleteFile as removeFromStorage } from './supabaseStorage';
 
@@ -99,7 +100,7 @@ class UploadService {
 
   async uploadSingle(data: SingleUploadData): Promise<void> {
     this.validateSingle(data);
-    const id = crypto.randomUUID();
+    const id = uuidv4(); // Changed from crypto.randomUUID()
 
     try {
       const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
@@ -133,7 +134,7 @@ class UploadService {
 
   async uploadAlbum(data: AlbumUploadData): Promise<void> {
     this.validateAlbum(data);
-    const albumId = crypto.randomUUID();
+    const albumId = uuidv4(); // Changed from crypto.randomUUID()
 
     try {
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, albumId, 'albums');
@@ -155,7 +156,7 @@ class UploadService {
       if (albumError) throw albumError;
 
       for (const t of data.tracks) {
-        const trackId = crypto.randomUUID();
+        const trackId = uuidv4(); // Changed from crypto.randomUUID()
         const audioUrl = await this.uploadTrackAudio(t.audioFile, data.artistId, trackId, albumId);
         const { error: trackError } = await supabase
           .from('tracks')
