@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 import { uploadAudio, uploadImage, deleteFile } from './supabaseStorage';
-import { v4 as uuidv4 } from 'uuid'; // npm install --save-dev @types/uuid
+import { v4 as uuidv4 } from 'uuid';
 
 export interface SingleUploadData {
   title: string;
@@ -38,110 +38,128 @@ export interface AlbumUploadData {
   }>;
 }
 
+
 class UploadService {
-  /**
-   * Upload a single track using Supabase Storage and Database
-   */
-  async uploadSingle(data: SingleUploadData): Promise<void> {
-    const id = uuidv4();
-    // Upload audio
-    const audioResult = await uploadAudio(
-      data.audioFile,
-      `singles/${data.artistId}/${id}.mp3`
-    );
-    const audioUrl = audioResult.url;
+  /** Placeholder to allow future storage setup */
+  initializeStorage(): void {
+    // Currently no-op, but called on mount to ensure storage is ready
+  }
 
-    // Upload cover image if provided
-    let coverUrl: string | null = null;
-    if (data.coverFile) {
-      const ext = data.coverFile.name?.split('.').pop() || 'jpg';
-      const coverResult = await uploadImage(
-        data.coverFile,
-        `singles/${data.artistId}/${id}-cover.${ext}`
-      );
-      coverUrl = coverResult.url;
-    }
+  private validateSingle(data: SingleUploadData) {
+    if (!data.title.trim()) throw new Error('Track title is required');
+    if (!data.audioFile) throw new Error('Audio file is required');
+    if (!data.artistId) throw new Error('Artist ID is required');
+    if (!data.mainArtistId) throw new Error('Main artist is required');
+  }
 
-    // Insert metadata into database
-    const { error } = await supabase.from('singles').insert({
-      id,
-      title: data.title,
-      lyrics: data.lyrics || '',
-      duration: data.duration || 0,
-      genres: data.genres,
-      explicit: data.explicit,
-      description: data.description || '',
-      release_date: data.releaseDate,
-      artist_id: data.artistId,
-      main_artist_id: data.mainArtistId,
-      featured_artist_ids: data.featuredArtistIds,
-      audio_url: audioUrl,
-      cover_url: coverUrl,
+  private validateAlbum(data: AlbumUploadData) {
+    if (!data.title.trim()) throw new Error('Album title is required');
+    if (!data.artistId) throw new Error('Artist ID is required');
+    if (!data.mainArtistId) throw new Error('Main artist is required');
+    if (!data.tracks.length) throw new Error('At least one track is required');
+    data.tracks.forEach((t, i) => {
+      if (!t.title.trim()) throw new Error(`Track ${i + 1} title is required`);
+      if (!t.audioFile) throw new Error(`Track ${i + 1} audio file is required`);
     });
+  }
 
-    if (error) {
-      throw new Error(`Failed to upload single: ${error.message}`);
+  private async uploadCover(
+    file: { uri: string; name?: string; type?: string } | undefined,
+    artistId: string,
+    id: string,
+    prefix: 'singles' | 'albums',
+  ): Promise<string | null> {
+    if (!file) return null;
+    const ext = file.name?.split('.').pop() || 'jpg';
+    const path = `images/${artistId}/${prefix}/${id}-cover.${ext}`;
+    const { url } = await uploadImage(file, path);
+    return url;
+  }
+
+  private async uploadTrackAudio(
+    file: { uri: string; name?: string; type?: string },
+    artistId: string,
+    id: string,
+    albumId?: string,
+  ): Promise<string> {
+    const base = albumId ? `audio/${artistId}/albums/${albumId}` : `audio/${artistId}/singles`;
+    const path = `${base}/${id}.mp3`;
+    const { url } = await uploadAudio(file, path);
+    return url;
+  }
+
+  /** Upload a single track using Supabase Storage and Database */
+  async uploadSingle(data: SingleUploadData): Promise<void> {
+    this.validateSingle(data);
+    const id = uuidv4();
+
+    try {
+      const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
+      const coverUrl = await this.uploadCover(data.coverFile, data.artistId, id, 'singles');
+
+      const { error } = await supabase.from('singles').insert({
+        id,
+        title: data.title.trim(),
+        lyrics: data.lyrics || '',
+        duration: data.duration || 0,
+        genres: data.genres,
+        explicit: data.explicit,
+        description: data.description || '',
+        release_date: data.releaseDate,
+        artist_id: data.artistId,
+        main_artist_id: data.mainArtistId,
+        featured_artist_ids: data.featuredArtistIds,
+        audio_url: audioUrl,
+        cover_url: coverUrl,
+      });
+
+      if (error) throw error;
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Failed to upload single');
     }
   }
 
-  /**
-   * Upload an album and its tracks
-   */
+  /** Upload an album and its tracks */
   async uploadAlbum(data: AlbumUploadData): Promise<void> {
+    this.validateAlbum(data);
     const albumId = uuidv4();
-    // Upload cover image if provided
-    let coverUrl: string | null = null;
-    if (data.coverFile) {
-      const ext = data.coverFile.name?.split('.').pop() || 'jpg';
-      const coverResult = await uploadImage(
-        data.coverFile,
-        `albums/${data.artistId}/${albumId}-cover.${ext}`
-      );
-      coverUrl = coverResult.url;
-    }
 
-    // Create album record
-    const { error: albumError } = await supabase.from('albums').insert({
-      id: albumId,
-      title: data.title,
-      description: data.description || '',
-      release_date: data.releaseDate,
-      genres: data.genres,
-      explicit: data.explicit,
-      artist_id: data.artistId,
-      main_artist_id: data.mainArtistId,
-      featured_artist_ids: data.featuredArtistIds,
-      cover_url: coverUrl,
-    });
+    try {
+      const coverUrl = await this.uploadCover(data.coverFile, data.artistId, albumId, 'albums');
 
-    if (albumError) {
-      throw new Error(`Failed to create album: ${albumError.message}`);
-    }
-
-    // Upload each track
-    for (const track of data.tracks) {
-      const trackId = uuidv4();
-      const audioResult = await uploadAudio(
-        track.audioFile,
-        `albums/${data.artistId}/${albumId}/${trackId}.mp3`
-      );
-      const audioUrl = audioResult.url;
-
-      const { error: trackError } = await supabase.from('tracks').insert({
-        id: trackId,
-        album_id: albumId,
-        title: track.title,
-        lyrics: track.lyrics || '',
-        duration: track.duration || 0,
-        explicit: track.explicit,
-        track_number: track.trackNumber,
-        featured_artist_ids: track.featuredArtistIds,
-        audio_url: audioUrl,
+      const { error: albumError } = await supabase.from('albums').insert({
+        id: albumId,
+        title: data.title.trim(),
+        description: data.description || '',
+        release_date: data.releaseDate,
+        genres: data.genres,
+        explicit: data.explicit,
+        artist_id: data.artistId,
+        main_artist_id: data.mainArtistId,
+        featured_artist_ids: data.featuredArtistIds,
+        cover_url: coverUrl,
       });
+      if (albumError) throw albumError;
 
-      if (trackError) {
-        throw new Error(`Failed to upload track "${track.title}": ${trackError.message}`);
+      for (const track of data.tracks) {
+        const trackId = uuidv4();
+        const audioUrl = await this.uploadTrackAudio(track.audioFile, data.artistId, trackId, albumId);
+
+        const { error: trackError } = await supabase.from('tracks').insert({
+          id: trackId,
+          album_id: albumId,
+          title: track.title.trim(),
+          lyrics: track.lyrics || '',
+          duration: track.duration || 0,
+          explicit: track.explicit,
+          track_number: track.trackNumber,
+          featured_artist_ids: track.featuredArtistIds,
+          audio_url: audioUrl,
+        });
+        if (trackError) throw trackError;
       }
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Failed to upload album');
     }
   }
 
