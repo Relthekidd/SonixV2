@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert } from 'react-native';
-import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
+import { uploadService, SingleUploadData, AlbumUploadData, UploadPermissions } from '@/services/uploadService';
 
 interface UseUploadReturn {
   isUploading: boolean;
@@ -8,6 +8,7 @@ interface UseUploadReturn {
   uploadSingle: (data: SingleUploadData) => Promise<any>;
   uploadAlbum: (data: AlbumUploadData) => Promise<any>;
   checkPermissions: () => Promise<boolean>;
+  getUploadPermissions: () => Promise<UploadPermissions>;
 }
 
 export function useUpload(): UseUploadReturn {
@@ -20,11 +21,8 @@ export function useUpload(): UseUploadReturn {
       setUploadProgress(0);
 
       // Check permissions first
-      const hasPermission = await uploadService.checkUploadPermissions();
-      if (!hasPermission) {
-        throw new Error('You do not have permission to upload content');
-      }
-
+      const permissions = await uploadService.checkUploadPermissions();
+      
       // Simulate progress updates
       setUploadProgress(25);
       
@@ -48,11 +46,8 @@ export function useUpload(): UseUploadReturn {
       setUploadProgress(0);
 
       // Check permissions first
-      const hasPermission = await uploadService.checkUploadPermissions();
-      if (!hasPermission) {
-        throw new Error('You do not have permission to upload content');
-      }
-
+      const permissions = await uploadService.checkUploadPermissions();
+      
       // Simulate progress updates
       setUploadProgress(25);
       
@@ -70,7 +65,18 @@ export function useUpload(): UseUploadReturn {
     }
   };
 
-  const checkPermissions = async () => {
+  const checkPermissions = async (): Promise<boolean> => {
+    try {
+      const permissions = await uploadService.checkUploadPermissions();
+      // Return true if user is authenticated (has userId)
+      return !!permissions.userId;
+    } catch (error) {
+      console.error('Permission check error:', error);
+      return false;
+    }
+  };
+
+  const getUploadPermissions = async (): Promise<UploadPermissions> => {
     return await uploadService.checkUploadPermissions();
   };
 
@@ -80,5 +86,6 @@ export function useUpload(): UseUploadReturn {
     uploadSingle,
     uploadAlbum,
     checkPermissions,
+    getUploadPermissions,
   };
 }

@@ -39,18 +39,31 @@ export interface AlbumUploadData {
   }>;
 }
 
+export interface UploadPermissions {
+  userId: string;
+  isAdmin: boolean;
+}
+
 class UploadService {
   /** No-op initializer to ensure imports are loaded */
   initializeStorage(): void {}
 
-  private validateSingle(data: SingleUploadData) {
+  /**
+   * Check if the current user has upload permissions
+   * @returns Promise with user ID and admin status
+   */
+  async checkUploadPermissions(): Promise<UploadPermissions> {
+    return await this.checkAuthAndRole();
+  }
+
+  private validateSingle(data: SingleUploadData): void {
     if (!data.title.trim()) throw new Error('Track title is required');
     if (!data.audioFile?.uri) throw new Error('Audio file is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
     if (!data.mainArtistId) throw new Error('Main artist is required');
   }
 
-  private async checkAuthAndRole(): Promise<{ userId: string; isAdmin: boolean }> {
+  private async checkAuthAndRole(): Promise<UploadPermissions> {
     const { data: { user }, error } = await supabase.auth.getUser();
     if (error || !user) {
       throw new Error('User not authenticated');
@@ -68,14 +81,19 @@ class UploadService {
     };
   }
 
-  private validateAlbum(data: AlbumUploadData) {
+  private validateAlbum(data: AlbumUploadData): void {
     if (!data.title.trim()) throw new Error('Album title is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
     if (!data.mainArtistId) throw new Error('Main artist is required');
     if (data.tracks.length < 1) throw new Error('At least one track is required');
-    data.tracks.forEach((t, i) => {
-      if (!t.title.trim()) throw new Error(`Track ${i + 1} title is required`);
-      if (!t.audioFile?.uri) throw new Error(`Track ${i + 1} audio file is required`);
+    
+    data.tracks.forEach((track, index) => {
+      if (!track.title.trim()) {
+        throw new Error(`Track ${index + 1} title is required`);
+      }
+      if (!track.audioFile?.uri) {
+        throw new Error(`Track ${index + 1} audio file is required`);
+      }
     });
   }
 
@@ -86,8 +104,10 @@ class UploadService {
     prefix: 'singles' | 'albums'
   ): Promise<string | null> {
     if (!file?.uri) return null;
+    
     const ext = file.name?.split('.').pop() || 'jpg';
     const path = `images/${artistId}/${prefix}/${entityId}-cover.${ext}`;
+    
     try {
       const { url } = await uploadImage(file, path);
       return url;
@@ -107,6 +127,7 @@ class UploadService {
       ? `audio/${artistId}/albums/${albumId}`
       : `audio/${artistId}/singles`;
     const path = `${base}/${trackId}.mp3`;
+    
     try {
       const { url } = await uploadAudio(file, path);
       return url;
@@ -118,26 +139,22 @@ class UploadService {
 
   async uploadSingle(data: SingleUploadData): Promise<void> {
     this.validateSingle(data);
-    const id = uuidv4(); // Changed from crypto.randomUUID()
+    const id = uuidv4();
 
     try {
-      // Debug: Check current user and profile
-      const { data: { user } } = await supabase.auth.getUser();
-      console.log('Current user:', user?.id);
+      // Verify user permissions
+      const { userId } = await this.checkUploadPermissions();
       
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user?.id)
-        .single();
-      console.log('User profile:', profile);
-      console.log('User role:', profile?.role);
+      // Debug logging
+      console.log('Current user:', userId);
       console.log('Data.artistId (created_by):', data.artistId);
-      console.log('Match created_by?', user?.id === data.artistId);
+      console.log('Match created_by?', userId === data.artistId);
 
+      // Upload files
       const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, id, 'singles');
 
+      // Insert track record
       const { error } = await supabase
         .from('tracks')
         .insert({
@@ -157,6 +174,7 @@ class UploadService {
           audio_url: audioUrl,
           cover_url: coverUrl,
         });
+      
       if (error) throw error;
     } catch (err: any) {
       console.error('uploadSingle error:', err);
@@ -166,11 +184,16 @@ class UploadService {
 
   async uploadAlbum(data: AlbumUploadData): Promise<void> {
     this.validateAlbum(data);
-    const albumId = uuidv4(); // Changed from crypto.randomUUID()
+    const albumId = uuidv4();
 
     try {
+      // Verify user permissions
+      await this.checkUploadPermissions();
+
+      // Upload album cover
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, albumId, 'albums');
 
+      // Insert album record
       const { error: albumError } = await supabase
         .from('albums')
         .insert({
@@ -185,30 +208,34 @@ class UploadService {
           featured_artist_ids: data.featuredArtistIds,
           cover_url: coverUrl,
         });
+      
       if (albumError) throw albumError;
 
-      for (const t of data.tracks) {
-        const trackId = uuidv4(); // Changed from crypto.randomUUID()
-        const audioUrl = await this.uploadTrackAudio(t.audioFile, data.artistId, trackId, albumId);
+      // Upload each track
+      for (const track of data.tracks) {
+        const trackId = uuidv4();
+        const audioUrl = await this.uploadTrackAudio(track.audioFile, data.artistId, trackId, albumId);
+        
         const { error: trackError } = await supabase
           .from('tracks')
           .insert({
             id: trackId,
             album_id: albumId,
-            title: t.title.trim(),
-            lyrics: t.lyrics || '',
-            duration: t.duration || 0,
-            explicit: t.explicit,
+            title: track.title.trim(),
+            lyrics: track.lyrics || '',
+            duration: track.duration || 0,
+            explicit: track.explicit,
             release_date: data.releaseDate,
             artist_id: data.mainArtistId,
             created_by: data.artistId,
-            featured_artist_ids: t.featuredArtistIds,
-            track_number: t.trackNumber,
+            featured_artist_ids: track.featuredArtistIds,
+            track_number: track.trackNumber,
             genres: data.genres,
             description: data.description || '',
             audio_url: audioUrl,
             cover_url: null,
           });
+        
         if (trackError) throw trackError;
       }
     } catch (err: any) {
