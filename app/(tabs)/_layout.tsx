@@ -15,9 +15,15 @@ export default function TabLayout() {
     }
   }, [user, isLoading]);
 
-  if (isLoading || !user) {
-    return null;
-  }
+  if (isLoading) {
+  return null; // Or <LoadingScreen />
+}
+
+if (!user) {
+  router.replace('/(auth)/login');
+  return null;
+}
+
 
   return (
     <View style={styles.container}>
