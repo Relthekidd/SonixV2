@@ -19,7 +19,7 @@ type Profile = {
   id: string;
   email: string;
   display_name?: string;
-  role?: 'listener' | 'artist';
+  role?: 'listener' | 'artist' | 'admin';
   [key: string]: any;
 };
 
@@ -27,7 +27,6 @@ type AuthContextType = {
   user: Profile | null;
   session: Session | null;
   isLoading: boolean;
-  // ✅ Added hasUser and userId properties
   hasUser: boolean;
   userId: string | null;
   login: (email: string, password: string) => Promise<void>;
@@ -35,7 +34,7 @@ type AuthContextType = {
     email: string,
     password: string,
     displayName: string,
-    role?: 'listener' | 'artist',
+    role?: 'listener' | 'artist' | 'admin',
     additionalData?: Partial<Profile>
   ) => Promise<void>;
   logout: () => Promise<void>;
@@ -51,38 +50,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ Computed properties for hasUser and userId
-  const hasUser = !isLoading && user !== null && session !== null;
+  const hasUser = !isLoading && !!user && !!session;
   const userId = session?.user?.id || null;
 
-  const loadUserProfile = useCallback(async (userId: string) => {
+  const loadUserProfile = useCallback(async (uid: string) => {
+    console.log('[Auth] loadUserProfile start for', uid);
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('id', uid)
         .single();
       if (error) throw error;
+      console.log('[Auth] loadUserProfile success', data);
       setUser(data as Profile);
     } catch (err) {
-      console.error('Error loading user profile:', err);
+      console.error('[Auth] loadUserProfile error', err);
+      setUser(null);
     }
   }, []);
 
   const login = useCallback(async (email: string, password: string) => {
+    console.log('[Auth] login start', email);
     setIsLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      console.log('[Auth] signInWithPassword result', { data, error });
       if (error) throw error;
-      setSession(data.session);
-      // Always provide a string to setAuthToken
-      apiService.setAuthToken(data.session?.access_token ?? '');
-      if (data.user) await loadUserProfile(data.user.id);
+      const newSession = data.session;
+      console.log('[Auth] received session', newSession);
+      setSession(newSession);
+      apiService.setAuthToken(newSession?.access_token ?? '');
+      const sessionUser = newSession?.user;
+      if (sessionUser) {
+        console.log('[Auth] login user id', sessionUser.id);
+        await loadUserProfile(sessionUser.id);
+      }
     } catch (err) {
-      console.error('Login error:', err);
+      console.error('[Auth] login error', err);
       throw err;
     } finally {
       setIsLoading(false);
+      console.log('[Auth] login end, isLoading=false');
     }
   }, [loadUserProfile]);
 
@@ -91,149 +100,163 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: string,
       password: string,
       displayName: string,
-      role: 'listener' | 'artist' = 'listener',
+      role: 'listener' | 'artist' | 'admin' = 'listener',
       additionalData: Partial<Profile> = {}
     ) => {
+      console.log('[Auth] signup start', email);
       setIsLoading(true);
       try {
         const { data, error } = await supabase.auth.signUp({ email, password });
+        console.log('[Auth] signUp result', { data, error });
         if (error) throw error;
-        if (data.user) {
-          const profile: Profile = {
-            id: data.user.id,
-            email,
-            display_name: displayName,
-            role,
-            ...additionalData,
-          };
-          const { error: upError } = await supabase.from('profiles').insert(profile);
-          if (upError) throw upError;
-          await loadUserProfile(data.user.id);
+        const newUser = data.user;
+        if (!newUser) {
+          throw new Error('No user returned after signup');
         }
+        console.log('[Auth] signup user id', newUser.id);
+        const uid = newUser.id;
+        const profile: Profile = { id: uid, email, display_name: displayName, role, ...additionalData };
+        const { error: upError } = await supabase.from('profiles').insert(profile);
+        if (upError) throw upError;
+        console.log('[Auth] profile insert success');
+        await loadUserProfile(uid);
       } catch (err) {
-        console.error('Signup error:', err);
+        console.error('[Auth] signup error', err);
         throw err;
       } finally {
         setIsLoading(false);
+        console.log('[Auth] signup end, isLoading=false');
       }
     },
     [loadUserProfile]
   );
 
   const logout = useCallback(async () => {
+    console.log('[Auth] logout start');
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.signOut();
+      console.log('[Auth] signOut result', { error });
       if (error) throw error;
       setUser(null);
       setSession(null);
-      // Clear token on logout
       apiService.setAuthToken('');
     } catch (err) {
-      console.error('Logout error:', err);
+      console.error('[Auth] logout error', err);
       throw err;
     } finally {
       setIsLoading(false);
+      console.log('[Auth] logout end, isLoading=false');
     }
   }, []);
 
   const updateProfile = useCallback(
     async (updates: Partial<Profile>) => {
+      console.log('[Auth] updateProfile start', updates);
+      if (!user) throw new Error('No user to update');
       setIsLoading(true);
       try {
-        if (!user) throw new Error('No user to update');
         const { error } = await supabase
           .from('profiles')
           .update(updates)
           .eq('id', user.id);
+        console.log('[Auth] updateProfile result', { error });
         if (error) throw error;
         setUser(prev => (prev ? { ...prev, ...updates } : prev));
       } catch (err) {
-        console.error('Update profile error:', err);
+        console.error('[Auth] updateProfile error', err);
         throw err;
       } finally {
         setIsLoading(false);
+        console.log('[Auth] updateProfile end, isLoading=false');
       }
     },
     [user]
   );
 
   const resetPassword = useCallback(async (email: string) => {
+    console.log('[Auth] resetPassword start', email);
     setIsLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email);
+      console.log('[Auth] resetPassword result', { error });
       if (error) throw error;
     } catch (err) {
-      console.error('Reset password error:', err);
+      console.error('[Auth] resetPassword error', err);
       throw err;
     } finally {
       setIsLoading(false);
+      console.log('[Auth] resetPassword end, isLoading=false');
     }
   }, []);
 
   const resendConfirmation = useCallback(async (email: string) => {
+    console.log('[Auth] resendConfirmation start', email);
     setIsLoading(true);
     try {
-      // Trigger sign-up for resend
       const { error } = await supabase.auth.signUp({ email, password: '' });
-      if (error) console.warn('Resend confirmation warning:', error.message);
+      console.log('[Auth] resendConfirmation result', { error });
+      if (error) console.warn('[Auth] resendConfirmation warning', error.message);
     } catch (err) {
-      console.error('Resend confirmation error:', err);
+      console.error('[Auth] resendConfirmation error', err);
     } finally {
       setIsLoading(false);
+      console.log('[Auth] resendConfirmation end, isLoading=false');
     }
   }, []);
 
   useEffect(() => {
-    // Register unauthorized callback
+    console.log('[Auth] initializing provider');
     apiService.setOnUnauthorizedCallback(logout);
 
-    // Initial session load
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[Auth] initial getSession', session);
       setSession(session);
       apiService.setAuthToken(session?.access_token ?? '');
-      if (session?.user) {
-        loadUserProfile(session.user.id).finally(() => setIsLoading(false));
+      if (session?.user.id) {
+        loadUserProfile(session.user.id)
+          .finally(() => {
+            setIsLoading(false);
+            console.log('[Auth] initial profile load complete');
+          });
       } else {
         setIsLoading(false);
+        console.log('[Auth] no session user, isLoading=false');
       }
     });
 
-    // Listen to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('[Auth] onAuthStateChange', event, session);
       setSession(session);
       apiService.setAuthToken(session?.access_token ?? '');
-      if (event === 'SIGNED_IN' && session?.user) {
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user.id) {
         loadUserProfile(session.user.id);
       } else if (event === 'SIGNED_OUT') {
         setUser(null);
         setIsLoading(false);
-      } else if (event === 'TOKEN_REFRESHED' && session?.user) {
-        loadUserProfile(session.user.id);
       }
     });
 
     return () => {
       subscription.unsubscribe();
-      // Remove callback on cleanup
       apiService.setOnUnauthorizedCallback(() => {});
     };
   }, [logout, loadUserProfile]);
 
   return (
     <AuthContext.Provider
-      value={{ 
-        user, 
-        session, 
-        isLoading, 
-        hasUser, // ✅ Added hasUser
-        userId,  // ✅ Added userId
-        login, 
-        signup, 
-        logout, 
-        updateProfile, 
-        resetPassword, 
-        resendConfirmation 
+      value={{
+        user,
+        session,
+        isLoading,
+        hasUser,
+        userId,
+        login,
+        signup,
+        logout,
+        updateProfile,
+        resetPassword,
+        resendConfirmation,
       }}
     >
       {children}
