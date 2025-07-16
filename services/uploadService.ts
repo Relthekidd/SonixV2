@@ -46,17 +46,23 @@ export interface UploadPermissions {
 
 class UploadService {
   /** No-op initializer to ensure imports are loaded */
-  initializeStorage(): void {}
+  initializeStorage(): void {
+    console.log('[UploadService] initializeStorage called');
+  }
 
   /**
    * Check if the current user has upload permissions
    * @returns Promise with user ID and admin status
    */
   async checkUploadPermissions(): Promise<UploadPermissions> {
-    return await this.checkAuthAndRole();
+    console.log('[UploadService] checkUploadPermissions start');
+    const perms = await this.checkAuthAndRole();
+    console.log('[UploadService] checkUploadPermissions result', perms);
+    return perms;
   }
 
   private validateSingle(data: SingleUploadData): void {
+    console.log('[UploadService] validateSingle', data);
     if (!data.title.trim()) throw new Error('Track title is required');
     if (!data.audioFile?.uri) throw new Error('Audio file is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
@@ -64,29 +70,37 @@ class UploadService {
   }
 
   private async checkAuthAndRole(): Promise<UploadPermissions> {
-    const { data: { user }, error } = await supabase.auth.getUser();
-    if (error || !user) {
+    console.log('[UploadService] checkAuthAndRole start');
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData.user) {
+      console.error('[UploadService] checkAuthAndRole authError', authError);
       throw new Error('User not authenticated');
     }
+    const userId = authData.user.id;
+    console.log('[UploadService] authenticated user', userId);
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
+    if (profileError) {
+      console.error('[UploadService] fetching profile error', profileError);
+      throw profileError;
+    }
 
-    return {
-      userId: user.id,
-      isAdmin: profile?.role === 'admin'
-    };
+    const isAdmin = profile?.role === 'admin';
+    console.log('[UploadService] user role', profile?.role, 'isAdmin=', isAdmin);
+    return { userId, isAdmin };
   }
 
   private validateAlbum(data: AlbumUploadData): void {
+    console.log('[UploadService] validateAlbum', data);
     if (!data.title.trim()) throw new Error('Album title is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
     if (!data.mainArtistId) throw new Error('Main artist is required');
     if (data.tracks.length < 1) throw new Error('At least one track is required');
-    
+
     data.tracks.forEach((track, index) => {
       if (!track.title.trim()) {
         throw new Error(`Track ${index + 1} title is required`);
@@ -103,16 +117,22 @@ class UploadService {
     entityId: string,
     prefix: 'singles' | 'albums'
   ): Promise<string | null> {
-    if (!file?.uri) return null;
-    
+    console.log(`[UploadService] uploadCover start for ${prefix}/${entityId}`, file);
+    if (!file?.uri) {
+      console.log('[UploadService] no cover file provided');
+      return null;
+    }
+
     const ext = file.name?.split('.').pop() || 'jpg';
     const path = `images/${artistId}/${prefix}/${entityId}-cover.${ext}`;
-    
+    console.log('[UploadService] cover path', path);
+
     try {
       const { url } = await uploadImage(file, path);
+      console.log('[UploadService] cover upload success:', url);
       return url;
     } catch (err) {
-      console.error('Cover upload failed:', err);
+      console.error('[UploadService] cover upload failed:', err);
       throw new Error('Failed to upload cover image');
     }
   }
@@ -127,34 +147,37 @@ class UploadService {
       ? `audio/${artistId}/albums/${albumId}`
       : `audio/${artistId}/singles`;
     const path = `${base}/${trackId}.mp3`;
-    
+    console.log('[UploadService] uploadTrackAudio start, path=', path, file);
+
     try {
       const { url } = await uploadAudio(file, path);
+      console.log('[UploadService] audio upload success:', url);
       return url;
     } catch (err) {
-      console.error('Audio upload failed:', err);
+      console.error('[UploadService] audio upload failed:', err);
       throw new Error('Failed to upload audio file');
     }
   }
 
   async uploadSingle(data: SingleUploadData): Promise<void> {
+    console.log('[UploadService] uploadSingle start', data);
     this.validateSingle(data);
     const id = uuidv4();
+    console.log('[UploadService] generated track ID', id);
 
     try {
-      // Verify user permissions
-      const { userId } = await this.checkUploadPermissions();
-      
-      // Debug logging
-      console.log('Current user:', userId);
-      console.log('Data.artistId (created_by):', data.artistId);
-      console.log('Match created_by?', userId === data.artistId);
+      const { userId, isAdmin } = await this.checkUploadPermissions();
+      console.log('[UploadService] permissions for uploadSingle', { userId, isAdmin });
 
-      // Upload files
+      console.log('[UploadService] comparing created_by');
+      console.log('Current user:', userId);
+      console.log('Data.artistId:', data.artistId);
+      console.log('Match?', userId === data.artistId);
+
       const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, id, 'singles');
 
-      // Insert track record
+      console.log('[UploadService] inserting track record');
       const { error } = await supabase
         .from('tracks')
         .insert({
@@ -174,26 +197,29 @@ class UploadService {
           audio_url: audioUrl,
           cover_url: coverUrl,
         });
-      
-      if (error) throw error;
+      if (error) {
+        console.error('[UploadService] supabase.insert track error', error);
+        throw error;
+      }
+      console.log('[UploadService] uploadSingle complete');
     } catch (err: any) {
-      console.error('uploadSingle error:', err);
+      console.error('[UploadService] uploadSingle error:', err);
       throw new Error(err.message || 'Failed to upload single');
     }
   }
 
   async uploadAlbum(data: AlbumUploadData): Promise<void> {
+    console.log('[UploadService] uploadAlbum start', data);
     this.validateAlbum(data);
     const albumId = uuidv4();
+    console.log('[UploadService] generated album ID', albumId);
 
     try {
-      // Verify user permissions
-      await this.checkUploadPermissions();
+      const { userId, isAdmin } = await this.checkUploadPermissions();
+      console.log('[UploadService] permissions for uploadAlbum', { userId, isAdmin });
 
-      // Upload album cover
       const coverUrl = await this.uploadCover(data.coverFile, data.artistId, albumId, 'albums');
-
-      // Insert album record
+      console.log('[UploadService] inserting album record');
       const { error: albumError } = await supabase
         .from('albums')
         .insert({
@@ -208,14 +234,18 @@ class UploadService {
           featured_artist_ids: data.featuredArtistIds,
           cover_url: coverUrl,
         });
-      
-      if (albumError) throw albumError;
+      if (albumError) {
+        console.error('[UploadService] supabase.insert album error', albumError);
+        throw albumError;
+      }
+      console.log('[UploadService] album record inserted');
 
-      // Upload each track
       for (const track of data.tracks) {
         const trackId = uuidv4();
+        console.log('[UploadService] processing track', track.trackNumber, track);
         const audioUrl = await this.uploadTrackAudio(track.audioFile, data.artistId, trackId, albumId);
-        
+
+        console.log('[UploadService] inserting track for album');
         const { error: trackError } = await supabase
           .from('tracks')
           .insert({
@@ -235,20 +265,25 @@ class UploadService {
             audio_url: audioUrl,
             cover_url: null,
           });
-        
-        if (trackError) throw trackError;
+        if (trackError) {
+          console.error('[UploadService] supabase.insert track for album error', trackError);
+          throw trackError;
+        }
       }
+      console.log('[UploadService] uploadAlbum complete');
     } catch (err: any) {
-      console.error('uploadAlbum error:', err);
+      console.error('[UploadService] uploadAlbum error:', err);
       throw new Error(err.message || 'Failed to upload album');
     }
   }
 
   async deleteFile(path: string, bucket = 'audio-files'): Promise<void> {
+    console.log('[UploadService] deleteFile start', { path, bucket });
     try {
       await removeFromStorage(path, bucket);
+      console.log('[UploadService] deleteFile success');
     } catch (err) {
-      console.error('deleteFile error:', err);
+      console.error('[UploadService] deleteFile error:', err);
       throw new Error('Failed to delete file');
     }
   }

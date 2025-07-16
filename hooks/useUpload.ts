@@ -16,68 +16,84 @@ export function useUpload(): UseUploadReturn {
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const uploadSingle = async (data: SingleUploadData) => {
+    console.log('[useUpload] uploadSingle start', data);
     try {
       setIsUploading(true);
       setUploadProgress(0);
 
-      // Check permissions first
+      console.log('[useUpload] Checking upload permissions...');
       const permissions = await uploadService.checkUploadPermissions();
-      
-      // Simulate progress updates
+      console.log('[useUpload] Permissions result', permissions);
+
+      console.log('[useUpload] Simulating progress 25%');
       setUploadProgress(25);
-      
+
       const result = await uploadService.uploadSingle(data);
-      
+      console.log('[useUpload] uploadSingle success', result);
+
       setUploadProgress(100);
-      
+      console.log('[useUpload] uploadProgress set to 100');
+
       return result;
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('[useUpload] uploadSingle error', error);
+      Alert.alert('Upload error', (error as Error).message);
       throw error;
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      console.log('[useUpload] uploadSingle end, reset state');
     }
   };
 
   const uploadAlbum = async (data: AlbumUploadData) => {
+    console.log('[useUpload] uploadAlbum start', data);
     try {
       setIsUploading(true);
       setUploadProgress(0);
 
-      // Check permissions first
+      console.log('[useUpload] Checking upload permissions...');
       const permissions = await uploadService.checkUploadPermissions();
-      
-      // Simulate progress updates
+      console.log('[useUpload] Permissions result', permissions);
+
+      console.log('[useUpload] Simulating progress 25%');
       setUploadProgress(25);
-      
+
       const result = await uploadService.uploadAlbum(data);
-      
+      console.log('[useUpload] uploadAlbum success', result);
+
       setUploadProgress(100);
-      
+      console.log('[useUpload] uploadProgress set to 100');
+
       return result;
     } catch (error) {
-      console.error('Upload error:', error);
+      console.error('[useUpload] uploadAlbum error', error);
+      Alert.alert('Upload error', (error as Error).message);
       throw error;
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
+      console.log('[useUpload] uploadAlbum end, reset state');
     }
   };
 
   const checkPermissions = async (): Promise<boolean> => {
+    console.log('[useUpload] checkPermissions start');
     try {
       const permissions = await uploadService.checkUploadPermissions();
-      // Return true if user is authenticated (has userId)
+      console.log('[useUpload] checkPermissions result', permissions);
       return !!permissions.userId;
     } catch (error) {
-      console.error('Permission check error:', error);
+      console.error('[useUpload] checkPermissions error', error);
       return false;
     }
   };
 
   const getUploadPermissions = async (): Promise<UploadPermissions> => {
-    return await uploadService.checkUploadPermissions();
+    console.log('[useUpload] getUploadPermissions');
+    const permissions = await uploadService.checkUploadPermissions();
+    console.log('[useUpload] getUploadPermissions result', permissions);
+    return permissions;
   };
 
   return {

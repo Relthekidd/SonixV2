@@ -70,30 +70,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    console.log('[Auth] login start', email);
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      console.log('[Auth] signInWithPassword result', { data, error });
-      if (error) throw error;
-      const newSession = data.session;
-      console.log('[Auth] received session', newSession);
-      setSession(newSession);
-      apiService.setAuthToken(newSession?.access_token ?? '');
-      const sessionUser = newSession?.user;
-      if (sessionUser) {
-        console.log('[Auth] login user id', sessionUser.id);
-        await loadUserProfile(sessionUser.id);
+  const syncClientSession = useCallback((sess: Session) => {
+    supabase.auth
+      .setSession({
+        access_token: sess.access_token,
+        refresh_token: sess.refresh_token,
+      })
+      .then(({ error }) => {
+        if (error) console.error('[Auth] syncClientSession error', error);
+        else console.log('[Auth] syncClientSession success');
+      });
+  }, []);
+
+  const login = useCallback(
+    async (email: string, password: string) => {
+      console.log('[Auth] login start', email);
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        console.log('[Auth] signInWithPassword result', { data, error });
+        if (error) throw error;
+        const newSession = data.session!;
+        console.log('[Auth] received session', newSession);
+        setSession(newSession);
+        syncClientSession(newSession);
+        apiService.setAuthToken(newSession.access_token);
+        const sessionUser = newSession.user;
+        if (sessionUser) {
+          console.log('[Auth] login user id', sessionUser.id);
+          await loadUserProfile(sessionUser.id);
+        }
+      } catch (err) {
+        console.error('[Auth] login error', err);
+        throw err;
+      } finally {
+        setIsLoading(false);
+        console.log('[Auth] login end, isLoading=false');
       }
-    } catch (err) {
-      console.error('[Auth] login error', err);
-      throw err;
-    } finally {
-      setIsLoading(false);
-      console.log('[Auth] login end, isLoading=false');
-    }
-  }, [loadUserProfile]);
+    },
+    [loadUserProfile, syncClientSession]
+  );
 
   const signup = useCallback(
     async (
@@ -109,10 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const { data, error } = await supabase.auth.signUp({ email, password });
         console.log('[Auth] signUp result', { data, error });
         if (error) throw error;
-        const newUser = data.user;
-        if (!newUser) {
-          throw new Error('No user returned after signup');
-        }
+        const newUser = data.user!;
         console.log('[Auth] signup user id', newUser.id);
         const uid = newUser.id;
         const profile: Profile = { id: uid, email, display_name: displayName, role, ...additionalData };
@@ -156,10 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) throw new Error('No user to update');
       setIsLoading(true);
       try {
-        const { error } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', user.id);
+        const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
         console.log('[Auth] updateProfile result', { error });
         if (error) throw error;
         setUser(prev => (prev ? { ...prev, ...updates } : prev));
@@ -209,39 +219,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[Auth] initializing provider');
     apiService.setOnUnauthorizedCallback(logout);
 
+    // 1) initial session fetch
     supabase.auth.getSession().then(({ data: { session } }) => {
       console.log('[Auth] initial getSession', session);
       setSession(session);
-      apiService.setAuthToken(session?.access_token ?? '');
+      if (session) {
+        syncClientSession(session);
+        apiService.setAuthToken(session.access_token);
+      }
       if (session?.user.id) {
-        loadUserProfile(session.user.id)
-          .finally(() => {
-            setIsLoading(false);
-            console.log('[Auth] initial profile load complete');
-          });
+        loadUserProfile(session.user.id).finally(() => {
+          setIsLoading(false);
+          console.log('[Auth] initial profile load complete');
+        });
       } else {
         setIsLoading(false);
         console.log('[Auth] no session user, isLoading=false');
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    // 2) auth‑state listener (only react to SIGNED_IN / SIGNED_OUT)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
       console.log('[Auth] onAuthStateChange', event, session);
       setSession(session);
-      apiService.setAuthToken(session?.access_token ?? '');
-      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user.id) {
-        loadUserProfile(session.user.id);
+      if (session) {
+        apiService.setAuthToken(session.access_token);
+        if (event === 'SIGNED_IN') {
+          console.log('[Auth] –> SIGNED_IN, loading profile');
+          syncClientSession(session);
+          loadUserProfile(session.user.id);
+        }
       } else if (event === 'SIGNED_OUT') {
+        console.log('[Auth] –> SIGNED_OUT, clearing user');
         setUser(null);
         setIsLoading(false);
       }
+      // IGNORE TOKEN_REFRESHED here so we don’t loop
     });
 
     return () => {
       subscription.unsubscribe();
       apiService.setOnUnauthorizedCallback(() => {});
     };
-  }, [logout, loadUserProfile]);
+  }, [logout, loadUserProfile, syncClientSession]);
 
   return (
     <AuthContext.Provider
@@ -265,7 +287,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within an AuthProvider');
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within an AuthProvider');
+  return ctx;
 };
