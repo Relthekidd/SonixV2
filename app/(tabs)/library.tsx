@@ -12,31 +12,32 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
-import { 
-  Heart, 
-  Music, 
-  Plus, 
-  Play, 
-  Pause, 
+import {
+  Heart,
+  Music,
+  Plus,
+  Play,
+  Pause,
   MoreVertical,
-  X 
+  X,
 } from 'lucide-react-native';
+import { withAuthGuard } from '@/hoc/withAuthGuard';
 
-export default function LibraryScreen() {
+function LibraryScreen() {
   const [activeTab, setActiveTab] = useState('playlists');
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
-  
-  const { 
-    likedSongs, 
-    playlists, 
+
+  const {
+    likedSongs,
+    playlists,
     albums,
-    currentTrack, 
-    isPlaying, 
-    playTrack, 
+    currentTrack,
+    isPlaying,
+    playTrack,
     pauseTrack,
-    createPlaylist 
+    createPlaylist,
   } = useMusic();
 
   const handleCreatePlaylist = () => {
@@ -44,7 +45,6 @@ export default function LibraryScreen() {
       Alert.alert('Error', 'Please enter a playlist name');
       return;
     }
-    
     createPlaylist(playlistName, playlistDescription);
     setPlaylistName('');
     setPlaylistDescription('');
@@ -54,18 +54,14 @@ export default function LibraryScreen() {
 
   const handleTrackPress = (track: any) => {
     if (currentTrack?.id === track.id) {
-      if (isPlaying) {
-        pauseTrack();
-      } else {
-        playTrack(track, likedSongs);
-      }
+      isPlaying ? pauseTrack() : playTrack(track, likedSongs);
     } else {
       playTrack(track, likedSongs);
     }
   };
 
   const renderTrackItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.trackItem}
       onPress={() => handleTrackPress(item)}
     >
@@ -132,7 +128,7 @@ export default function LibraryScreen() {
     >
       <View style={styles.header}>
         <Text style={styles.title}>Your Library</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => setShowCreatePlaylist(true)}
         >
@@ -150,11 +146,11 @@ export default function LibraryScreen() {
             ]}
             onPress={() => setActiveTab(tab.id)}
           >
-            <tab.icon 
-              color={activeTab === tab.id ? '#8b5cf6' : '#64748b'} 
-              size={20} 
+            <tab.icon
+              color={activeTab === tab.id ? '#8b5cf6' : '#64748b'}
+              size={20}
             />
-            <Text 
+            <Text
               style={[
                 styles.tabText,
                 activeTab === tab.id && styles.activeTabText,
@@ -519,3 +515,5 @@ const styles = StyleSheet.create({
     height: 120,
   },
 });
+
+export default withAuthGuard(LibraryScreen);

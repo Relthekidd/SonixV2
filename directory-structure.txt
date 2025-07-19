@@ -12,6 +12,7 @@
 │   │   └── signup.tsx
 │   ├── (tabs)
 │   │   ├── _layout.tsx
+│   │   ├── admin
 │   │   ├── admin.tsx
 │   │   ├── artist-dashboard.tsx
 │   │   ├── index.tsx
@@ -19,9 +20,6 @@
 │   │   ├── profile.tsx
 │   │   └── search.tsx
 │   ├── +not-found.tsx
-│   ├── admin
-│   │   ├── upload.tsx
-│   │   └── uploads.tsx
 │   ├── album
 │   │   └── [id].tsx
 │   ├── artist
@@ -41,10 +39,13 @@
 ├── babel.config.js
 ├── components
 │   ├── ArtistAutocomplete.tsx
+│   ├── LoadingSpinner.tsx
 │   ├── MiniPlayer.tsx
 │   └── UploadProgressModal.tsx
 ├── directory-structure.txt
 ├── expo-env.d.ts
+├── hoc
+│   └── withAuthGuard.tsx
 ├── hooks
 │   ├── useFrameworkReady.ts
 │   └── useUpload.ts
@@ -84,4 +85,4 @@
 └── types
     └── env.d.ts
 
-20 directories, 65 files
+21 directories, 65 files

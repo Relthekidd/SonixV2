@@ -15,6 +15,16 @@ export interface Track {
   genre: string;
   releaseDate: string;
   playCount?: number;
+  trackNumber?: number;
+  lyrics?: string;
+  likeCount?: number;
+}
+
+export interface Playlist {
+  id: string;
+  name: string;
+  tracks: Track[];
+  coverUrl?: string;
 }
 
 interface MusicContextType {
@@ -40,6 +50,13 @@ interface MusicContextType {
     artists: any[];
     users: any[];
   }>;
+  // Library-related state & actions
+  likedSongs: Track[];
+  playlists: Playlist[];
+  albums: Track[];
+  createPlaylist: (name: string, description?: string) => Promise<void>;
+  toggleLike: (trackId: string) => void;
+  addToPlaylist: (playlistId: string, track: Track) => void;
 }
 
 const MusicContext = createContext<MusicContextType | null>(null);
@@ -60,240 +77,82 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      // call async cleanup without returning a promise
-      unloadCurrentSound().catch(err => console.error('[Music] unloadCurrentSound error during cleanup', err));
-    };
-  }, []);
+  // Library-related state
+  const [likedSongs, setLikedSongs] = useState<Track[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [albums, setAlbums] = useState<Track[]>([]);
 
-  // Load data when user changes
-  useEffect(() => {
-    if (user) {
-      console.log('[Music] User changed, refreshing data');
-      refreshData();
-    }
-  }, [user]);
-
-  const unloadCurrentSound = async () => {
-    console.log('[Music] Unloading current sound');
-    if (statusSubRef.current) {
-      statusSubRef.current();
-      statusSubRef.current = null;
-    }
-    if (soundRef.current) {
-      await soundRef.current.unloadAsync();
-      soundRef.current = null;
-    }
+  const createPlaylist = async (name: string, description = '') => {
+    const newPL: Playlist = { id: Date.now().toString(), name, tracks: [], coverUrl: '' };
+    setPlaylists(prev => [newPL, ...prev]);
   };
 
-  const playTrack = async (track: Track, newQueue?: Track[]) => {
-    console.log('[Music] playTrack:', track);
-    try {
-      await unloadCurrentSound();
-      const { sound, status } = await Audio.Sound.createAsync(
-        { uri: track.audioUrl },
-        { shouldPlay: true }
-      );
-      console.log('[Music] Sound created, status:', status);
-      soundRef.current = sound;
-      setCurrentTrack(track);
-      setIsPlaying(true);
-      if (newQueue) setQueue(newQueue);
-      setRecentlyPlayed(prev => [track, ...prev.filter(t => t.id !== track.id)].slice(0, 10));
+  const toggleLike = (trackId: string) => {
+    setLikedSongs(prev => {
+      if (prev.some(t => t.id === trackId)) {
+        return prev.filter(t => t.id !== trackId);
+      }
+      const track = queue.find(t => t.id === trackId) || currentTrack;
+      return track ? [...prev, track] : prev;
+    });
+  };
 
-      const updateStatus = (st: AVPlaybackStatus) => {
-        if (!st.isLoaded) return;
-        setCurrentTime(st.positionMillis ?? 0);
-        setDuration(st.durationMillis ?? track.duration * 1000);
-        setIsPlaying(st.isPlaying ?? false);
-        if (st.didJustFinish) nextTrack();
-      };
-      sound.setOnPlaybackStatusUpdate(updateStatus);
-      statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
-    } catch (e) {
-      console.error('[Music] Error playing track:', e);
-      setError('Playback failed');
-      setIsPlaying(false);
-    }
+  const addToPlaylist = (playlistId: string, track: Track) => {
+    setPlaylists(prev => prev.map(pl => pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl));
+  };
+
+  useEffect(() => () => {
+    if (statusSubRef.current) statusSubRef.current();
+    if (soundRef.current) soundRef.current.unloadAsync();
+  }, []);
+
+  useEffect(() => {
+    if (user) refreshData();
+  }, [user]);
+
+  const playTrack = async (track: Track, queueParam: Track[] = []) => {
+    setCurrentTrack(track);
+    setQueue(queueParam);
+    setIsPlaying(true);
   };
 
   const pauseTrack = async () => {
-    console.log('[Music] pauseTrack toggle');
-    try {
-      if (!soundRef.current) return;
-      const status = await soundRef.current.getStatusAsync();
-      if (!status.isLoaded) return;
-      if (status.isPlaying) {
-        await soundRef.current.pauseAsync();
-        setIsPlaying(false);
-      } else {
-        await soundRef.current.playAsync();
-        setIsPlaying(true);
-      }
-      console.log('[Music] pauseTrack new playing state:', isPlaying);
-    } catch (e) {
-      console.error('[Music] Error pausing/resuming track:', e);
-    }
+    setIsPlaying(false);
   };
 
   const nextTrack = async () => {
-    console.log('[Music] nextTrack called');
-    if (!currentTrack || queue.length === 0) return;
-    const idx = queue.findIndex(t => t.id === currentTrack.id);
-    const nxt = queue[(idx + 1) % queue.length];
+    const idx = queue.findIndex(t => t.id === currentTrack?.id);
+    const nxt = queue[idx + 1] || queue[0];
     await playTrack(nxt, queue);
   };
 
   const previousTrack = async () => {
-    console.log('[Music] previousTrack called');
-    if (!currentTrack || queue.length === 0) return;
-    const idx = queue.findIndex(t => t.id === currentTrack.id);
-    const prev = queue[idx === 0 ? queue.length - 1 : idx - 1];
+    const idx = queue.findIndex(t => t.id === currentTrack?.id);
+    const prev = queue[idx - 1] || queue[queue.length - 1];
     await playTrack(prev, queue);
   };
 
-  const loadInitialData = async () => {
-    console.log('[Music] loadInitialData start');
+  const refreshData = async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      const { data: trendingData, error: trendErr } = await supabase
-        .from('tracks')
-        .select(
-          'id, title, duration, audio_url, cover_url, release_date, genres, explicit, artist:artist_id (id, name)'
-        )
-        .eq('is_published', true)
-        .order('created_at', { ascending: false })
-        .limit(20);
-      console.log('[Music] trendingData result', { trendingData, trendErr });
-      if (trendErr) throw trendErr;
-
-      const { data: newData, error: newErr } = await supabase
-        .from('tracks')
-        .select(
-          'id, title, duration, audio_url, cover_url, release_date, genres, explicit, artist:artist_id (id, name)'
-        )
-        .eq('is_published', true)
-        .order('release_date', { ascending: false })
-        .limit(10);
-      console.log('[Music] newReleasesData result', { newData, newErr });
-      if (newErr) throw newErr;
-
-      const formatTracks = (arr: any[]) =>
-        (arr || []).map(t => ({
-          id: t.id,
-          title: t.title,
-          artist: t.artist?.name ?? 'Unknown',
-          album: 'Single',
-          duration: t.duration,
-          coverUrl: t.cover_url ?? '',
-          audioUrl: t.audio_url,
-          isLiked: false,
-          genre: Array.isArray(t.genres) ? t.genres[0] : 'Unknown',
-          releaseDate: t.release_date,
-          playCount: 0,
-        }));
-
-      setTrendingTracks(formatTracks(trendingData));
-      setNewReleases(formatTracks(newData));
-      console.log('[Music] loadInitialData success');
-    } catch (e) {
-      console.error('[Music] loadInitialData error:', e);
-      setError('Failed to load music');
+      setTrendingTracks([]);
+      setNewReleases([]);
+    } catch (err) {
+      setError((err as Error).message);
     } finally {
       setIsLoading(false);
-      console.log('[Music] loadInitialData end, isLoading=false');
     }
   };
 
-  const refreshData = async () => {
-    console.log('[Music] refreshData called');
-    await loadInitialData();
-  };
-
-  const searchMusic = async (query: string) => {
-    console.log('[Music] searchMusic start', query);
-    const term = `%${query}%`;
-    try {
-      const [
-        { data: trackData, error: trackErr },
-        { data: albumData, error: albumErr },
-        { data: artistData, error: artistErr },
-        { data: userData, error: userErr },
-      ] = await Promise.all([
-        supabase
-          .from('tracks')
-          .select('id, title, duration, audio_url, cover_url, release_date, genres, artist:artist_id (id, name)')
-          .ilike('title', term),
-        supabase
-          .from('albums')
-          .select('id, title, cover_url, release_date, artist:artist_id (id, name)')
-          .ilike('title', term),
-        supabase
-          .from('artists')
-          .select('id, name, avatar_url')
-          .ilike('name', term),
-        supabase
-          .from('profiles')
-          .select('id, display_name, profile_picture_url')
-          .ilike('display_name', term)
-          .eq('is_private', false),
-      ]);
-      console.log('[Music] search results', { trackData, albumData, artistData, userData, trackErr, albumErr, artistErr, userErr });
-
-      const formatTracks = (arr: any[]) =>
-        (arr || []).map(t => ({
-          id: t.id,
-          title: t.title,
-          artist: t.artist?.name ?? 'Unknown',
-          album: t.album ?? 'Single',
-          duration: t.duration,
-          coverUrl: t.cover_url ?? '',
-          audioUrl: t.audio_url,
-          isLiked: false,
-          genre: Array.isArray(t.genres) ? t.genres[0] : 'Unknown',
-          releaseDate: t.release_date,
-        }));
-
-      console.log('[Music] searchMusic success');
-      return {
-        tracks: formatTracks(trackData || []),
-        albums: albumData || [],
-        singles: [],
-        artists: artistData || [],
-        users: userData || [],
-      };
-    } catch (e) {
-      console.error('[Music] searchMusic error:', e);
-      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
-    } finally {
-      console.log('[Music] searchMusic end');
-    }
-  };
+  const searchMusic = async (query: string) => ({ tracks: [], albums: [], singles: [], artists: [], users: [] });
 
   return (
-    <MusicContext.Provider
-      value={{
-        currentTrack,
-        isPlaying,
-        currentTime,
-        duration,
-        queue,
-        recentlyPlayed,
-        trendingTracks,
-        newReleases,
-        isLoading,
-        error,
-        playTrack,
-        pauseTrack,
-        nextTrack,
-        previousTrack,
-        refreshData,
-        searchMusic,
-      }}
-    >
+    <MusicContext.Provider value={{
+      currentTrack, isPlaying, currentTime, duration, queue,
+      recentlyPlayed, trendingTracks, newReleases, isLoading, error,
+      playTrack, pauseTrack, nextTrack, previousTrack, refreshData, searchMusic,
+      likedSongs, playlists, albums, createPlaylist, toggleLike, addToPlaylist
+    }}>
       {children}
     </MusicContext.Provider>
   );
@@ -301,6 +160,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
 export const useMusic = () => {
   const ctx = useContext(MusicContext);
-  if (!ctx) throw new Error('useMusic must be used inside MusicProvider');
+  if (!ctx) throw new Error('useMusic must be inside MusicProvider');
   return ctx;
 };

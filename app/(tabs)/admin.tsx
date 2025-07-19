@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,17 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { supabase } from '@/providers/AuthProvider';
-import { Users, Music, Upload, ChartBar as BarChart3, Settings, Shield, Plus, TrendingUp, CirclePlay as PlayCircle, Heart, Calendar } from 'lucide-react-native';
+import { supabase } from '@/services/supabase';
+import {
+  Users,
+  Music,
+  Upload,
+  ChartBar as BarChart3,
+  Settings,
+  Plus,
+  TrendingUp,
+  CirclePlay as PlayCircle,
+} from 'lucide-react-native';
 
 interface AdminStats {
   totalUsers: number;
@@ -24,13 +33,10 @@ interface AdminStats {
   newUsersToday: number;
   newTracksToday: number;
   playsToday: number;
-  topTracks: any[];
-  topArtists: any[];
-  recentUsers: any[];
 }
 
 export default function AdminScreen() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [stats, setStats] = useState<AdminStats>({
     totalUsers: 0,
     totalTracks: 0,
@@ -41,66 +47,44 @@ export default function AdminScreen() {
     newUsersToday: 0,
     newTracksToday: 0,
     playsToday: 0,
-    topTracks: [],
-    topArtists: [],
-    recentUsers: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // Redirect non-admins
   useEffect(() => {
-    loadAdminStats();
-  }, []);
+    if (!authLoading && user?.role !== 'admin') {
+      router.replace('/');
+    }
+  }, [authLoading, user]);
 
-  const loadAdminStats = async () => {
+  const loadAdminStats = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      
-      // Call the admin statistics function
-      const { data, error } = await supabase
-        .rpc('get_admin_statistics');
-
-      if (error) {
-        console.error('Error loading admin stats:', error);
-        // Fallback to individual queries if function fails
-        await loadStatsManually();
-        return;
-      }
-
-      if (data && data.length > 0) {
-        const statsData = data[0];
+      const { data, error } = await supabase.rpc('get_admin_statistics');
+      if (error) throw error;
+      if (Array.isArray(data) && data[0]) {
+        const s = data[0] as any;
         setStats({
-          totalUsers: parseInt(statsData.total_users) || 0,
-          totalTracks: parseInt(statsData.total_tracks) || 0,
-          totalAlbums: parseInt(statsData.total_albums) || 0,
-          totalArtists: parseInt(statsData.total_artists) || 0,
-          totalPlays: parseInt(statsData.total_plays) || 0,
-          totalLikes: parseInt(statsData.total_likes) || 0,
-          newUsersToday: parseInt(statsData.new_users_today) || 0,
-          newTracksToday: parseInt(statsData.new_tracks_today) || 0,
-          playsToday: parseInt(statsData.plays_today) || 0,
-          topTracks: statsData.top_tracks || [],
-          topArtists: statsData.top_artists || [],
-          recentUsers: statsData.recent_users || [],
+          totalUsers: +s.total_users || 0,
+          totalTracks: +s.total_tracks || 0,
+          totalAlbums: +s.total_albums || 0,
+          totalArtists: +s.total_artists || 0,
+          totalPlays: +s.total_plays || 0,
+          totalLikes: +s.total_likes || 0,
+          newUsersToday: +s.new_users_today || 0,
+          newTracksToday: +s.new_tracks_today || 0,
+          playsToday: +s.plays_today || 0,
         });
       }
-    } catch (error) {
-      console.error('Error loading admin stats:', error);
-      await loadStatsManually();
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const loadStatsManually = async () => {
-    try {
-      // Get basic counts
+    } catch {
+      // fallback manual counts
       const [
-        usersResult,
-        tracksResult,
-        albumsResult,
-        artistsResult,
-        playsResult,
+        { count: u },
+        { count: t },
+        { count: a },
+        { count: ar },
+        { count: p },
       ] = await Promise.all([
         supabase.from('users').select('*', { count: 'exact', head: true }),
         supabase.from('tracks').select('*', { count: 'exact', head: true }),
@@ -108,150 +92,43 @@ export default function AdminScreen() {
         supabase.from('artists').select('*', { count: 'exact', head: true }),
         supabase.from('song_plays').select('*', { count: 'exact', head: true }),
       ]);
-
-      // Get today's stats
       const today = new Date().toISOString().split('T')[0];
-      const [newUsersResult, newTracksResult, playsToday] = await Promise.all([
-        supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', today),
-        supabase
-          .from('tracks')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', today),
-        supabase
-          .from('song_plays')
-          .select('*', { count: 'exact', head: true })
-          .gte('created_at', today),
+      const [
+        { count: nu },
+        { count: nt },
+        { count: pt },
+      ] = await Promise.all([
+        supabase.from('users').select('*', { count: 'exact', head: true }).gte('created_at', today),
+        supabase.from('tracks').select('*', { count: 'exact', head: true }).gte('created_at', today),
+        supabase.from('song_plays').select('*', { count: 'exact', head: true }).gte('created_at', today),
       ]);
-
       setStats({
-        totalUsers: usersResult.count || 0,
-        totalTracks: tracksResult.count || 0,
-        totalAlbums: albumsResult.count || 0,
-        totalArtists: artistsResult.count || 0,
-        totalPlays: playsResult.count || 0,
-        totalLikes: 0, // Would need to implement likes tracking
-        newUsersToday: newUsersResult.count || 0,
-        newTracksToday: newTracksResult.count || 0,
-        playsToday: playsToday.count || 0,
-        topTracks: [],
-        topArtists: [],
-        recentUsers: [],
+        totalUsers: u || 0,
+        totalTracks: t || 0,
+        totalAlbums: a || 0,
+        totalArtists: ar || 0,
+        totalPlays: p || 0,
+        totalLikes: 0,
+        newUsersToday: nu || 0,
+        newTracksToday: nt || 0,
+        playsToday: pt || 0,
       });
-    } catch (error) {
-      console.error('Error loading manual stats:', error);
-    }
-  };
-
-  const onRefresh = React.useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await loadAdminStats();
     } finally {
-      setRefreshing(false);
+      setIsLoading(false);
     }
   }, []);
 
-   // ——— HERE’S THE FIXED CHECK ———
-    if ((user?.role as string) !== 'admin') {
-      return (
-        <LinearGradient
-          colors={['#1a1a2e', '#16213e', '#0f3460']}
-          style={styles.container}
-        >
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Access denied. Admin only.</Text>
-          </View>
-        </LinearGradient>
-      );
-    }
-  
+  useEffect(() => {
+    loadAdminStats();
+  }, [loadAdminStats]);
 
-  const adminOptions = [
-    {
-      id: 'artists',
-      title: 'Artist Management',
-      description: 'Review and approve artist applications',
-      icon: Users,
-      color: '#10b981',
-      route: '/(admin)/artists',
-    },
-    {
-      id: 'upload-content',
-      title: 'Upload Content',
-      description: 'Upload singles, albums, and manage tracks',
-      icon: Upload,
-      color: '#8b5cf6',
-      route: '/admin/upload',
-    },
-    {
-      id: 'content-management',
-      title: 'Content Management',
-      description: 'Manage tracks, albums, and playlists',
-      icon: Music,
-      color: '#f59e0b',
-      route: '/admin/content',
-    },
-    {
-      id: 'analytics',
-      title: 'Analytics & Reports',
-      description: 'View platform statistics and insights',
-      icon: BarChart3,
-      color: '#06b6d4',
-      route: '/admin/analytics',
-    },
-    {
-      id: 'playlists',
-      title: 'App Playlists',
-      description: 'Create and manage featured playlists',
-      icon: Music,
-      color: '#ec4899',
-      route: '/admin/playlists',
-    },
-    {
-      id: 'settings',
-      title: 'Platform Settings',
-      description: 'Configure platform-wide settings',
-      icon: Settings,
-      color: '#ef4444',
-      route: '/admin/settings',
-    },
-  ];
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadAdminStats();
+    setRefreshing(false);
+  }, [loadAdminStats]);
 
-  const statsCards = [
-    {
-      title: 'Total Users',
-      value: stats.totalUsers.toLocaleString(),
-      change: `+${stats.newUsersToday} today`,
-      icon: Users,
-      color: '#8b5cf6',
-    },
-    {
-      title: 'Total Tracks',
-      value: stats.totalTracks.toLocaleString(),
-      change: `+${stats.newTracksToday} today`,
-      icon: Music,
-      color: '#10b981',
-    },
-    {
-      title: 'Total Plays',
-      value: stats.totalPlays.toLocaleString(),
-      change: `+${stats.playsToday} today`,
-      icon: PlayCircle,
-      color: '#f59e0b',
-    },
-    {
-      title: 'Total Artists',
-      value: stats.totalArtists.toLocaleString(),
-      change: 'Active artists',
-      icon: Users,
-      color: '#ef4444',
-    },
-  ];
-
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <LinearGradient
         colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -265,14 +142,26 @@ export default function AdminScreen() {
     );
   }
 
+  const quickActions = [
+    { label: 'Upload Content', icon: Upload, route: '/admin/upload' },
+    { label: 'View Uploads', icon: Plus, route: '/admin/uploads' },
+    { label: 'Manage Artists', icon: Users, route: '/admin/artists' },
+  ] as const;
+
+  const statsCards = [
+    { title: 'Users', value: stats.totalUsers, subtitle: `${stats.newUsersToday} today`, icon: Users },
+    { title: 'Tracks', value: stats.totalTracks, subtitle: `${stats.newTracksToday} today`, icon: Music },
+    { title: 'Plays', value: stats.totalPlays, subtitle: `${stats.playsToday} today`, icon: PlayCircle },
+    { title: 'Artists', value: stats.totalArtists, subtitle: 'Active', icon: Users },
+  ];
+
   return (
     <LinearGradient
       colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
-      <ScrollView 
-        style={styles.scrollView} 
-        showsVerticalScrollIndicator={false}
+      <ScrollView
+        style={styles.scrollView}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -284,254 +173,71 @@ export default function AdminScreen() {
       >
         <View style={styles.header}>
           <Text style={styles.title}>Admin Dashboard</Text>
-          <Text style={styles.subtitle}>Manage your music platform</Text>
+          <Text style={styles.subtitle}>Overview & Tools</Text>
         </View>
 
         {/* Quick Actions */}
-        <View style={styles.quickActionsContainer}>
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.quickActions}>
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/admin/upload')}
-            >
-              <LinearGradient
-                colors={['#8b5cf6', '#a855f7']}
-                style={styles.quickActionGradient}
+          <View style={styles.actionsRow}>
+            {quickActions.map((act) => (
+              <TouchableOpacity
+                key={act.label}
+                style={styles.actionBtn}
+                onPress={() => router.push(act.route as any)}
               >
-                <Plus color="#ffffff" size={24} />
-                <Text style={styles.quickActionText}>Upload Content</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.quickActionButton}
-              onPress={() => router.push('/(admin)/artists')}
-            >
-              <LinearGradient
-                colors={['#10b981', '#059669']}
-                style={styles.quickActionGradient}
-              >
-                <Users color="#ffffff" size={24} />
-                <Text style={styles.quickActionText}>Manage Artists</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+                <LinearGradient
+                  colors={['#8b5cf6', '#a855f7']}
+                  style={styles.actionGradient}
+                >
+                  <act.icon color="#fff" size={20} />
+                  <Text style={styles.actionText}>{act.label}</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            ))}
           </View>
         </View>
 
         {/* Stats Overview */}
-        <View style={styles.statsContainer}>
-          <Text style={styles.sectionTitle}>Platform Overview</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Platform Stats</Text>
           <View style={styles.statsGrid}>
-            {statsCards.map((stat, index) => (
-              <View key={index} style={styles.statCard}>
-                <View style={[styles.statIcon, { backgroundColor: `${stat.color}20` }]}>
-                  <stat.icon color={stat.color} size={24} />
-                </View>
-                <Text style={styles.statValue}>{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
-                <Text style={styles.statChange}>{stat.change}</Text>
+            {statsCards.map((card) => (
+              <View key={card.title} style={styles.card}>
+                <View style={styles.cardIcon}><card.icon color="#8b5cf6" size={24} /></View>
+                <Text style={styles.cardValue}>{card.value.toLocaleString()}</Text>
+                <Text style={styles.cardTitle}>{card.title}</Text>
+                <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        {/* Admin Options */}
-        <View style={styles.optionsContainer}>
-          <Text style={styles.sectionTitle}>Management Tools</Text>
-          {adminOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.optionCard}
-              onPress={() => router.push(option.route as any)}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: `${option.color}20` }]}>
-                <option.icon color={option.color} size={24} />
-              </View>
-              <View style={styles.optionContent}>
-                <Text style={styles.optionTitle}>{option.title}</Text>
-                <Text style={styles.optionDescription}>{option.description}</Text>
-              </View>
-              <TrendingUp color="#94a3b8" size={20} />
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        <View style={styles.bottomPadding} />
       </ScrollView>
+      <View style={styles.bottomPadding} />
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginTop: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    marginTop: 24,
-    marginBottom: 12,
-  },
-  errorText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 60,
-    paddingBottom: 32,
-  },
-  title: {
-    fontSize: 28,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-    marginBottom: 16,
-  },
-  quickActionsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  quickActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  quickActionButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  quickActionGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    gap: 8,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
-  statsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '47%',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-  },
-  statIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  statValue: {
-    fontSize: 24,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  statTitle: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: '#94a3b8',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  statChange: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#10b981',
-  },
-  optionsContainer: {
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  optionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  iconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  optionContent: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 4,
-  },
-  optionDescription: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    lineHeight: 20,
-  },
-  bottomPadding: {
-    height: 120,
-  },
+  container: { flex: 1 },
+  scrollView: { flex: 1 },
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { fontSize: 16, color: '#94a3b8', marginTop: 12 },
+  header: { padding: 24, paddingTop: 60 },
+  title: { fontSize: 28, color: '#fff', fontFamily: 'Poppins-Bold' },
+  subtitle: { fontSize: 16, color: '#94a3b8', marginTop: 4 },
+  section: { marginBottom: 32, paddingHorizontal: 24 },
+  sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16, fontFamily: 'Poppins-SemiBold' },
+  actionsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  actionBtn: { flex: 1, marginRight: 12, borderRadius: 12, overflow: 'hidden' },
+  actionGradient: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 12 },
+  actionText: { color: '#fff', marginLeft: 8, fontFamily: 'Inter-Medium' },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  card: { width: '47%', backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 12 },
+  cardIcon: { marginBottom: 8 },
+  cardValue: { fontSize: 22, color: '#fff', fontFamily: 'Poppins-Bold' },
+  cardTitle: { fontSize: 14, color: '#94a3b8', fontFamily: 'Inter-Medium' },
+  cardSubtitle: { fontSize: 12, color: '#10b981' },
+  bottomPadding: { height: 120 },
 });
