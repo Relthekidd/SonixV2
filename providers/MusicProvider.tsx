@@ -144,7 +144,54 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const searchMusic = async (query: string) => ({ tracks: [], albums: [], singles: [], artists: [], users: [] });
+  const searchMusic = async (query: string) => {
+    const term = query.trim();
+    if (!term) {
+      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+    }
+
+    try {
+      const [trackRes, artistRes, userRes] = await Promise.all([
+        supabase
+          .from('tracks')
+          .select(
+            'id,title,duration,cover_url,audio_url,artist_name,album:title,genres,release_date,created_at'
+          )
+          .ilike('title', `%${term}%`)
+          .limit(10),
+        supabase
+          .from('artists')
+          .select('id,name,avatar_url')
+          .ilike('name', `%${term}%`)
+          .limit(10),
+        supabase.rpc('search_users', { search_query: term, limit_count: 10 })
+      ]);
+
+      const tracks = (trackRes.data || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist_name || 'Unknown Artist',
+        album: t.album || 'Single',
+        duration: t.duration || 0,
+        coverUrl: t.cover_url,
+        audioUrl: t.audio_url,
+        isLiked: likedSongs.some((l) => l.id === t.id),
+        genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
+        releaseDate: t.release_date || t.created_at,
+      }));
+
+      return {
+        tracks,
+        albums: [],
+        singles: [],
+        artists: artistRes.data || [],
+        users: userRes.data || [],
+      };
+    } catch (err) {
+      console.error('searchMusic error', err);
+      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+    }
+  };
 
   return (
     <MusicContext.Provider value={{

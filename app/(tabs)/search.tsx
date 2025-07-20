@@ -160,14 +160,75 @@ function SearchScreen() {
 
       {!isSearching && (
         <ScrollView style={styles.content}>
-          {query === '' ? (
-            <> ... </>
+          {query.trim() === '' ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Trending Searches</Text>
+              <View style={styles.trendingContainer}>
+                {trendingSearches.map((t) => (
+                  <TouchableOpacity
+                    key={t}
+                    style={styles.trendingItem}
+                    onPress={() => handleTrendingPress(t)}
+                  >
+                    <Text style={styles.trendingText}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           ) : (
-            Object.entries(filteredResults).map(([key, arr]) => (
-              arr.length > 0 && key !== 'singles' && key !== 'artists' && (
-                <View key={key} style={styles.section}> ... </View>
-              )
-            ))
+            <>
+              {filteredResults.tracks && filteredResults.tracks.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Songs</Text>
+                  {filteredResults.tracks.map((item) => (
+                    <View key={item.id}>{renderTrackItem({ item })}</View>
+                  ))}
+                </View>
+              )}
+
+              {filteredResults.artists && filteredResults.artists.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Artists</Text>
+                  {filteredResults.artists.map((item: any) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.resultItem}
+                      onPress={() => router.push(`/artist/${item.id}`)}
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            item.avatar_url ||
+                            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg',
+                        }}
+                        style={styles.resultImage}
+                      />
+                      <View style={styles.resultInfo}>
+                        <Text style={styles.resultTitle}>{item.name}</Text>
+                        <Text style={styles.resultSubtitle}>Artist</Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
+              {filteredResults.users && filteredResults.users.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Users</Text>
+                  {filteredResults.users.map((item) => (
+                    <View key={item.id}>{renderUserItem({ item })}</View>
+                  ))}
+                </View>
+              )}
+
+              {filteredResults.tracks?.length === 0 &&
+                filteredResults.artists?.length === 0 &&
+                filteredResults.users?.length === 0 && (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No results found</Text>
+                  </View>
+                )}
+            </>
           )}
         </ScrollView>
       )}
@@ -200,6 +261,8 @@ const styles = StyleSheet.create({
   playButton: { padding:8 },
   userMeta: { flexDirection:'row', alignItems:'center', justifyContent:'space-between' },
   privacyIndicator: { marginLeft:8 },
+  emptyState: { alignItems:'center', marginTop:40 },
+  emptyText: { color:'#94a3b8' },
   bottomPadding: { height:120 }
 });
 
