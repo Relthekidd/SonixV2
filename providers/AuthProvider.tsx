@@ -226,7 +226,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(initialSession);
       apiService.setAuthToken(initialSession?.access_token ?? '');
       if (initialSession?.user?.id) {
-        loadUserProfile(initialSession.user.id);
+        loadUserProfile(initialSession.user.id).finally(() => {
+          if (mounted) setIsLoading(false);
+        });
       } else {
         setIsLoading(false);
       }
@@ -239,11 +241,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       switch (event) {
         case 'SIGNED_IN':
+        case 'INITIAL_SESSION':
           setSession(sess);
           apiService.setAuthToken(sess!.access_token);
-          loadUserProfile(sess!.user.id).finally(() => {
-            if (mounted) setIsLoading(false);
-          });
+          if (sess?.user?.id) {
+            loadUserProfile(sess.user.id).finally(() => {
+              if (mounted) setIsLoading(false);
+            });
+          } else {
+            setIsLoading(false);
+          }
           break;
 
         case 'SIGNED_OUT':
