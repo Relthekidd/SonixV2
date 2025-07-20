@@ -131,7 +131,7 @@ export default function AdminScreen() {
   if (authLoading || isLoading) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#111827', '#0b1120']}
         style={styles.container}
       >
         <View style={styles.loadingContainer}>
@@ -157,7 +157,7 @@ export default function AdminScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#111827', '#0b1120']}
       style={styles.container}
     >
       <ScrollView
@@ -190,7 +190,7 @@ export default function AdminScreen() {
                   colors={["#8b5cf6", "#a855f7"]}
                   style={styles.actionGradient}
                 >
-                  <act.icon color="#fff" size={20} />
+                  <act.icon color="#fff" size={24} />
                 </LinearGradient>
                 <Text style={styles.actionText}>{act.label}</Text>
               </TouchableOpacity>
@@ -229,19 +229,18 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 16, color: '#94a3b8', marginTop: 4 },
   section: { marginBottom: 32, paddingHorizontal: 24 },
   sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16, fontFamily: 'Poppins-SemiBold' },
-  actionsRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  actionsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
   actionBtn: {
     flex: 1,
-    marginRight: 12,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 12,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+    padding: 16,
     alignItems: 'center',
   },
   actionGradient: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -251,19 +250,20 @@ const styles = StyleSheet.create({
   card: {
     width: '47%',
     backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   cardIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(139,92,246,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   cardValue: { fontSize: 22, color: '#fff', fontFamily: 'Poppins-Bold' },
   cardTitle: { fontSize: 14, color: '#94a3b8', fontFamily: 'Inter-Medium' },
