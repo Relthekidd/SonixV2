@@ -1,5 +1,8 @@
 import { supabase } from './supabase';
 
+// Base URL for any REST endpoints if needed
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
+
 // Define types for album and track details
 export interface TrackData {
   id: string;
@@ -23,6 +26,45 @@ export interface AlbumDetails {
 }
 
 class ApiService {
+  private authToken = '';
+  private unauthorizedCallback: (() => void) | null = null;
+
+  /**
+   * Set the authorization token used for REST requests
+   */
+  setAuthToken(token: string) {
+    this.authToken = token;
+  }
+
+  /**
+   * Register a callback for unauthorized responses
+   */
+  setOnUnauthorizedCallback(cb: () => void) {
+    this.unauthorizedCallback = cb;
+  }
+
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+    const res = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}),
+        ...(options.headers || {}),
+      },
+    });
+
+    if (res.status === 401 && this.unauthorizedCallback) {
+      this.unauthorizedCallback();
+    }
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || `Request failed with status ${res.status}`);
+    }
+
+    const data = await res.json().catch(() => ({}));
+    return (data.data ?? data) as T;
+  }
   /**
    * Fetch album by ID, including its tracks
    */
