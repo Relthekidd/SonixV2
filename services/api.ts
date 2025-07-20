@@ -89,22 +89,4 @@ class ApiService {
           like_count,
           lyrics
         )
-      `
       )
-      .eq('id', id)
-      .single();
-
-    if (error) {
-      throw error;
-    }
-    if (!data) {
-      throw new Error(`Album with ID ${id} not found`);
-    }
-    // Type assertion since Supabase returns untyped data
-    return data as AlbumDetails;
-  }
-
-  // ... add other API methods here (e.g., search, getTrackById, etc.)
-}
-
-export const apiService = new ApiService();
