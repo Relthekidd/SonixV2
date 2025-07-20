@@ -66,3 +66,10 @@ export async function deleteFile(
     throw new Error(`Failed to delete file: ${error.message}`);
   }
 }
+
+/** Convenience object for easier imports */
+export const supabaseStorage = {
+  uploadAudio,
+  uploadImage,
+  deleteFile,
+};
