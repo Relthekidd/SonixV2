@@ -82,7 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.log('[Auth] loadUserProfile: no changes, skip');
           return prev;
         }
-        console.log('[Auth] loadUserProfile success, updating');
+        console.log('[Auth] loadUserProfile success, role:', data.role);
         return data as Profile;
       });
     } catch (err) {

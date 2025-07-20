@@ -143,9 +143,9 @@ export default function AdminScreen() {
   }
 
   const quickActions = [
-    { label: 'Upload Content', icon: Upload, route: '/admin/upload' },
-    { label: 'View Uploads', icon: Plus, route: '/admin/uploads' },
-    { label: 'Manage Artists', icon: Users, route: '/admin/artists' },
+    { label: 'Upload Single', icon: Upload, route: '/admin/upload?type=single' },
+    { label: 'Upload Album', icon: Plus, route: '/admin/upload?type=album' },
+    { label: 'View Uploads', icon: Music, route: '/admin/uploads' },
   ] as const;
 
   const statsCards = [

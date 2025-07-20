@@ -31,6 +31,7 @@ function SearchScreen() {
   });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const {
     currentTrack,
@@ -63,6 +64,7 @@ function SearchScreen() {
 
   const handleSearch = async (searchQuery: string) => {
     setIsSearching(true);
+    setErrorMessage(null);
     try {
       const musicResults = await searchMusic(searchQuery);
       setResults({
@@ -72,6 +74,9 @@ function SearchScreen() {
         artists: musicResults.artists || [],
         users: musicResults.users || [],
       });
+    } catch (err) {
+      console.error('search error', err);
+      setErrorMessage('Something went wrong');
     } finally {
       setIsSearching(false);
     }
@@ -166,6 +171,12 @@ function SearchScreen() {
         </View>
       )}
 
+      {errorMessage && !isSearching && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      )}
+
       {!isSearching && (
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {query.trim() === '' ? (
@@ -247,6 +258,8 @@ const styles = StyleSheet.create({
   searchInput: { flex:1, marginLeft:8, color:'#fff' },
   loadingContainer: { flex:1, justifyContent:'center', alignItems:'center' },
   loadingText: { color:'#94a3b8', marginTop:12 },
+  errorContainer: { padding:24, alignItems:'center' },
+  errorText: { color:'#ef4444' },
   content: { flex:1 },
   section: { marginBottom:32, paddingHorizontal:24 },
   sectionTitle: { fontSize:20, color:'#fff', marginBottom:16 },

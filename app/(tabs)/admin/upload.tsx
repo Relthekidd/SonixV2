@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+
+export const unstable_settings = { href: null };
 import {
   View,
   Text,
