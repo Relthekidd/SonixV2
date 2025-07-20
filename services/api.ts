@@ -116,6 +116,82 @@ class ApiService {
     }
   }
 
+  /**
+   * Fetch track by ID with related artist and album
+   */
+  async getTrackById(id: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('tracks')
+      .select(
+        `*, artist:artist_id(*), album:album_id(*)`
+      )
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Get artist info */
+  async getArtistById(id: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('artists')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Get tracks for an artist */
+  async getArtistTracks(id: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('tracks')
+      .select('*')
+      .eq('artist_id', id)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data || [];
+  }
+
+  /** Recent uploads across singles, albums and tracks */
+  async getRecentUploads() {
+    const [singles, albums, tracks] = await Promise.all([
+      supabase.from('singles').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('albums').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase.from('tracks').select('*').order('created_at', { ascending: false }).limit(20),
+    ]);
+    return {
+      singles: singles.data || [],
+      albums: albums.data || [],
+      tracks: tracks.data || [],
+    };
+  }
+
+  /** Publish a track */
+  async publishTrack(id: string) {
+    const { error } = await supabase
+      .from('tracks')
+      .update({ is_published: true })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Unpublish a track */
+  async unpublishTrack(id: string) {
+    const { error } = await supabase
+      .from('tracks')
+      .update({ is_published: false })
+      .eq('id', id);
+    if (error) throw error;
+  }
+
+  /** Delete uploaded content by type */
+  async deleteContent(type: 'single' | 'album' | 'track', id: string) {
+    const table = type === 'album' ? 'albums' : type === 'single' ? 'singles' : 'tracks';
+    const { error } = await supabase.from(table).delete().eq('id', id);
+    if (error) throw error;
+  }
+
   // If you need to call REST endpoints:
   // async fetchSomeOtherResource() {
   //   return this.request<SomeType>('/some-endpoint');

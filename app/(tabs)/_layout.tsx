@@ -112,9 +112,6 @@ if (!user) {
           />
         )}
 
-        {/* Hide admin management screens from tab bar */}
-        <Tabs.Screen name="admin/upload" href={null} />
-        <Tabs.Screen name="admin/uploads" href={null} />
         
         {/* Profile tab - visible to all users */}
         <Tabs.Screen
