@@ -112,8 +112,10 @@ if (!user) {
           />
         )}
 
-        {/* Hide admin management screens from tab bar */}
+        {/* Admin management screens are part of the admin stack but hidden from the tab bar */}
+        {/* @ts-ignore expo-router href prop */}
         <Tabs.Screen name="admin/upload" href={null} />
+        {/* @ts-ignore expo-router href prop */}
         <Tabs.Screen name="admin/uploads" href={null} />
         
         {/* Profile tab - visible to all users */}
