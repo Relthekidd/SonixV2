@@ -2,7 +2,14 @@ import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { useEffect } from 'react';
 import { router } from 'expo-router';
-import { Chrome as Home, Search, Library, User, Upload, Settings } from 'lucide-react-native';
+import {
+  Chrome as Home,
+  Search,
+  Library,
+  User,
+  Upload,
+  Settings,
+} from 'lucide-react-native';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { View, StyleSheet } from 'react-native';
 
@@ -79,8 +86,8 @@ if (!user) {
           }}
         />
         
-        {/* Artist Dashboard - only visible to verified artists (NOT admins) */}
-        {user.role === 'artist' && user.artistVerified && (
+        {/* Artist Dashboard - only visible to artists */}
+        {user?.role === 'artist' && (
           <Tabs.Screen
             name="artist-dashboard"
             options={{
@@ -91,9 +98,9 @@ if (!user) {
             }}
           />
         )}
-        
+
         {/* Admin Dashboard - only visible to admins */}
-        {user.role === 'admin' && (
+        {user?.role === 'admin' && (
           <Tabs.Screen
             name="admin"
             options={{
@@ -104,6 +111,12 @@ if (!user) {
             }}
           />
         )}
+
+        {/* Admin management screens are part of the admin stack but hidden from the tab bar */}
+        {/* @ts-ignore expo-router href prop */}
+        <Tabs.Screen name="admin/upload" href={null} />
+        {/* @ts-ignore expo-router href prop */}
+        <Tabs.Screen name="admin/uploads" href={null} />
         
         {/* Profile tab - visible to all users */}
         <Tabs.Screen
