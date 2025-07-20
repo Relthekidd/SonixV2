@@ -1,4 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
 import { createClient, Session } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { apiService } from '../services/api';
@@ -53,6 +60,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hasUser = !isLoading && !!user && !!session;
   const userId = session?.user?.id || null;
 
+  const prevTokenRef = useRef<string | null>(null);
+  const prevUidRef = useRef<string | null>(null);
+
   const loadUserProfile = useCallback(async (uid: string) => {
     console.log('[Auth] loadUserProfile start for', uid);
     try {
@@ -81,6 +91,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const syncSession = useCallback(
+    async (sess: Session | null) => {
+      setSession(sess);
+
+      const token = sess?.access_token ?? null;
+      if (token && prevTokenRef.current !== token) {
+        apiService.setAuthToken(token);
+        prevTokenRef.current = token;
+      } else if (!token) {
+        apiService.setAuthToken('');
+        prevTokenRef.current = null;
+      }
+
+      const uid = sess?.user?.id;
+      if (uid && prevUidRef.current !== uid) {
+        prevUidRef.current = uid;
+        await loadUserProfile(uid);
+      }
+    },
+    [loadUserProfile]
+  );
+
   const login = useCallback(
     async (email: string, password: string) => {
       console.log('[Auth] login start', email);
@@ -90,13 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] signInWithPassword result', { data, error });
         if (error) throw error;
 
-        const newSession = data.session!;
-        setSession(newSession);
-        apiService.setAuthToken(newSession.access_token);
-
-        if (newSession.user?.id) {
-          await loadUserProfile(newSession.user.id);
-        }
+        await syncSession(data.session!);
       } catch (err) {
         console.error('[Auth] login error', err);
         throw err;
@@ -105,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] login end');
       }
     },
-    [loadUserProfile]
+    [syncSession]
   );
 
   const signup = useCallback(
@@ -151,8 +177,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) throw error;
 
       setUser(null);
-      setSession(null);
-      apiService.setAuthToken('');
+      prevUidRef.current = null;
+      prevTokenRef.current = null;
+      await syncSession(null);
     } catch (err) {
       console.error('[Auth] logout error', err);
       throw err;
@@ -160,7 +187,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(false);
       console.log('[Auth] logout end');
     }
-  }, []);
+  }, [syncSession]);
 
   const updateProfile = useCallback(
     async (updates: Partial<Profile>) => {
@@ -220,18 +247,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     // Initial session fetch
-    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
       console.log('[Auth] initial getSession', initialSession);
       if (!mounted) return;
-      setSession(initialSession);
-      apiService.setAuthToken(initialSession?.access_token ?? '');
-      if (initialSession?.user?.id) {
-        loadUserProfile(initialSession.user.id).finally(() => {
-          if (mounted) setIsLoading(false);
-        });
-      } else {
-        setIsLoading(false);
-      }
+      await syncSession(initialSession);
+      setIsLoading(false);
     });
 
     // Listen to auth events
@@ -242,27 +262,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       switch (event) {
         case 'SIGNED_IN':
         case 'INITIAL_SESSION':
-          setSession(sess);
-          apiService.setAuthToken(sess!.access_token);
-          if (sess?.user?.id) {
-            loadUserProfile(sess.user.id).finally(() => {
-              if (mounted) setIsLoading(false);
-            });
-          } else {
-            setIsLoading(false);
-          }
+          syncSession(sess).finally(() => {
+            if (mounted) setIsLoading(false);
+          });
           break;
 
         case 'SIGNED_OUT':
-          setSession(null);
           setUser(null);
-          apiService.setAuthToken('');
-          setIsLoading(false);
+          prevUidRef.current = null;
+          prevTokenRef.current = null;
+          syncSession(null).finally(() => setIsLoading(false));
           break;
 
         case 'TOKEN_REFRESHED':
-          setSession(sess);
-          apiService.setAuthToken(sess!.access_token);
+          syncSession(sess);
           break;
 
         default:
@@ -275,7 +288,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscription.unsubscribe();
       apiService.setOnUnauthorizedCallback(() => {});
     };
-  }, [logout, loadUserProfile]);
+  }, [logout, syncSession]);
 
   return (
     <AuthContext.Provider
