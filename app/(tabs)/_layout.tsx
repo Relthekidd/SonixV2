@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { router } from 'expo-router';
 import {
   Chrome as Home,
@@ -15,6 +15,7 @@ import { View, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const { user, isLoading } = useAuth();
+  const role = user?.role;
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -22,15 +23,31 @@ export default function TabLayout() {
     }
   }, [user, isLoading]);
 
-  if (isLoading) {
-  return null; // Or <LoadingScreen />
-}
+  useEffect(() => {
+    if (user) {
+      console.log('[Tabs] user role', role);
+    }
+  }, [role, user]);
 
-if (!user) {
-  router.replace('/(auth)/login');
-  return null;
-}
+  if (isLoading || !user) {
+    return null; // Or <LoadingScreen />
+  }
 
+  const screens = [
+    { name: 'index', title: 'Home', icon: Home },
+    { name: 'search', title: 'Search', icon: Search },
+    { name: 'library', title: 'Library', icon: Library },
+  ];
+
+  if (role === 'artist') {
+    screens.push({ name: 'artist-dashboard', title: 'Upload', icon: Upload });
+  }
+
+  if (role === 'admin') {
+    screens.push({ name: 'admin', title: 'Admin', icon: Settings });
+  }
+
+  screens.push({ name: 'profile', title: 'Profile', icon: User });
 
   return (
     <View style={styles.container}>
@@ -53,76 +70,18 @@ if (!user) {
           },
         }}
       >
-        {/* Home tab - visible to all users */}
-        <Tabs.Screen
-          name="index"
-          options={{
-            title: 'Home',
-            tabBarIcon: ({ size, color }) => (
-              <Home size={size} color={color} />
-            ),
-          }}
-        />
-        
-        {/* Search tab - visible to all users */}
-        <Tabs.Screen
-          name="search"
-          options={{
-            title: 'Search',
-            tabBarIcon: ({ size, color }) => (
-              <Search size={size} color={color} />
-            ),
-          }}
-        />
-        
-        {/* Library tab - visible to all users */}
-        <Tabs.Screen
-          name="library"
-          options={{
-            title: 'Library',
-            tabBarIcon: ({ size, color }) => (
-              <Library size={size} color={color} />
-            ),
-          }}
-        />
-        
-        {/* Artist Dashboard - only visible to artists */}
-        {user?.role === 'artist' && (
+        {screens.map(({ name, title, icon: Icon }) => (
           <Tabs.Screen
-            name="artist-dashboard"
+            key={name}
+            name={name}
             options={{
-              title: 'Upload',
+              title,
               tabBarIcon: ({ size, color }) => (
-                <Upload size={size} color={color} />
+                <Icon size={size} color={color} />
               ),
             }}
           />
-        )}
-
-        {/* Admin Dashboard - only visible to admins */}
-        {user?.role === 'admin' && (
-          <Tabs.Screen
-            name="admin"
-            options={{
-              title: 'Admin',
-              tabBarIcon: ({ size, color }) => (
-                <Settings size={size} color={color} />
-              ),
-            }}
-          />
-        )}
-
-        
-        {/* Profile tab - visible to all users */}
-        <Tabs.Screen
-          name="profile"
-          options={{
-            title: 'Profile',
-            tabBarIcon: ({ size, color }) => (
-              <User size={size} color={color} />
-            ),
-          }}
-        />
+        ))}
       </Tabs>
       <MiniPlayer />
     </View>
