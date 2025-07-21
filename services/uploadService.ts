@@ -17,6 +17,8 @@ export interface SingleUploadData {
   featuredArtistIds: string[];
   coverFile?: { uri: string; name?: string; type?: string };
   audioFile: { uri: string; name?: string; type?: string };
+  isPublished?: boolean;
+  scheduledPublishAt?: string | null;
 }
 
 export interface AlbumUploadData {
@@ -38,6 +40,8 @@ export interface AlbumUploadData {
     featuredArtistIds: string[];
     audioFile: { uri: string; name?: string; type?: string };
   }>;
+  isPublished?: boolean;
+  scheduledPublishAt?: string | null;
 }
 
 export interface UploadPermissions {
@@ -197,6 +201,8 @@ class UploadService {
           description: data.description || '',
           audio_url: audioUrl,
           cover_url: coverUrl,
+          is_published: data.isPublished ?? false,
+          scheduled_publish_at: data.scheduledPublishAt ?? null,
         });
       if (error) {
         console.error('[UploadService] supabase.insert track error', error);
@@ -237,6 +243,8 @@ class UploadService {
           created_by: data.artistId,
           featured_artist_ids: data.featuredArtistIds,
           cover_url: coverUrl,
+          is_published: data.isPublished ?? false,
+          scheduled_publish_at: data.scheduledPublishAt ?? null,
         });
       if (albumError) {
         console.error('[UploadService] supabase.insert album error', albumError);
@@ -269,6 +277,8 @@ class UploadService {
             description: data.description || '',
             audio_url: audioUrl,
             cover_url: null,
+            is_published: data.isPublished ?? false,
+            scheduled_publish_at: data.scheduledPublishAt ?? null,
           });
         if (trackError) {
           console.error('[UploadService] supabase.insert track for album error', trackError);
