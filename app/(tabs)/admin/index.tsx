@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
@@ -21,6 +22,7 @@ import {
   Plus,
   TrendingUp,
   CirclePlay as PlayCircle,
+  Check,
 } from 'lucide-react-native';
 
 interface AdminStats {
@@ -160,17 +162,18 @@ export default function AdminScreen() {
       colors={['#0f172a', '#111827', '#0b1120']}
       style={styles.container}
     >
-      <ScrollView
-        style={styles.scrollView}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8b5cf6"
-            colors={['#8b5cf6']}
-          />
-        }
-      >
+      <SafeAreaView style={styles.safeArea} edges={['bottom']}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#8b5cf6"
+              colors={['#8b5cf6']}
+            />
+          }
+        >
         <View style={styles.header}>
           <Text style={styles.title}>Admin Dashboard</Text>
           <Text style={styles.subtitle}>Overview & Tools</Text>
@@ -204,7 +207,9 @@ export default function AdminScreen() {
           <View style={styles.statsGrid}>
             {statsCards.map((card) => (
               <View key={card.title} style={styles.card}>
-                <View style={styles.cardIcon}><card.icon color="#8b5cf6" size={24} /></View>
+                <View style={styles.cardIcon}>
+                  <card.icon color="#8b5cf6" size={24} />
+                </View>
                 <Text style={styles.cardValue}>{card.value.toLocaleString()}</Text>
                 <Text style={styles.cardTitle}>{card.title}</Text>
                 <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
@@ -213,15 +218,39 @@ export default function AdminScreen() {
           </View>
         </View>
 
-      </ScrollView>
-      <View style={styles.bottomPadding} />
+        {/* Admin Tools */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Admin Tools</Text>
+          <View style={styles.toolsList}>
+            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/uploads')}>
+              <Music color="#8b5cf6" size={20} />
+              <Text style={styles.toolText}>Manage Tracks</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/verify-artists')}>
+              <Check color="#8b5cf6" size={20} />
+              <Text style={styles.toolText}>Artist Verification</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/users')}>
+              <Users color="#8b5cf6" size={20} />
+              <Text style={styles.toolText}>User Management</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/analytics')}>
+              <BarChart3 color="#8b5cf6" size={20} />
+              <Text style={styles.toolText}>Analytics</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollView: { flex: 1 },
+  safeArea: { flex: 1 },
+  scrollContent: { paddingBottom: 120 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { fontSize: 16, color: '#94a3b8', marginTop: 12 },
   header: { padding: 24, paddingTop: 60 },
@@ -268,5 +297,7 @@ const styles = StyleSheet.create({
   cardValue: { fontSize: 22, color: '#fff', fontFamily: 'Poppins-Bold' },
   cardTitle: { fontSize: 14, color: '#94a3b8', fontFamily: 'Inter-Medium' },
   cardSubtitle: { fontSize: 12, color: '#10b981' },
-  bottomPadding: { height: 120 },
+  toolsList: { gap: 12 },
+  toolItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  toolText: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
 });

@@ -6,212 +6,169 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  TextInput,
   Switch,
-  Alert,
   ActivityIndicator,
-  FlatList,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useAuth, supabase } from '@/providers/AuthProvider';
 import { useMusic } from '@/providers/MusicProvider';
-import { router } from 'expo-router';
-import { withAuthGuard } from '@/hoc/withAuthGuard';
-import { 
-  Edit3, 
-  Settings, 
-  LogOut, 
-  User as UserIcon, 
-  Mail, 
-  Eye, 
-  EyeOff, 
-  Camera, 
-  Save, 
-  X, 
-  Users,
-  Music,
-  Heart,
-  Calendar,
-  Lock,
-  Globe,
-  Play,
-  Pause,
-  Check,
-  AlertCircle
-} from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { uploadImage } from '@/services/supabaseStorage';
+import { Edit3, LogOut, Play, Pause } from 'lucide-react-native';
 
 interface UserProfile {
   id: string;
   display_name: string;
-  first_name?: string;
-  last_name?: string;
   bio?: string;
   profile_picture_url?: string;
   is_private: boolean;
   follower_count: number;
   following_count: number;
-  created_at: string;
   top_artists: any[];
   top_songs: any[];
-  status_text?: string;
-  pinned_content_type?: string;
-  pinned_content_id?: string;
-  profile_completed?: boolean;
-}
-
-interface ProfileFormData {
-  displayName: string;
-  firstName: string;
-  lastName: string;
-  bio: string;
-  isPrivate: boolean;
-  statusText: string;
 }
 
 function ProfileScreen() {
-  const { user, logout, updateProfile } = useAuth();
+  const { user, logout } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<any>(null);
-  const [showSetupPrompt, setShowSetupPrompt] = useState(false);
-
-  const [formData, setFormData] = useState<ProfileFormData>({
-    displayName: '',
-    firstName: '',
-    lastName: '',
-    bio: '',
-    isPrivate: false,
-    statusText: '',
-  });
-  const [formErrors, setFormErrors] = useState<Partial<ProfileFormData>>({});
+  const [isPrivate, setIsPrivate] = useState(false);
 
   useEffect(() => {
-    if (user && profile) {
-      setFormData({
-        displayName: profile.display_name || user.displayName || '',
-        firstName: profile.first_name || user.firstName || '',
-        lastName: profile.last_name || user.lastName || '',
-        bio: profile.bio || user.bio || '',
-        isPrivate: profile.is_private || user.isPrivate || false,
-        statusText: profile.status_text || '',
-      });
-    }
-  }, [user, profile]);
-
-  useEffect(() => {
-    if (user) loadUserProfile();
+    if (user) loadProfile();
   }, [user]);
 
-  useEffect(() => {
-    if (profile && !isLoading) {
-      setShowSetupPrompt(!profile.display_name || !profile.bio);
-    }
-  }, [profile, isLoading]);
-
-  const loadUserProfile = async () => {
+  const loadProfile = async () => {
     if (!user) return;
+    setIsLoading(true);
     try {
-      setIsLoading(true);
-      const { data, error } = await supabase
-        .rpc('get_user_profile_with_stats', { target_user_id: user!.id });
-      if (error) { Alert.alert('Error', 'Failed to load profile'); return; }
-      if (data?.length) setProfile(data[0]);
-      else await createInitialProfile();
-    } catch {
+      const { data, error } = await supabase.rpc('get_user_profile_with_stats', {
+        target_user_id: user.id,
+      });
+      if (error) throw error;
+      if (data && data.length) {
+        const p = data[0] as UserProfile;
+        setProfile(p);
+        setIsPrivate(p.is_private);
+      }
+    } catch (err) {
       Alert.alert('Error', 'Failed to load profile');
-    } finally { setIsLoading(false); }
-  };
-
-  const createInitialProfile = async () => {
-    if (!user) return;
-    await supabase.from('profiles').insert({$1id: user!.id,
-      display_name: user.displayName || 'User',
-      is_private: false,
-      profile_completed: false,
-    });
-    loadUserProfile();
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadUserProfile();
+    await loadProfile();
     setIsRefreshing(false);
   }, []);
 
-  const validateForm = (): boolean => {
-    const errs: Partial<ProfileFormData> = {};
-    if (!formData.displayName.trim()) errs.displayName = 'Required';
-    if (formData.bio.length > 500) errs.bio = 'Max 500 chars';
-    if (formData.statusText.length > 200) errs.statusText = 'Max 200 chars';
-    setFormErrors(errs);
-    return !Object.keys(errs).length;
+  const togglePrivacy = async () => {
+    if (!user) return;
+    const newVal = !isPrivate;
+    setIsPrivate(newVal);
+    await supabase.from('profiles').update({ is_private: newVal }).eq('id', user.id);
   };
 
-  const updateFormData = (field: keyof ProfileFormData, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (formErrors[field]) setFormErrors(prev => ({ ...prev, [field]: undefined }));
-  };
-
-  const pickAvatar = async () => {
-    const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, aspect: [1,1] });
-    if (!res.canceled) setAvatarFile(res.assets[0]);
-  };
-
-  const handleSaveProfile = async () => {
-    if (!validateForm()) return Alert.alert('Fix errors');
-    setIsSaving(true);
-    let avatarUrl = profile?.profile_picture_url;
-    if (avatarFile && user) {
-      const ext = avatarFile.name?.split('.').pop() || 'jpg';
-      const { url } = await uploadImage(avatarFile, `images/avatars/${user!.id}.${ext}`);
-      avatarUrl = url;
-    }
-    await supabase.from('profiles').update({
-      display_name: formData.displayName,
-      first_name: formData.firstName,
-      last_name: formData.lastName,
-      bio: formData.bio,
-      is_private: formData.isPrivate,
-      profile_picture_url: avatarUrl,
-      status_text: formData.statusText || null,
-      profile_completed: true,
-    }) .eq('id', user!.id);
-    await updateProfile({ displayName: formData.displayName, firstName: formData.firstName, lastName: formData.lastName, bio: formData.bio, isPrivate: formData.isPrivate, profile_picture_url: avatarUrl });
-    setIsEditing(false);
-    setAvatarFile(null);
-    setShowSetupPrompt(false);
-    loadUserProfile();
-    setIsSaving(false);
-    Alert.alert('Success','Profile updated!');
-  };
-
-  const handleLogout = () => Alert.alert('Logout','Sure?',[{ text:'Cancel'},{ text:'Logout', onPress:logout }]);
   const handleTrackPress = (track: any) => {
-    if (currentTrack?.id===track.id) isPlaying ? pauseTrack() : playTrack(track, profile?.top_songs||[]);
-    else playTrack(track, profile?.top_songs||[]);
+    if (currentTrack?.id === track.id) {
+      isPlaying ? pauseTrack() : playTrack(track, profile?.top_songs || []);
+    } else {
+      playTrack(track, profile?.top_songs || []);
+    }
   };
 
-  if (isLoading) return (
-    <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
-      <ActivityIndicator size="large" color="#8b5cf6" />
-    </LinearGradient>
-  );
+  if (isLoading) {
+    return (
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+        <ActivityIndicator size="large" color="#8b5cf6" />
+      </LinearGradient>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+        <View style={styles.centered}> 
+          <Text style={styles.errorText}>Profile not found</Text>
+        </View>
+      </LinearGradient>
+    );
+  }
 
   return (
-    <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
-      <ScrollView refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}>
-        {showSetupPrompt && (
-          <View style={styles.setupPrompt}>{/* ... */}</View>
+    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+      <ScrollView
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Image
+            source={{ uri: profile.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200' }}
+            style={styles.avatar}
+          />
+          <Text style={styles.name}>{profile.display_name}</Text>
+          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+          <TouchableOpacity style={styles.editButton} onPress={() => Alert.alert('Edit Profile')}>
+            <Edit3 color="#fff" size={16} />
+            <Text style={styles.editText}>Edit Profile</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Favorites */}
+        {profile.top_songs?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Favorite Songs</Text>
+            {profile.top_songs.slice(0,5).map((song) => (
+              <TouchableOpacity key={song.id} style={styles.songRow} onPress={() => handleTrackPress(song)}>
+                <Image source={{ uri: song.cover_url }} style={styles.songCover} />
+                <View style={styles.songInfo}>
+                  <Text style={styles.songTitle} numberOfLines={1}>{song.title}</Text>
+                  <Text style={styles.songArtist} numberOfLines={1}>{song.artist}</Text>
+                </View>
+                <TouchableOpacity>
+                  {currentTrack?.id === song.id && isPlaying ? (
+                    <Pause color="#8b5cf6" size={20} />
+                  ) : (
+                    <Play color="#8b5cf6" size={20} />
+                  )}
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
-        {/* rest of profile UI... */}
+
+        {profile.top_artists?.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Followed Artists</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {profile.top_artists.slice(0,5).map((artist) => (
+                <View key={artist.id} style={styles.artistCard}>
+                  <Image source={{ uri: artist.avatar_url }} style={styles.artistAvatar} />
+                  <Text style={styles.artistName} numberOfLines={1}>{artist.name}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Settings</Text>
+          <View style={styles.settingRow}>
+            <Text style={styles.settingLabel}>Private Account</Text>
+            <Switch value={isPrivate} onValueChange={togglePrivacy} />
+          </View>
+          <TouchableOpacity style={styles.settingRow} onPress={logout}>
+            <LogOut color="#ef4444" size={20} />
+            <Text style={[styles.settingLabel, { color: '#ef4444', marginLeft: 8 }]}>Logout</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
@@ -219,9 +176,27 @@ function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  loadingContainer: { flex:1,justifyContent:'center',alignItems:'center' },
-  setupPrompt: { padding:20, backgroundColor:'rgba(245,158,11,0.1)', margin:16, borderRadius:12 },
-  /* ... include all other needed style definitions from original file ... */
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  errorText: { color: '#fff' },
+  scrollContent: { paddingBottom: 120 },
+  header: { alignItems: 'center', padding: 24, paddingTop: 60 },
+  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
+  name: { fontSize: 24, fontFamily: 'Poppins-Bold', color: '#fff' },
+  bio: { color: '#94a3b8', fontFamily: 'Inter-Regular', textAlign: 'center', marginTop: 8 },
+  editButton: { flexDirection: 'row', alignItems: 'center', marginTop: 16, backgroundColor: 'rgba(255,255,255,0.1)', padding: 8, borderRadius: 20 },
+  editText: { color: '#fff', fontFamily: 'Inter-Medium', marginLeft: 6 },
+  section: { marginBottom: 32, paddingHorizontal: 24 },
+  sectionTitle: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: '#fff', marginBottom: 16 },
+  songRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, backgroundColor: 'rgba(255,255,255,0.05)', padding: 12, borderRadius: 12 },
+  songCover: { width: 50, height: 50, borderRadius: 6 },
+  songInfo: { flex: 1, marginLeft: 12 },
+  songTitle: { color: '#fff', fontFamily: 'Inter-SemiBold' },
+  songArtist: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 12 },
+  artistCard: { alignItems: 'center', marginRight: 16, width: 80 },
+  artistAvatar: { width: 60, height: 60, borderRadius: 30, marginBottom: 8 },
+  artistName: { color: '#fff', fontSize: 12, textAlign: 'center' },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  settingLabel: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
 });
 
 export default withAuthGuard(ProfileScreen);
