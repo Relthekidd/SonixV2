@@ -222,21 +222,21 @@ export default function AdminScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Admin Tools</Text>
           <View style={styles.toolsList}>
-            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/uploads')}>
-              <Music color="#8b5cf6" size={20} />
-              <Text style={styles.toolText}>Manage Tracks</Text>
+            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/uploads')}>
+              <Music color="#8b5cf6" size={24} />
+              <Text style={styles.toolText}>Manage Uploads</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/verify-artists')}>
-              <Check color="#8b5cf6" size={20} />
-              <Text style={styles.toolText}>Artist Verification</Text>
+            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/verify-artists')}>
+              <Check color="#8b5cf6" size={24} />
+              <Text style={styles.toolText}>Verify Artists</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/users')}>
-              <Users color="#8b5cf6" size={20} />
-              <Text style={styles.toolText}>User Management</Text>
+            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/users')}>
+              <Users color="#8b5cf6" size={24} />
+              <Text style={styles.toolText}>Manage Users</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.toolItem} onPress={() => router.push('/admin/analytics')}>
-              <BarChart3 color="#8b5cf6" size={20} />
-              <Text style={styles.toolText}>Analytics</Text>
+            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/analytics')}>
+              <BarChart3 color="#8b5cf6" size={24} />
+              <Text style={styles.toolText}>View Analytics</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -298,6 +298,15 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 14, color: '#94a3b8', fontFamily: 'Inter-Medium' },
   cardSubtitle: { fontSize: 12, color: '#10b981' },
   toolsList: { gap: 12 },
-  toolItem: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  toolCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 12,
+  },
   toolText: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
 });
