@@ -176,7 +176,7 @@ export default function UploadScreen() {
   return (
     <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.toggleRow}>
+        <View style={[styles.section, styles.toggleRow]}>
           {['single', 'album'].map((t) => (
             <TouchableOpacity
               key={t}
@@ -187,54 +187,89 @@ export default function UploadScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <TextInput
-          style={styles.input}
-          placeholder="Title"
-          placeholderTextColor="#64748b"
-          value={title}
-          onChangeText={setTitle}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Description"
-          placeholderTextColor="#64748b"
-          value={description}
-          onChangeText={setDescription}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Release Date"
-          placeholderTextColor="#64748b"
-          value={releaseDate}
-          onChangeText={setReleaseDate}
-        />
-        <ArtistAutocomplete onArtistSelect={setMainArtist} />
-        <TouchableOpacity style={styles.fileBtn} onPress={pickCover}>
-          <Text style={styles.fileBtnText}>{coverFile ? 'Change Cover' : 'Pick Cover Image'}</Text>
-        </TouchableOpacity>
-        {mode === 'single' && (
-          <TouchableOpacity style={styles.fileBtn} onPress={pickSingleAudio}>
-            <Text style={styles.fileBtnText}>{audioFile ? 'Change Audio File' : 'Pick Audio File'}</Text>
+        <View style={styles.section}>
+          <Text style={styles.label}>Title</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Title"
+            placeholderTextColor="#64748b"
+            value={title}
+            onChangeText={setTitle}
+          />
+          <Text style={styles.label}>Description</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Description"
+            placeholderTextColor="#64748b"
+            value={description}
+            onChangeText={setDescription}
+          />
+          <Text style={styles.label}>Release Date</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Release Date"
+            placeholderTextColor="#64748b"
+            value={releaseDate}
+            onChangeText={setReleaseDate}
+          />
+          <ArtistAutocomplete onArtistSelect={setMainArtist} />
+        </View>
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.fileBtn} onPress={pickCover}>
+            <Text style={styles.fileBtnText}>
+              {coverFile ? 'Change Cover' : 'Pick Cover Image'}
+            </Text>
           </TouchableOpacity>
+          {coverFile && (
+            <Text style={styles.fileNameText}>
+              {coverFile.name || coverFile.uri.split('/').pop()}
+            </Text>
+          )}
+        </View>
+        {mode === 'single' && (
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.fileBtn} onPress={pickSingleAudio}>
+              <Text style={styles.fileBtnText}>
+                {audioFile ? 'Change Audio File' : 'Pick Audio File'}
+              </Text>
+            </TouchableOpacity>
+            {audioFile && (
+              <Text style={styles.fileNameText}>
+                {audioFile.name || audioFile.uri.split('/').pop()}
+              </Text>
+            )}
+          </View>
         )}
         {mode === 'album' && (
-          <View style={{ width: '100%' }}>
+          <View style={[styles.section, { width: '100%' }]}>
             {tracks.map((t, idx) => (
-              <View key={idx} style={styles.trackRow}>
-                <TextInput
-                  style={[styles.input, { flex: 1 }]}
-                  placeholder={`Track ${idx + 1} Title`}
-                  placeholderTextColor="#64748b"
-                  value={t.title}
-                  onChangeText={(val) => {
-                    const arr = [...tracks];
-                    arr[idx].title = val;
-                    setTracks(arr);
-                  }}
-                />
-                <TouchableOpacity onPress={() => pickTrackAudio(idx)} style={styles.fileBtnSmall}>
-                  <Text style={styles.fileBtnText}>{t.audioFile ? 'Replace' : 'Audio'}</Text>
-                </TouchableOpacity>
+              <View key={idx} style={styles.trackContainer}>
+                <View style={styles.trackRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder={`Track ${idx + 1} Title`}
+                    placeholderTextColor="#64748b"
+                    value={t.title}
+                    onChangeText={(val) => {
+                      const arr = [...tracks];
+                      arr[idx].title = val;
+                      setTracks(arr);
+                    }}
+                  />
+                  <TouchableOpacity
+                    onPress={() => pickTrackAudio(idx)}
+                    style={styles.fileBtnSmall}
+                  >
+                    <Text style={styles.fileBtnText}>
+                      {t.audioFile ? 'Replace' : 'Audio'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {t.audioFile && (
+                  <Text style={styles.fileNameText}>
+                    {t.audioFile.name || t.audioFile.uri.split('/').pop()}
+                  </Text>
+                )}
               </View>
             ))}
             <TouchableOpacity style={styles.fileBtn} onPress={addTrack}>
@@ -242,23 +277,27 @@ export default function UploadScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <TextInput
-          style={styles.input}
-          placeholder="Duration (sec)"
-          placeholderTextColor="#64748b"
-          keyboardType="numeric"
-          value={duration}
-          onChangeText={setDuration}
-        />
-        <TextInput
-          style={[styles.input, { height: 80 }]}
-          placeholder="Lyrics"
-          placeholderTextColor="#64748b"
-          value={lyrics}
-          onChangeText={setLyrics}
-          multiline
-        />
-        <View style={styles.publishRow}>
+        <View style={styles.section}>
+          <Text style={styles.label}>Duration (sec)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Duration"
+            placeholderTextColor="#64748b"
+            keyboardType="numeric"
+            value={duration}
+            onChangeText={setDuration}
+          />
+          <Text style={styles.label}>Lyrics</Text>
+          <TextInput
+            style={[styles.input, { height: 80 }]}
+            placeholder="Lyrics"
+            placeholderTextColor="#64748b"
+            value={lyrics}
+            onChangeText={setLyrics}
+            multiline
+          />
+        </View>
+        <View style={[styles.section, styles.publishRow]}>
           <Text style={styles.toggleText}>Publish now</Text>
           <Switch value={publish} onValueChange={setPublish} />
         </View>
@@ -305,7 +344,8 @@ export default function UploadScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20 },
-  toggleRow: { flexDirection: 'row', marginBottom: 20 },
+  section: { marginBottom: 20, width: '100%' },
+  toggleRow: { flexDirection: 'row' },
   toggleBtn: {
     flex: 1,
     padding: 12,
@@ -316,6 +356,7 @@ const styles = StyleSheet.create({
   },
   toggleBtnActive: { backgroundColor: 'rgba(139,92,246,0.3)' },
   toggleText: { color: '#fff' },
+  label: { color: '#cbd5e1', marginBottom: 4 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.1)',
     borderRadius: 8,
@@ -337,7 +378,9 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   fileBtnText: { color: '#fff' },
-  trackRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  fileNameText: { color: '#cbd5e1', fontSize: 12, marginTop: 4 },
+  trackContainer: { marginBottom: 12 },
+  trackRow: { flexDirection: 'row', alignItems: 'center' },
   submitBtn: {
     backgroundColor: '#8b5cf6',
     padding: 16,
@@ -346,7 +389,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   submitText: { color: '#fff', fontWeight: '600' },
-  publishRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
+  publishRow: { flexDirection: 'row', alignItems: 'center' },
   adminActions: { flexDirection: 'row', marginTop: 20 },
   actionBtn: {
     backgroundColor: 'rgba(255,255,255,0.1)',

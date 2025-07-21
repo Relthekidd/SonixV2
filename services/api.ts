@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+// Use the global Supabase client from the AuthProvider to ensure
+// authenticated requests have access to the current session.
+import { supabase } from '../providers/AuthProvider';
 
 // Base URL for any REST endpoints if needed
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
