@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+// Use the shared Supabase client from the AuthProvider so uploads are
+// authenticated with the current user session.
+import { supabase } from '../providers/AuthProvider';
 
 /**
  * Upload a file to Supabase Storage and return its public URL

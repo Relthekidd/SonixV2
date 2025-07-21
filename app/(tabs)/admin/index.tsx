@@ -12,7 +12,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { supabase } from '@/services/supabase';
+// Use the shared Supabase client with the active auth session
+import { supabase } from '@/providers/AuthProvider';
 import {
   Users,
   Music,

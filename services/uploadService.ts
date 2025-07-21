@@ -1,6 +1,7 @@
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
-import { supabase } from './supabase';
+// Use the shared Supabase client with persisted auth session
+import { supabase } from '../providers/AuthProvider';
 import { uploadAudio, uploadImage, deleteFile as removeFromStorage } from './supabaseStorage';
 
 export interface SingleUploadData {
