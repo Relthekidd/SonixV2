@@ -38,7 +38,7 @@ export function ArtistAutocomplete({
   const [showSuggestions, setShowSuggestions] = useState<boolean>(false);
 
   // Use a nullable ref to debounce searches
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setQuery(initialValue);

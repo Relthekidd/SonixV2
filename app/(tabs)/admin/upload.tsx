@@ -53,14 +53,14 @@ export default function UploadScreen() {
 
   const pickSingleAudio = async () => {
     const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
-    if (res.type === 'success') setAudioFile(res);
+    if (!res.canceled && res.assets?.[0]) setAudioFile(res.assets[0]);
   };
 
   const pickTrackAudio = async (idx: number) => {
     const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
-    if (res.type === 'success') {
+    if (!res.canceled && res.assets?.[0]) {
       const arr = [...tracks];
-      arr[idx].audioFile = res;
+      arr[idx].audioFile = res.assets[0];
       setTracks(arr);
     }
   };

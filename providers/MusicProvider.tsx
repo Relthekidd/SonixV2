@@ -120,9 +120,11 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  useEffect(() => () => {
-    if (statusSubRef.current) statusSubRef.current();
-    if (soundRef.current) soundRef.current.unloadAsync();
+  useEffect(() => {
+    return () => {
+      if (statusSubRef.current) statusSubRef.current();
+      if (soundRef.current) soundRef.current.unloadAsync();
+    };
   }, []);
 
   useEffect(() => {
@@ -139,14 +141,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         { shouldPlay: true },
       );
       soundRef.current = sound;
-      statusSubRef.current = sound.setOnPlaybackStatusUpdate(
-        (status: AVPlaybackStatus) => {
-          if (!status.isLoaded) return;
-          setIsPlaying(status.isPlaying);
-          setCurrentTime(status.positionMillis / 1000);
-          setDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
-        },
-      );
+      sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
+        if (!status.isLoaded) return;
+        setIsPlaying(status.isPlaying);
+        setCurrentTime(status.positionMillis / 1000);
+        setDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
+      });
+      statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
       setCurrentTrack(track);
       setQueue(queueParam.length ? queueParam : [track]);
     } catch (err) {
