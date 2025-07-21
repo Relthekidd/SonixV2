@@ -83,22 +83,41 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [albums, setAlbums] = useState<Track[]>([]);
 
   const createPlaylist = async (name: string, description = '') => {
-    const newPL: Playlist = { id: Date.now().toString(), name, tracks: [], coverUrl: '' };
-    setPlaylists(prev => [newPL, ...prev]);
+    if (!user) return;
+    const { data, error } = await supabase
+      .from('playlists')
+      .insert({ name, description, user_id: user.id })
+      .select()
+      .single();
+    if (!error && data) {
+      const newPL: Playlist = { id: data.id, name: data.name, tracks: [], coverUrl: data.cover_url || '' };
+      setPlaylists(prev => [newPL, ...prev]);
+    }
   };
 
-  const toggleLike = (trackId: string) => {
-    setLikedSongs(prev => {
-      if (prev.some(t => t.id === trackId)) {
-        return prev.filter(t => t.id !== trackId);
-      }
+  const toggleLike = async (trackId: string) => {
+    if (!user) return;
+    const already = likedSongs.some(t => t.id === trackId);
+    if (already) {
+      await supabase.from('liked_songs').delete().match({ user_id: user.id, track_id: trackId });
+      setLikedSongs(prev => prev.filter(t => t.id !== trackId));
+    } else {
       const track = queue.find(t => t.id === trackId) || currentTrack;
-      return track ? [...prev, track] : prev;
-    });
+      if (track) {
+        await supabase.from('liked_songs').upsert({ user_id: user.id, track_id: trackId });
+        setLikedSongs(prev => [...prev, track]);
+      }
+    }
   };
 
-  const addToPlaylist = (playlistId: string, track: Track) => {
-    setPlaylists(prev => prev.map(pl => pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl));
+  const addToPlaylist = async (playlistId: string, track: Track) => {
+    if (!user) return;
+    await supabase.from('playlist_tracks').upsert({ playlist_id: playlistId, track_id: track.id });
+    setPlaylists(prev =>
+      prev.map(pl =>
+        pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl,
+      ),
+    );
   };
 
   useEffect(() => () => {
@@ -111,12 +130,34 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   const playTrack = async (track: Track, queueParam: Track[] = []) => {
-    setCurrentTrack(track);
-    setQueue(queueParam);
-    setIsPlaying(true);
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: track.audioUrl },
+        { shouldPlay: true },
+      );
+      soundRef.current = sound;
+      statusSubRef.current = sound.setOnPlaybackStatusUpdate(
+        (status: AVPlaybackStatus) => {
+          if (!status.isLoaded) return;
+          setIsPlaying(status.isPlaying);
+          setCurrentTime(status.positionMillis / 1000);
+          setDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
+        },
+      );
+      setCurrentTrack(track);
+      setQueue(queueParam.length ? queueParam : [track]);
+    } catch (err) {
+      console.error('playTrack error', err);
+    }
   };
 
   const pauseTrack = async () => {
+    try {
+      await soundRef.current?.pauseAsync();
+    } catch {}
     setIsPlaying(false);
   };
 
@@ -137,6 +178,33 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     try {
       setTrendingTracks([]);
       setNewReleases([]);
+      if (user) {
+        const [likedRes, playlistRes] = await Promise.all([
+          supabase
+            .from('liked_songs')
+            .select('track:tracks(*)')
+            .eq('user_id', user.id),
+          supabase
+            .from('playlists')
+            .select('id,name,cover_url,playlist_tracks(track:tracks(*))')
+            .eq('user_id', user.id),
+        ]);
+        const liked = (likedRes.data || []).map((r: any) => ({
+          ...r.track,
+          id: r.track.id,
+        })) as Track[];
+        setLikedSongs(liked);
+        const pls = (playlistRes.data || []).map((p: any) => ({
+          id: p.id,
+          name: p.name,
+          coverUrl: p.cover_url || '',
+          tracks: (p.playlist_tracks || []).map((pt: any) => ({
+            ...pt.track,
+            id: pt.track.id,
+          })),
+        }));
+        setPlaylists(pls);
+      }
     } catch (err) {
       setError((err as Error).message);
     } finally {

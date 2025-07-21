@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
@@ -37,6 +38,9 @@ function ProfileScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newBio, setNewBio] = useState('');
 
   useEffect(() => {
     if (user) loadProfile();
@@ -46,14 +50,40 @@ function ProfileScreen() {
     if (!user) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_user_profile_with_stats', {
-        target_user_id: user.id,
-      });
+      const { data, error } = await supabase.rpc(
+        'get_user_profile_with_stats',
+        { target_user_id: user.id },
+      );
       if (error) throw error;
       if (data && data.length) {
         const p = data[0] as UserProfile;
         setProfile(p);
         setIsPrivate(p.is_private);
+        setNewName(p.display_name);
+        setNewBio(p.bio || '');
+        return;
+      }
+      // fallback to basic profile
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      if (prof) {
+        setProfile({
+          id: prof.id,
+          display_name: prof.display_name || prof.email,
+          bio: prof.bio || '',
+          profile_picture_url: prof.avatar_url || '',
+          is_private: prof.is_private || false,
+          follower_count: 0,
+          following_count: 0,
+          top_artists: [],
+          top_songs: [],
+        });
+        setIsPrivate(!!prof.is_private);
+        setNewName(prof.display_name || prof.email);
+        setNewBio(prof.bio || '');
       }
     } catch (err) {
       Alert.alert('Error', 'Failed to load profile');
@@ -113,12 +143,53 @@ function ProfileScreen() {
             source={{ uri: profile.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200' }}
             style={styles.avatar}
           />
-          <Text style={styles.name}>{profile.display_name}</Text>
-          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-          <TouchableOpacity style={styles.editButton} onPress={() => Alert.alert('Edit Profile')}>
-            <Edit3 color="#fff" size={16} />
-            <Text style={styles.editText}>Edit Profile</Text>
-          </TouchableOpacity>
+          {isEditing ? (
+            <>
+              <TextInput
+                style={[styles.input, { marginBottom: 8 }]}
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Display name"
+                placeholderTextColor="#64748b"
+              />
+              <TextInput
+                style={[styles.input, { height: 80 }]}
+                multiline
+                value={newBio}
+                onChangeText={setNewBio}
+                placeholder="Bio"
+                placeholderTextColor="#64748b"
+              />
+              <View style={{ flexDirection: 'row', gap: 12 }}>
+                <TouchableOpacity
+                  style={[styles.editButton, { backgroundColor: '#8b5cf6' }]}
+                  onPress={async () => {
+                    if (!user) return;
+                    await supabase
+                      .from('profiles')
+                      .update({ display_name: newName, bio: newBio })
+                      .eq('id', user.id);
+                    setProfile({ ...(profile as UserProfile), display_name: newName, bio: newBio });
+                    setIsEditing(false);
+                  }}
+                >
+                  <Text style={styles.editText}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(false)}>
+                  <Text style={styles.editText}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={styles.name}>{profile.display_name}</Text>
+              {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
+              <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+                <Edit3 color="#fff" size={16} />
+                <Text style={styles.editText}>Edit Profile</Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
 
         {/* Favorites */}
@@ -197,6 +268,13 @@ const styles = StyleSheet.create({
   artistName: { color: '#fff', fontSize: 12, textAlign: 'center' },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   settingLabel: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 8,
+    borderRadius: 8,
+    color: '#fff',
+    width: '100%',
+  },
 });
 
 export default withAuthGuard(ProfileScreen);
