@@ -32,6 +32,8 @@ function SearchScreen() {
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>('relevance');
+  const [genre, setGenre] = useState<string | null>(null);
 
   const {
     currentTrack,
@@ -60,7 +62,7 @@ function SearchScreen() {
     }
     const timer = setTimeout(() => handleSearch(query), 300);
     return () => clearTimeout(timer);
-  }, [query]);
+  }, [query, sort, genre]);
 
   const handleSearch = async (searchQuery: string) => {
     setIsSearching(true);
@@ -161,6 +163,17 @@ function SearchScreen() {
             value={query}
             onChangeText={setQuery}
           />
+        </View>
+        <View style={styles.filterRow}>
+          {['relevance', 'recent', 'popular'].map((f) => (
+            <TouchableOpacity
+              key={f}
+              style={[styles.filterOption, sort === f && styles.filterOptionActive]}
+              onPress={() => setSort(f as any)}
+            >
+              <Text style={styles.filterText}>{f.charAt(0).toUpperCase() + f.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -266,6 +279,10 @@ const styles = StyleSheet.create({
   trendingContainer: { flexDirection:'row', flexWrap:'wrap', marginBottom:16 },
   trendingItem: { backgroundColor:'rgba(139,92,246,0.2)', padding:8, borderRadius:20, margin:4 },
   trendingText: { color:'#8b5cf6' },
+  filterRow: { flexDirection:'row', gap:8, marginTop:12 },
+  filterOption: { paddingVertical:6, paddingHorizontal:12, borderRadius:20, backgroundColor:'rgba(255,255,255,0.05)' },
+  filterOptionActive: { backgroundColor:'rgba(139,92,246,0.3)' },
+  filterText: { color:'#fff', fontSize:12 },
   resultItem: { flexDirection:'row', alignItems:'center', padding:12, marginHorizontal:24, marginBottom:8, backgroundColor:'rgba(255,255,255,0.05)', borderRadius:12 },
   resultImage: { width:50, height:50, borderRadius:8 },
   userImage: { borderRadius:25 },
