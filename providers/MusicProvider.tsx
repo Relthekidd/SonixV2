@@ -227,6 +227,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
             'id,title,duration,cover_url,audio_url,artist_name,album:title,genres,release_date,created_at'
           )
           .ilike('title', `%${term}%`)
+          .eq('is_published', true)
           .limit(10),
         supabase
           .from('artists')

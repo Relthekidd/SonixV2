@@ -8,3 +8,5 @@ declare global {
 }
 
 export {};
+
+declare module '@react-native-community/datetimepicker';

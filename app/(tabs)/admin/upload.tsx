@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,8 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  Switch,
+  Image,
 } from 'react-native';
+// @ts-ignore
+import DateTimePicker from '@react-native-community/datetimepicker';
+import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
@@ -31,7 +34,10 @@ export default function UploadScreen() {
   );
   const [mainArtist, setMainArtist] = useState<any>(null);
   const [coverFile, setCoverFile] = useState<any>(null);
-  const [publish, setPublish] = useState(false);
+  const [publishMode, setPublishMode] = useState<'now' | 'schedule' | 'draft'>('now');
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
+  const [published, setPublished] = useState(false);
 
   const [audioFile, setAudioFile] = useState<any>(null);
   const [duration, setDuration] = useState('');
@@ -43,6 +49,21 @@ export default function UploadScreen() {
 
   const [uploadDone, setUploadDone] = useState(false);
   const [newId, setNewId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (uploadDone) {
+      const t = setTimeout(() => {
+        setUploadDone(false);
+        setTitle('');
+        setDescription('');
+        setAudioFile(null);
+        setCoverFile(null);
+        setTracks([]);
+        router.push('/admin/uploads');
+      }, 4000);
+      return () => clearTimeout(t);
+    }
+  }, [uploadDone]);
 
   const pickCover = async () => {
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -94,6 +115,11 @@ export default function UploadScreen() {
     if (!validate()) return;
     try {
       let id: string | null = null;
+      const isPublished = publishMode === 'now';
+      const scheduledPublishAt =
+        publishMode === 'schedule' && scheduledAt
+          ? scheduledAt.toISOString()
+          : null;
       if (mode === 'single') {
         id = await uploadSingle({
           title: title.trim(),
@@ -108,8 +134,11 @@ export default function UploadScreen() {
           featuredArtistIds: [],
           coverFile,
           audioFile,
+          isPublished,
+          scheduledPublishAt,
         });
-        if (publish && id) await apiService.publishTrack(id);
+        if (isPublished && id) await apiService.publishTrack(id);
+        setPublished(isPublished);
       } else {
         const res = await uploadAlbum({
           title: title.trim(),
@@ -130,13 +159,16 @@ export default function UploadScreen() {
             featuredArtistIds: [],
             audioFile: t.audioFile,
           })),
+          isPublished,
+          scheduledPublishAt,
         });
         id = res.albumId;
-        if (publish) {
+        if (isPublished) {
           for (const tid of res.trackIds) {
             await apiService.publishTrack(tid);
           }
         }
+        setPublished(isPublished);
       }
       setNewId(id);
       setUploadDone(true);
@@ -161,12 +193,12 @@ export default function UploadScreen() {
   const handleTogglePublish = async () => {
     if (!newId) return;
     try {
-      if (publish) {
+      if (published) {
         await apiService.unpublishTrack(newId);
-        setPublish(false);
+        setPublished(false);
       } else {
         await apiService.publishTrack(newId);
-        setPublish(true);
+        setPublished(true);
       }
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -176,7 +208,7 @@ export default function UploadScreen() {
   return (
     <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.section, styles.toggleRow]}>
+        <View style={[styles.section, styles.card, styles.toggleRow]}>
           {['single', 'album'].map((t) => (
             <TouchableOpacity
               key={t}
@@ -187,7 +219,7 @@ export default function UploadScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <View style={styles.section}>
+        <View style={[styles.section, styles.card]}>
           <Text style={styles.label}>Title</Text>
           <TextInput
             style={styles.input}
@@ -214,20 +246,23 @@ export default function UploadScreen() {
           />
           <ArtistAutocomplete onArtistSelect={setMainArtist} />
         </View>
-        <View style={styles.section}>
+        <View style={[styles.section, styles.card]}>
           <TouchableOpacity style={styles.fileBtn} onPress={pickCover}>
             <Text style={styles.fileBtnText}>
               {coverFile ? 'Change Cover' : 'Pick Cover Image'}
             </Text>
           </TouchableOpacity>
           {coverFile && (
-            <Text style={styles.fileNameText}>
-              {coverFile.name || coverFile.uri.split('/').pop()}
-            </Text>
+            <>
+              <Image source={{ uri: coverFile.uri }} style={styles.preview} />
+              <Text style={styles.fileNameText}>
+                {coverFile.name || coverFile.uri.split('/').pop()}
+              </Text>
+            </>
           )}
         </View>
         {mode === 'single' && (
-          <View style={styles.section}>
+          <View style={[styles.section, styles.card]}>
             <TouchableOpacity style={styles.fileBtn} onPress={pickSingleAudio}>
               <Text style={styles.fileBtnText}>
                 {audioFile ? 'Change Audio File' : 'Pick Audio File'}
@@ -241,7 +276,7 @@ export default function UploadScreen() {
           </View>
         )}
         {mode === 'album' && (
-          <View style={[styles.section, { width: '100%' }]}>
+          <View style={[styles.section, styles.card, { width: '100%' }]}>
             {tracks.map((t, idx) => (
               <View key={idx} style={styles.trackContainer}>
                 <View style={styles.trackRow}>
@@ -277,7 +312,7 @@ export default function UploadScreen() {
             </TouchableOpacity>
           </View>
         )}
-        <View style={styles.section}>
+        <View style={[styles.section, styles.card]}>
           <Text style={styles.label}>Duration (sec)</Text>
           <TextInput
             style={styles.input}
@@ -297,17 +332,52 @@ export default function UploadScreen() {
             multiline
           />
         </View>
-        <View style={[styles.section, styles.publishRow]}>
-          <Text style={styles.toggleText}>Publish now</Text>
-          <Switch value={publish} onValueChange={setPublish} />
+        <View style={[styles.section, styles.card, styles.publishRow]}>
+          {['now', 'schedule', 'draft'].map((opt) => (
+            <TouchableOpacity
+              key={opt}
+              style={[
+                styles.toggleBtn,
+                publishMode === opt && styles.toggleBtnActive,
+                { marginRight: 8 },
+              ]}
+              onPress={() => setPublishMode(opt as any)}
+            >
+              <Text style={styles.toggleText}>
+                {opt === 'now' ? 'Publish Now' : opt === 'schedule' ? 'Schedule' : 'Draft'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+        {publishMode === 'schedule' && (
+          <View style={[styles.section, styles.card, styles.row]}>
+            <TouchableOpacity
+              style={styles.fileBtn}
+              onPress={() => setShowPicker(true)}
+            >
+              <Text style={styles.fileBtnText}>
+                {scheduledAt ? scheduledAt.toLocaleString() : 'Pick Date & Time'}
+              </Text>
+            </TouchableOpacity>
+            {showPicker && (
+              <DateTimePicker
+                value={scheduledAt || new Date()}
+                mode="datetime"
+                onChange={(event: any, d?: Date) => {
+                  setShowPicker(false);
+                  if (d) setScheduledAt(d);
+                }}
+              />
+            )}
+          </View>
+        )}
         <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isUploading}>
           <Text style={styles.submitText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
         </TouchableOpacity>
         {uploadDone && isAdmin && newId && (
           <View style={styles.adminActions}>
             <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePublish}>
-              <Text style={styles.actionText}>{publish ? 'Unpublish' : 'Publish'}</Text>
+              <Text style={styles.actionText}>{published ? 'Unpublish' : 'Publish'}</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
               <Text style={styles.actionText}>Delete</Text>
@@ -323,19 +393,36 @@ export default function UploadScreen() {
         type={mode}
       />
       {uploadDone && (
-        <TouchableOpacity
-          style={styles.doneOverlay}
-          onPress={() => {
-            setUploadDone(false);
-            setTitle('');
-            setDescription('');
-            setAudioFile(null);
-            setCoverFile(null);
-            setTracks([]);
-          }}
-        >
-          <Text style={styles.doneText}>Done</Text>
-        </TouchableOpacity>
+        <View style={styles.doneOverlay}>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => {
+              setUploadDone(false);
+              setTitle('');
+              setDescription('');
+              setAudioFile(null);
+              setCoverFile(null);
+              setTracks([]);
+              router.push('/admin/uploads');
+            }}
+          >
+            <Text style={styles.doneText}>View Uploads</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeBtn}
+            onPress={() => {
+              setUploadDone(false);
+              setTitle('');
+              setDescription('');
+              setAudioFile(null);
+              setCoverFile(null);
+              setTracks([]);
+              router.push('/admin');
+            }}
+          >
+            <Text style={styles.doneText}>Back to Dashboard</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </LinearGradient>
   );
@@ -345,6 +432,14 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 20 },
   section: { marginBottom: 20, width: '100%' },
+  card: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    padding: 16,
+    borderRadius: 12,
+    width: '100%',
+    marginBottom: 20,
+  },
+  row: { flexDirection: 'row', alignItems: 'center' },
   toggleRow: { flexDirection: 'row' },
   toggleBtn: {
     flex: 1,
@@ -379,6 +474,7 @@ const styles = StyleSheet.create({
   },
   fileBtnText: { color: '#fff' },
   fileNameText: { color: '#cbd5e1', fontSize: 12, marginTop: 4 },
+  preview: { width: '100%', height: 150, marginTop: 8, borderRadius: 8 },
   trackContainer: { marginBottom: 12 },
   trackRow: { flexDirection: 'row', alignItems: 'center' },
   submitBtn: {
@@ -406,6 +502,15 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 20,
   },
-  doneText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
+  closeBtn: {
+    backgroundColor: 'rgba(139,92,246,0.8)',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  doneText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

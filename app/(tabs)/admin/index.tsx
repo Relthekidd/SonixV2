@@ -148,7 +148,7 @@ export default function AdminScreen() {
   const quickActions = [
     { label: 'Upload Single', icon: Upload, route: '/admin/upload?type=single' },
     { label: 'Upload Album', icon: Plus, route: '/admin/upload?type=album' },
-    { label: 'View Uploads', icon: Music, route: '/admin/upload' },
+    { label: 'View Uploads', icon: Music, route: '/admin/uploads' },
   ] as const;
 
   const statsCards = [
@@ -223,7 +223,7 @@ export default function AdminScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Admin Tools</Text>
           <View style={styles.toolsList}>
-            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/upload')}>
+            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/uploads')}>
               <Music color="#8b5cf6" size={24} />
               <Text style={styles.toolText}>Manage Uploads</Text>
             </TouchableOpacity>
