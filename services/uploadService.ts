@@ -159,7 +159,7 @@ class UploadService {
     }
   }
 
-  async uploadSingle(data: SingleUploadData): Promise<void> {
+  async uploadSingle(data: SingleUploadData): Promise<string> {
     console.log('[UploadService] uploadSingle start', data);
     this.validateSingle(data);
     const id = uuidv4();
@@ -202,13 +202,16 @@ class UploadService {
         throw error;
       }
       console.log('[UploadService] uploadSingle complete');
+      return id;
     } catch (err: any) {
       console.error('[UploadService] uploadSingle error:', err);
       throw new Error(err.message || 'Failed to upload single');
     }
   }
 
-  async uploadAlbum(data: AlbumUploadData): Promise<void> {
+  async uploadAlbum(
+    data: AlbumUploadData,
+  ): Promise<{ albumId: string; trackIds: string[] }> {
     console.log('[UploadService] uploadAlbum start', data);
     this.validateAlbum(data);
     const albumId = uuidv4();
@@ -240,6 +243,7 @@ class UploadService {
       }
       console.log('[UploadService] album record inserted');
 
+      const trackIds: string[] = [];
       for (const track of data.tracks) {
         const trackId = uuidv4();
         console.log('[UploadService] processing track', track.trackNumber, track);
@@ -269,8 +273,10 @@ class UploadService {
           console.error('[UploadService] supabase.insert track for album error', trackError);
           throw trackError;
         }
+        trackIds.push(trackId);
       }
       console.log('[UploadService] uploadAlbum complete');
+      return { albumId, trackIds };
     } catch (err: any) {
       console.error('[UploadService] uploadAlbum error:', err);
       throw new Error(err.message || 'Failed to upload album');
