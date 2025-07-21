@@ -5,8 +5,10 @@ import { uploadService, SingleUploadData, AlbumUploadData, UploadPermissions } f
 interface UseUploadReturn {
   isUploading: boolean;
   uploadProgress: number;
-  uploadSingle: (data: SingleUploadData) => Promise<any>;
-  uploadAlbum: (data: AlbumUploadData) => Promise<any>;
+  uploadSingle: (data: SingleUploadData) => Promise<string>;
+  uploadAlbum: (
+    data: AlbumUploadData,
+  ) => Promise<{ albumId: string; trackIds: string[] }>;
   checkPermissions: () => Promise<boolean>;
   getUploadPermissions: () => Promise<UploadPermissions>;
 }
@@ -15,7 +17,7 @@ export function useUpload(): UseUploadReturn {
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  const uploadSingle = async (data: SingleUploadData) => {
+  const uploadSingle = async (data: SingleUploadData): Promise<string> => {
     console.log('[useUpload] uploadSingle start', data);
     try {
       setIsUploading(true);
@@ -46,7 +48,9 @@ export function useUpload(): UseUploadReturn {
     }
   };
 
-  const uploadAlbum = async (data: AlbumUploadData) => {
+  const uploadAlbum = async (
+    data: AlbumUploadData,
+  ): Promise<{ albumId: string; trackIds: string[] }> => {
     console.log('[useUpload] uploadAlbum start', data);
     try {
       setIsUploading(true);

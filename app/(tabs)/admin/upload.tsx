@@ -1,284 +1,368 @@
-import React, { useState, useEffect } from 'react';
-
-export const unstable_settings = { href: null };
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
+  TextInput,
   TouchableOpacity,
   ScrollView,
-  TextInput,
+  StyleSheet,
   Alert,
-  ActivityIndicator,
-  Image,
-  Platform,
   Switch,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '@/providers/AuthProvider';
-import { uploadService, SingleUploadData, AlbumUploadData } from '@/services/uploadService';
-import { ArtistData } from '@/services/artistService';
-import { ArtistAutocomplete } from '@/components/ArtistAutocomplete';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { router } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { useUpload } from '@/hooks/useUpload';
+import { ArtistAutocomplete } from '@/components/ArtistAutocomplete';
+import { UploadProgressModal } from '@/components/UploadProgressModal';
+import { apiService } from '@/services/api';
+import { useAuth } from '@/providers/AuthProvider';
 
-interface Track {
-  id: string;
-  title: string;
-  audioFile: any;
-  lyrics: string;
-  explicit: boolean;
-  duration: number;
-  description?: string;
-  featuredArtists: ArtistData[];
-}
+export default function UploadScreen() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+  const { isUploading, uploadProgress, uploadSingle, uploadAlbum } = useUpload();
 
-interface UploadFormData {
-  type: 'single' | 'album';
-  title: string;
-  mainArtist: ArtistData | null;
-  featuredArtists: ArtistData[];
-  releaseDate: string;
-  coverFile: any;
-  genres: string[];
-  explicit: boolean;
-  description: string;
-  tracks: Track[];
-}
+  const [mode, setMode] = useState<'single' | 'album'>('single');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [releaseDate, setReleaseDate] = useState(
+    new Date().toISOString().split('T')[0],
+  );
+  const [mainArtist, setMainArtist] = useState<any>(null);
+  const [coverFile, setCoverFile] = useState<any>(null);
+  const [publish, setPublish] = useState(false);
 
-const GENRES = [
-  'Hip-Hop','R&B','Pop','Rock','Electronic','Jazz','Classical',
-  'Country','Reggae','Blues','Folk','Indie','Alternative','Funk'
-];
+  const [audioFile, setAudioFile] = useState<any>(null);
+  const [duration, setDuration] = useState('');
+  const [lyrics, setLyrics] = useState('');
 
-export default function AdminUploadScreen() {
-  const { user, userId, hasUser, isLoading: authLoading } = useAuth();
-  const [isUploading, setIsUploading] = useState(false);
-  const [formData, setFormData] = useState<UploadFormData>({
-    type: 'single',
-    title: '',
-    mainArtist: null,
-    featuredArtists: [],
-    releaseDate: new Date().toISOString().split('T')[0],
-    coverFile: null,
-    genres: [],
-    explicit: false,
-    description: '',
-    tracks: [{
-      id: '1', title: '', audioFile: null,
-      lyrics: '', explicit: false,
-      duration: 0, description: '', featuredArtists: []
-    }],
-  });
+  const [tracks, setTracks] = useState<
+    Array<{ title: string; audioFile: any; duration: string; lyrics: string }>
+  >([]);
 
-  useEffect(() => {
-    console.log('[AdminUpload] initializing storage');
-    uploadService.initializeStorage();
-  }, []);
+  const [uploadDone, setUploadDone] = useState(false);
+  const [newId, setNewId] = useState<string | null>(null);
 
-  const pickCoverImage = async () => {
-    console.log('[AdminUpload] pickCoverImage start');
-    try {
-      const res = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1,1],
-        quality: 0.8,
-      });
-      console.log('[AdminUpload] pickCoverImage result', res);
-      if (!res.canceled && res.assets?.[0]) {
-        setFormData(prev => ({ ...prev, coverFile: res.assets[0] }));
-      }
-    } catch (err) {
-      console.error('[AdminUpload] pickCoverImage error', err);
-      Alert.alert('Error', 'Failed to pick cover image');
-    }
+  const pickCover = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    });
+    if (!res.canceled && res.assets?.[0]) setCoverFile(res.assets[0]);
   };
 
-  const pickAudioFile = async (index: number) => {
-    console.log('[AdminUpload] pickAudioFile start for track', index);
-    try {
-      const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*', copyToCacheDirectory: true });
-      console.log('[AdminUpload] pickAudioFile result', res);
-      if (!res.canceled && res.assets?.[0]) {
-        const tracks = [...formData.tracks];
-        tracks[index].audioFile = res.assets[0];
-        setFormData(prev => ({ ...prev, tracks }));
-      }
-    } catch (err) {
-      console.error('[AdminUpload] pickAudioFile error', err);
-      Alert.alert('Error', 'Failed to pick audio file');
-    }
+  const pickSingleAudio = async () => {
+    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
+    if (res.type === 'success') setAudioFile(res);
   };
 
-  const updateTrack = (index: number, field: keyof Track, value: any) => {
-    console.log('[AdminUpload] updateTrack', index, field, value);
-    const tracks = [...formData.tracks];
-    (tracks[index] as any)[field] = value;
-    setFormData(prev => ({ ...prev, tracks }));
+  const pickTrackAudio = async (idx: number) => {
+    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
+    if (res.type === 'success') {
+      const arr = [...tracks];
+      arr[idx].audioFile = res;
+      setTracks(arr);
+    }
   };
 
   const addTrack = () => {
-    console.log('[AdminUpload] addTrack');
-    setFormData(prev => ({
-      ...prev,
-      type: 'album',
-      tracks: [
-        ...prev.tracks,
-        { id: Date.now().toString(), title: '', audioFile: null, lyrics: '', explicit: false, duration: 0, description: '', featuredArtists: [] }
-      ]
-    }));
+    setTracks([
+      ...tracks,
+      { title: '', audioFile: null, duration: '', lyrics: '' },
+    ]);
   };
 
-  const removeTrack = (index: number) => {
-    console.log('[AdminUpload] removeTrack', index);
-    const tracks = formData.tracks.filter((_, i) => i !== index);
-    setFormData(prev => ({ ...prev, tracks }));
-  };
-
-  const toggleGenre = (genre: string) => {
-    console.log('[AdminUpload] toggleGenre', genre);
-    setFormData(prev => ({
-      ...prev,
-      genres: prev.genres.includes(genre)
-        ? prev.genres.filter(g => g !== genre)
-        : [...prev.genres, genre]
-    }));
-  };
-
-  const validateForm = (): boolean => {
-    console.log('[AdminUpload] validateForm', formData);
-    if (!formData.title.trim()) { Alert.alert('Error','Title is required'); return false; }
-    if (!formData.mainArtist) { Alert.alert('Error','Main artist is required'); return false; }
-    if (!formData.genres.length) { Alert.alert('Error','At least one genre is required'); return false; }
-    for (let i = 0; i < formData.tracks.length; i++) {
-      const t = formData.tracks[i];
-      if (!t.title.trim())    { Alert.alert('Error', `Track ${i+1} title is required`); return false; }
-      if (!t.audioFile)       { Alert.alert('Error', `Track ${i+1} audio is required`); return false; }
+  const validate = () => {
+    if (!title.trim()) return Alert.alert('Error', 'Title required');
+    if (!mainArtist) return Alert.alert('Error', 'Select main artist');
+    if (mode === 'single') {
+      if (!audioFile) return Alert.alert('Error', 'Select audio file');
+    } else {
+      if (tracks.length === 0)
+        return Alert.alert('Error', 'Add at least one track');
+      for (let i = 0; i < tracks.length; i++) {
+        if (!tracks[i].title.trim())
+          return Alert.alert('Error', `Track ${i + 1} title required`);
+        if (!tracks[i].audioFile)
+          return Alert.alert('Error', `Track ${i + 1} audio required`);
+      }
     }
     return true;
   };
 
   const handleSubmit = async () => {
-    console.log('[AdminUpload] handleSubmit start', { userId, hasUser, authLoading });
-    if (authLoading) {
-      console.log('[AdminUpload] auth still loading');
-      return Alert.alert('Hold up','Still loading your account info.');
-    }
-    if (!hasUser || !userId) {
-      console.warn('[AdminUpload] no user/session');
-      return Alert.alert('Error','User session not ready');
-    }
-    if (!validateForm()) return;
-
-    setIsUploading(true);
+    if (!validate()) return;
     try {
-      if (formData.type === 'single') {
-        const t = formData.tracks[0];
-        console.log('[AdminUpload] uploading single', t, formData);
-        await uploadService.uploadSingle({
-          title: formData.title.trim(),
-          lyrics: t.lyrics,
-          duration: t.duration,
-          genres: formData.genres,
-          explicit: formData.explicit,
-          coverFile: formData.coverFile,
-          audioFile: t.audioFile,
-          description: formData.description,
-          releaseDate: formData.releaseDate,
-          artistId: userId,
-          mainArtistId: formData.mainArtist!.id,
-          featuredArtistIds: formData.featuredArtists.map(a => a.id),
-        } as SingleUploadData);
+      let id: string | null = null;
+      if (mode === 'single') {
+        id = await uploadSingle({
+          title: title.trim(),
+          lyrics,
+          duration: Number(duration) || 0,
+          genres: [],
+          explicit: false,
+          description,
+          releaseDate,
+          artistId: user!.id,
+          mainArtistId: mainArtist.id,
+          featuredArtistIds: [],
+          coverFile,
+          audioFile,
+        });
+        if (publish && id) await apiService.publishTrack(id);
       } else {
-        console.log('[AdminUpload] uploading album', formData);
-        await uploadService.uploadAlbum({
-          title: formData.title.trim(),
-          description: formData.description,
-          releaseDate: formData.releaseDate,
-          coverFile: formData.coverFile,
-          genres: formData.genres,
-          explicit: formData.explicit,
-          artistId: userId,
-          mainArtistId: formData.mainArtist!.id,
-          featuredArtistIds: formData.featuredArtists.map(a => a.id),
-          tracks: formData.tracks.map((t, idx) => ({
+        const res = await uploadAlbum({
+          title: title.trim(),
+          description,
+          releaseDate,
+          genres: [],
+          explicit: false,
+          artistId: user!.id,
+          mainArtistId: mainArtist.id,
+          featuredArtistIds: [],
+          coverFile,
+          tracks: tracks.map((t, idx) => ({
             title: t.title.trim(),
             lyrics: t.lyrics,
-            duration: t.duration,
-            explicit: t.explicit,
-            trackNumber: idx+1,
-            featuredArtistIds: t.featuredArtists.map(a => a.id),
+            duration: Number(t.duration) || 0,
+            explicit: false,
+            trackNumber: idx + 1,
+            featuredArtistIds: [],
             audioFile: t.audioFile,
           })),
-        } as AlbumUploadData);
+        });
+        id = res.albumId;
+        if (publish) {
+          for (const tid of res.trackIds) {
+            await apiService.publishTrack(tid);
+          }
+        }
       }
-      console.log('[AdminUpload] uploadService success');
-      Alert.alert('Success','Upload complete', [{ text: 'View uploads', onPress: () => router.push('/admin/uploads') }]);
-    } catch (err) {
-      console.error('[AdminUpload] handleSubmit error', err);
-      Alert.alert('Error', (err as Error).message || 'Upload failed');
-    } finally {
-      setIsUploading(false);
-      console.log('[AdminUpload] handleSubmit end, isUploading=false');
+      setNewId(id);
+      setUploadDone(true);
+    } catch (err: any) {
+      Alert.alert('Upload failed', err.message);
     }
   };
 
-  if (authLoading) {
-    console.log('[AdminUpload] auth loading screen');
-    return (
-      <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading your account...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+  const handleDelete = async () => {
+    if (!newId) return;
+    try {
+      await apiService.deleteContent(mode === 'album' ? 'album' : 'track', newId);
+      Alert.alert('Deleted');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setUploadDone(false);
+      setNewId(null);
+    }
+  };
 
-  if (!hasUser || user?.role !== 'admin') {
-    console.log('[AdminUpload] access denied', { hasUser, role: user?.role });
-    return (
-      <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
-        <View style={styles.center}>
-          <Text style={styles.error}>Access denied. Admin privileges required.</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
+  const handleTogglePublish = async () => {
+    if (!newId) return;
+    try {
+      if (publish) {
+        await apiService.unpublishTrack(newId);
+        setPublish(false);
+      } else {
+        await apiService.publishTrack(newId);
+        setPublish(true);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    }
+  };
 
   return (
-    <LinearGradient colors={['#1a1a2e','#16213e','#0f3460']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upload Music</Text>
-        <TouchableOpacity onPress={() => router.push('/admin/uploads')} style={styles.viewBtn}>
-          <Text style={styles.viewText}>View Uploads</Text>
-        </TouchableOpacity>
-      </View>
-
+    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
-        {/* Title */}
-        ...
+        <View style={styles.toggleRow}>
+          {['single', 'album'].map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[styles.toggleBtn, mode === t && styles.toggleBtnActive]}
+              onPress={() => setMode(t as any)}
+            >
+              <Text style={styles.toggleText}>{t === 'single' ? 'Single' : 'Album'}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Title"
+          placeholderTextColor="#64748b"
+          value={title}
+          onChangeText={setTitle}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Description"
+          placeholderTextColor="#64748b"
+          value={description}
+          onChangeText={setDescription}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Release Date"
+          placeholderTextColor="#64748b"
+          value={releaseDate}
+          onChangeText={setReleaseDate}
+        />
+        <ArtistAutocomplete onArtistSelect={setMainArtist} />
+        <TouchableOpacity style={styles.fileBtn} onPress={pickCover}>
+          <Text style={styles.fileBtnText}>{coverFile ? 'Change Cover' : 'Pick Cover Image'}</Text>
+        </TouchableOpacity>
+        {mode === 'single' && (
+          <TouchableOpacity style={styles.fileBtn} onPress={pickSingleAudio}>
+            <Text style={styles.fileBtnText}>{audioFile ? 'Change Audio File' : 'Pick Audio File'}</Text>
+          </TouchableOpacity>
+        )}
+        {mode === 'album' && (
+          <View style={{ width: '100%' }}>
+            {tracks.map((t, idx) => (
+              <View key={idx} style={styles.trackRow}>
+                <TextInput
+                  style={[styles.input, { flex: 1 }]}
+                  placeholder={`Track ${idx + 1} Title`}
+                  placeholderTextColor="#64748b"
+                  value={t.title}
+                  onChangeText={(val) => {
+                    const arr = [...tracks];
+                    arr[idx].title = val;
+                    setTracks(arr);
+                  }}
+                />
+                <TouchableOpacity onPress={() => pickTrackAudio(idx)} style={styles.fileBtnSmall}>
+                  <Text style={styles.fileBtnText}>{t.audioFile ? 'Replace' : 'Audio'}</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TouchableOpacity style={styles.fileBtn} onPress={addTrack}>
+              <Text style={styles.fileBtnText}>Add Track</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        <TextInput
+          style={styles.input}
+          placeholder="Duration (sec)"
+          placeholderTextColor="#64748b"
+          keyboardType="numeric"
+          value={duration}
+          onChangeText={setDuration}
+        />
+        <TextInput
+          style={[styles.input, { height: 80 }]}
+          placeholder="Lyrics"
+          placeholderTextColor="#64748b"
+          value={lyrics}
+          onChangeText={setLyrics}
+          multiline
+        />
+        <View style={styles.publishRow}>
+          <Text style={styles.toggleText}>Publish now</Text>
+          <Switch value={publish} onValueChange={setPublish} />
+        </View>
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isUploading}>
+          <Text style={styles.submitText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
+        </TouchableOpacity>
+        {uploadDone && isAdmin && newId && (
+          <View style={styles.adminActions}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePublish}>
+              <Text style={styles.actionText}>{publish ? 'Unpublish' : 'Publish'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
+              <Text style={styles.actionText}>Delete</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
+      <UploadProgressModal
+        visible={isUploading || uploadDone}
+        progress={uploadProgress}
+        isComplete={uploadDone}
+        title={title}
+        type={mode}
+      />
+      {uploadDone && (
+        <TouchableOpacity
+          style={styles.doneOverlay}
+          onPress={() => {
+            setUploadDone(false);
+            setTitle('');
+            setDescription('');
+            setAudioFile(null);
+            setCoverFile(null);
+            setTracks([]);
+          }}
+        >
+          <Text style={styles.doneText}>Done</Text>
+        </TouchableOpacity>
+      )}
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex:1 },
-  center: { flex:1, justifyContent:'center', alignItems:'center' },
-  error: { color:'#ef4444', fontSize:18, textAlign:'center', paddingHorizontal:20 },
-  loadingText: { color:'#fff', marginTop:16, fontSize:16 },
-  header: { flexDirection:'row', alignItems:'center', justifyContent:'space-between', paddingHorizontal:16, paddingTop:48, paddingBottom:16 },
-  backBtn:{ padding:8 },
-  headerTitle:{ fontSize:20, color:'#fff' },
-  viewBtn:{ padding:8 },
-  viewText:{ color:'#8b5cf6' },
-  content:{ padding:16 },
-  // ... other styles unchanged
+  container: { flex: 1 },
+  content: { padding: 20 },
+  toggleRow: { flexDirection: 'row', marginBottom: 20 },
+  toggleBtn: {
+    flex: 1,
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  toggleBtnActive: { backgroundColor: 'rgba(139,92,246,0.3)' },
+  toggleText: { color: '#fff' },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    padding: 12,
+    color: '#fff',
+    marginBottom: 12,
+  },
+  fileBtn: {
+    backgroundColor: 'rgba(139,92,246,0.3)',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  fileBtnSmall: {
+    backgroundColor: 'rgba(139,92,246,0.3)',
+    padding: 8,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  fileBtnText: { color: '#fff' },
+  trackRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  submitBtn: {
+    backgroundColor: '#8b5cf6',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  submitText: { color: '#fff', fontWeight: '600' },
+  publishRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 8 },
+  adminActions: { flexDirection: 'row', marginTop: 20 },
+  actionBtn: {
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  actionText: { color: '#fff' },
+  doneOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  doneText: { color: '#fff', fontSize: 20, fontWeight: 'bold' },
 });
