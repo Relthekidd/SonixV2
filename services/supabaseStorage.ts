@@ -2,7 +2,6 @@
 // authenticated with the current user session.
 import { supabase } from './supabase';
 import * as FileSystem from 'expo-file-system';
-import { Buffer } from 'buffer';
 
 /**
  * Upload a file to Supabase Storage and return its public URL
@@ -14,12 +13,15 @@ async function uploadFile(
 ): Promise<{ url: string }> {
   // Fetch the file URI as a blob (React Native)
   const info = await FileSystem.getInfoAsync(file.uri);
-  console.log('[supabaseStorage] local file size', (info as any).size ?? 'unknown');
-  const base64 = await FileSystem.readAsStringAsync(file.uri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const buffer = Buffer.from(base64, 'base64');
-  const blob = new Blob([buffer], { type: file.type });
+  console.log(
+    '[supabaseStorage] local file size',
+    (info as any).size ?? 'unknown',
+  );
+  const res = await fetch(file.uri);
+  if (!res.ok) {
+    throw new Error('Unable to read file for upload');
+  }
+  const blob = await res.blob();
   console.log('[supabaseStorage] blob size', blob.size);
 
   // Upload to Supabase Storage

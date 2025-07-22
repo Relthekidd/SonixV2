@@ -142,7 +142,7 @@ class UploadService {
     }
 
     const ext = file.name?.split('.').pop() || 'jpg';
-    const path = `images/${artistId}/${prefix}/${entityId}-cover.${ext}`;
+    const path = `covers/${entityId}.${ext}`;
     console.log('[UploadService] cover path', path);
 
     try {
@@ -161,10 +161,9 @@ class UploadService {
     trackId: string,
     albumId?: string,
   ): Promise<string> {
-    const base = albumId
-      ? `audio/${artistId}/albums/${albumId}`
-      : `audio/${artistId}/singles`;
-    const path = `${base}/${trackId}.mp3`;
+    const base = albumId ? `track/${albumId}` : 'track';
+    const ext = file.name?.split('.').pop() || 'mp3';
+    const path = `${base}/${trackId}.${ext}`;
     console.log('[UploadService] uploadTrackAudio start, path=', path, file);
 
     try {

@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/services/supabase';
@@ -42,8 +43,13 @@ export default function UploadsScreen() {
       colors={['#0f172a', '#111827', '#0b1120']}
       style={{ flex: 1 }}
     >
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
+      <SafeAreaView style={{ flex: 1 }}>
+        <ScrollView
+          contentContainerStyle={{
+            paddingHorizontal: 20,
+            paddingTop: 20,
+            paddingBottom: 120,
+          }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -70,7 +76,8 @@ export default function UploadsScreen() {
         {uploads.length === 0 && (
           <Text style={styles.empty}>No uploads yet.</Text>
         )}
-      </ScrollView>
+        </ScrollView>
+      </SafeAreaView>
     </LinearGradient>
   );
 }
