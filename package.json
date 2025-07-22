@@ -38,6 +38,7 @@
     "expo-system-ui": "~5.0.5",
     "expo-video": "~2.2.2",
     "expo-web-browser": "~14.2.0",
+    "glob": "^9.3.5",
     "lucide-react-native": "^0.475.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
@@ -51,6 +52,7 @@
     "react-native-url-polyfill": "^2.0.0",
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
+    "rimraf": "^4.4.1",
     "uuid": "^9.0.1"
   },
   "devDependencies": {
