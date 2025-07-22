@@ -57,10 +57,15 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@eslint/js": "^9.31.0",
     "@types/mime": "^3.0.4",
     "@types/react": "~19.0.10",
     "@types/uuid": "^10.0.0",
     "babel-plugin-module-resolver": "^5.0.2",
-    "typescript": "~5.8.3"
+    "eslint": "^9.31.0",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.3.0",
+    "typescript": "~5.8.3",
+    "typescript-eslint": "^8.38.0"
   }
 }
