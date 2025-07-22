@@ -47,7 +47,8 @@ export default function TrackDetailScreen() {
   }
 
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const params = useLocalSearchParams();
+  const id = typeof params.id === 'string' ? params.id : undefined;
 
   if (!id) {
     Alert.alert('Error', 'Track ID is missing');

@@ -6,6 +6,7 @@ import React, {
   useRef,
 } from 'react';
 import { Audio, AVPlaybackStatus } from 'expo-av';
+import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { useAuth } from './AuthProvider';
 
@@ -170,6 +171,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       setQueue(queueParam.length ? queueParam : [track]);
     } catch (err) {
       console.error('playTrack error', err);
+      Alert.alert('Playback Error', 'Unable to play this track.');
+      setError((err as Error).message);
     }
   };
 
