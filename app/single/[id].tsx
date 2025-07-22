@@ -46,7 +46,14 @@ interface SingleData {
 }
 
 export default function SingleDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id } = useLocalSearchParams();
+  if (!id || typeof id !== 'string') {
+    return (
+      <View style={styles.centered}>
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
   const [single, setSingle] = useState<SingleData | null>(null);
   const [track, setTrack] = useState<SingleData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -62,7 +69,7 @@ export default function SingleDetailScreen() {
     setIsLoading(true);
     setError(null);
     try {
-      const singleData = await apiService.getTrackById(id!);
+      const singleData = await apiService.getSingleById(id as string);
       setSingle(singleData);
       const prepared: SingleData = {
         id: singleData.id,
@@ -168,7 +175,12 @@ export default function SingleDetailScreen() {
             <Heart color="#fff" size={24} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handlePlayPause} style={styles.playBtn}>
-            {currentTrack?.id === track.id && isPlaying ? <Pause color="#fff" size={32}/> : <Play color="#fff" size={32}/>}          </TouchableOpacity>
+            {currentTrack?.id === track.id && isPlaying ? (
+              <Pause color="#fff" size={32} />
+            ) : (
+              <Play color="#fff" size={32} />
+            )}
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleAddToQueue} style={styles.controlBtn}>
             <Plus color="#fff" size={24} />
           </TouchableOpacity>

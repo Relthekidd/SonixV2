@@ -134,6 +134,19 @@ class ApiService {
     return data;
   }
 
+  /**
+   * Fetch single by ID and join its track
+   */
+  async getSingleById(id: string): Promise<any> {
+    const { data, error } = await supabase
+      .from('singles')
+      .select(`*, artist:artist_id(*), track:track_id(*)`)
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
   /** Get artist info */
   async getArtistById(id: string): Promise<any> {
     const { data, error } = await supabase

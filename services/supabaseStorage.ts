@@ -1,6 +1,7 @@
 // Use the shared Supabase client from the AuthProvider so uploads are
 // authenticated with the current user session.
 import { supabase } from './supabase';
+import * as FileSystem from 'expo-file-system';
 
 /**
  * Upload a file to Supabase Storage and return its public URL
@@ -11,8 +12,11 @@ async function uploadFile(
   bucket: string = 'audio-files',
 ): Promise<{ url: string }> {
   // Fetch the file URI as a blob (React Native)
+  const info = await FileSystem.getInfoAsync(file.uri);
+  console.log('[supabaseStorage] local file size', (info as any).size ?? 'unknown');
   const response = await fetch(file.uri);
   const blob = await response.blob();
+  console.log('[supabaseStorage] blob size', blob.size);
 
   // Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage

@@ -75,9 +75,7 @@ function ProfileScreen() {
       // fallback to basic profile
       const { data: prof } = await supabase
         .from('users')
-        .select(
-          'id, email, display_name, bio, profile_picture_url, is_private'
-        )
+        .select('id, email, display_name, bio, profile_picture_url, is_private')
         .eq('id', uid)
         .single();
       if (prof) {
@@ -105,9 +103,11 @@ function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    await loadProfile();
+    if (user?.id) {
+      await loadProfile(user.id);
+    }
     setIsRefreshing(false);
-  }, []);
+  }, [user]);
 
   const togglePrivacy = async () => {
     if (!user) return;
