@@ -1,9 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  StyleSheet,
+  ActivityIndicator,
+  RefreshControl,
+  TouchableOpacity,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { useAuth, supabase } from '@/providers/AuthProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 
 interface TopItem {
   id: string;
@@ -47,7 +56,10 @@ export default function AdminAnalyticsScreen() {
 
   if ((user?.role as any) !== 'admin') {
     return (
-      <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.center}>
           <Text style={styles.text}>Access denied. Admin only.</Text>
         </View>
@@ -57,7 +69,10 @@ export default function AdminAnalyticsScreen() {
 
   if (isLoading) {
     return (
-      <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#8b5cf6" />
         </View>
@@ -80,9 +95,15 @@ export default function AdminAnalyticsScreen() {
   );
 
   return (
-    <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.container}
+    >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>Analytics</Text>
@@ -109,7 +130,7 @@ export default function AdminAnalyticsScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#8b5cf6"
-            colors={["#8b5cf6"]}
+            colors={['#8b5cf6']}
           />
         }
       />

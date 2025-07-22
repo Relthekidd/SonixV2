@@ -1,11 +1,14 @@
-import { supabase } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 
 export interface ArtistData {
   id: string;
   name: string;
 }
 
-export async function searchArtistsByName(query: string, limit = 8): Promise<ArtistData[]> {
+export async function searchArtistsByName(
+  query: string,
+  limit = 8,
+): Promise<ArtistData[]> {
   const { data, error } = await supabase
     .from('artists')
     .select('id, name')
@@ -20,7 +23,9 @@ export async function searchArtistsByName(query: string, limit = 8): Promise<Art
   return data || [];
 }
 
-export async function findOrCreateArtistByName(name: string): Promise<ArtistData | null> {
+export async function findOrCreateArtistByName(
+  name: string,
+): Promise<ArtistData | null> {
   const trimmed = name.trim();
   if (!trimmed) return null;
 

@@ -1,6 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useRef,
+} from 'react';
 import { Audio, AVPlaybackStatus } from 'expo-av';
-import { supabase } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 import { useAuth } from './AuthProvider';
 
 export interface Track {
@@ -90,31 +96,43 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       .select()
       .single();
     if (!error && data) {
-      const newPL: Playlist = { id: data.id, name: data.name, tracks: [], coverUrl: data.cover_url || '' };
-      setPlaylists(prev => [newPL, ...prev]);
+      const newPL: Playlist = {
+        id: data.id,
+        name: data.name,
+        tracks: [],
+        coverUrl: data.cover_url || '',
+      };
+      setPlaylists((prev) => [newPL, ...prev]);
     }
   };
 
   const toggleLike = async (trackId: string) => {
     if (!user) return;
-    const already = likedSongs.some(t => t.id === trackId);
+    const already = likedSongs.some((t) => t.id === trackId);
     if (already) {
-      await supabase.from('liked_songs').delete().match({ user_id: user.id, track_id: trackId });
-      setLikedSongs(prev => prev.filter(t => t.id !== trackId));
+      await supabase
+        .from('liked_songs')
+        .delete()
+        .match({ user_id: user.id, track_id: trackId });
+      setLikedSongs((prev) => prev.filter((t) => t.id !== trackId));
     } else {
-      const track = queue.find(t => t.id === trackId) || currentTrack;
+      const track = queue.find((t) => t.id === trackId) || currentTrack;
       if (track) {
-        await supabase.from('liked_songs').upsert({ user_id: user.id, track_id: trackId });
-        setLikedSongs(prev => [...prev, track]);
+        await supabase
+          .from('liked_songs')
+          .upsert({ user_id: user.id, track_id: trackId });
+        setLikedSongs((prev) => [...prev, track]);
       }
     }
   };
 
   const addToPlaylist = async (playlistId: string, track: Track) => {
     if (!user) return;
-    await supabase.from('playlist_tracks').upsert({ playlist_id: playlistId, track_id: track.id });
-    setPlaylists(prev =>
-      prev.map(pl =>
+    await supabase
+      .from('playlist_tracks')
+      .upsert({ playlist_id: playlistId, track_id: track.id });
+    setPlaylists((prev) =>
+      prev.map((pl) =>
         pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl,
       ),
     );
@@ -163,13 +181,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   const nextTrack = async () => {
-    const idx = queue.findIndex(t => t.id === currentTrack?.id);
+    const idx = queue.findIndex((t) => t.id === currentTrack?.id);
     const nxt = queue[idx + 1] || queue[0];
     await playTrack(nxt, queue);
   };
 
   const previousTrack = async () => {
-    const idx = queue.findIndex(t => t.id === currentTrack?.id);
+    const idx = queue.findIndex((t) => t.id === currentTrack?.id);
     const prev = queue[idx - 1] || queue[queue.length - 1];
     await playTrack(prev, queue);
   };
@@ -224,7 +242,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         supabase
           .from('tracks')
           .select(
-            'id,title,duration,cover_url,audio_url,artist_name,album:title,genres,release_date,created_at'
+            'id,title,duration,cover_url,audio_url,artist_name,album:title,genres,release_date,created_at',
           )
           .ilike('title', `%${term}%`)
           .eq('is_published', true)
@@ -234,7 +252,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .select('id,name,avatar_url')
           .ilike('name', `%${term}%`)
           .limit(10),
-        supabase.rpc('search_users', { search_query: term, limit_count: 10 })
+        supabase.rpc('search_users', { search_query: term, limit_count: 10 }),
       ]);
 
       const tracks = (trackRes.data || []).map((t: any) => ({
@@ -264,12 +282,32 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <MusicContext.Provider value={{
-      currentTrack, isPlaying, currentTime, duration, queue,
-      recentlyPlayed, trendingTracks, newReleases, isLoading, error,
-      playTrack, pauseTrack, nextTrack, previousTrack, refreshData, searchMusic,
-      likedSongs, playlists, albums, createPlaylist, toggleLike, addToPlaylist
-    }}>
+    <MusicContext.Provider
+      value={{
+        currentTrack,
+        isPlaying,
+        currentTime,
+        duration,
+        queue,
+        recentlyPlayed,
+        trendingTracks,
+        newReleases,
+        isLoading,
+        error,
+        playTrack,
+        pauseTrack,
+        nextTrack,
+        previousTrack,
+        refreshData,
+        searchMusic,
+        likedSongs,
+        playlists,
+        albums,
+        createPlaylist,
+        toggleLike,
+        addToPlaylist,
+      }}
+    >
       {children}
     </MusicContext.Provider>
   );

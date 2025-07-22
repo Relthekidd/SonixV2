@@ -1,8 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, TouchableOpacity, StyleSheet } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  RefreshControl,
+  TouchableOpacity,
+  StyleSheet,
+} from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
-import { supabase } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 import { router } from 'expo-router';
 
 export default function UploadsScreen() {
@@ -31,7 +38,10 @@ export default function UploadsScreen() {
   };
 
   return (
-    <LinearGradient colors={["#0f172a", "#111827", "#0b1120"]} style={{ flex: 1 }}>
+    <LinearGradient
+      colors={['#0f172a', '#111827', '#0b1120']}
+      style={{ flex: 1 }}
+    >
       <ScrollView
         contentContainerStyle={{ padding: 20 }}
         refreshControl={
@@ -39,7 +49,7 @@ export default function UploadsScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#8b5cf6"
-            colors={["#8b5cf6"]}
+            colors={['#8b5cf6']}
           />
         }
       >
@@ -52,7 +62,7 @@ export default function UploadsScreen() {
           >
             <Text style={styles.itemTitle}>{u.title}</Text>
             <Text style={styles.itemStatus}>
-              {u.is_published ? "Published" : "Unpublished"}
+              {u.is_published ? 'Published' : 'Unpublished'}
             </Text>
           </TouchableOpacity>
         ))}
@@ -66,18 +76,18 @@ export default function UploadsScreen() {
 
 const styles = StyleSheet.create({
   title: {
-    color: "#fff",
+    color: '#fff',
     fontSize: 24,
     marginBottom: 20,
-    fontFamily: "Poppins-Bold",
+    fontFamily: 'Poppins-Bold',
   },
   item: {
-    backgroundColor: "rgba(255,255,255,0.05)",
+    backgroundColor: 'rgba(255,255,255,0.05)',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
   },
-  itemTitle: { color: "#fff", fontSize: 16 },
-  itemStatus: { color: "#94a3b8", fontSize: 12, marginTop: 4 },
-  empty: { color: "#94a3b8", marginTop: 20 },
+  itemTitle: { color: '#fff', fontSize: 16 },
+  itemStatus: { color: '#94a3b8', fontSize: 12, marginTop: 4 },
+  empty: { color: '#94a3b8', marginTop: 20 },
 });

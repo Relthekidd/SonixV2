@@ -11,7 +11,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, Check } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { useAuth, supabase } from '@/providers/AuthProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 
 interface UserItem {
   id: string;
@@ -66,7 +67,10 @@ export default function AdminUsersScreen() {
 
   if ((user?.role as any) !== 'admin') {
     return (
-      <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.center}>
           <Text style={styles.text}>Access denied. Admin only.</Text>
         </View>
@@ -76,7 +80,10 @@ export default function AdminUsersScreen() {
 
   if (isLoading) {
     return (
-      <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.center}>
           <ActivityIndicator size="large" color="#8b5cf6" />
         </View>
@@ -110,9 +117,15 @@ export default function AdminUsersScreen() {
   );
 
   return (
-    <LinearGradient colors={["#1a1a2e", "#16213e", "#0f3460"]} style={styles.container}>
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.container}
+    >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>Users</Text>
@@ -128,7 +141,7 @@ export default function AdminUsersScreen() {
             refreshing={refreshing}
             onRefresh={onRefresh}
             tintColor="#8b5cf6"
-            colors={["#8b5cf6"]}
+            colors={['#8b5cf6']}
           />
         }
       />

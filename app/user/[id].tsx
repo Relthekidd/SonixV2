@@ -12,9 +12,24 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useAuth, supabase } from '@/providers/AuthProvider';
+import { useAuth } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 import { useMusic } from '@/providers/MusicProvider';
-import { ArrowLeft, Settings, UserPlus, UserMinus, Lock, Music, Play, Pause, Heart, Users, Calendar, Globe, MessageCircle } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Settings,
+  UserPlus,
+  UserMinus,
+  Lock,
+  Music,
+  Play,
+  Pause,
+  Heart,
+  Users,
+  Calendar,
+  Globe,
+  MessageCircle,
+} from 'lucide-react-native';
 
 interface UserProfile {
   id: string;
@@ -41,7 +56,7 @@ export default function UserProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
-  
+
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
@@ -58,10 +73,12 @@ export default function UserProfileScreen() {
   const loadUserProfile = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
-      const { data, error } = await supabase
-        .rpc('get_user_profile_with_stats', { target_user_id: id });
+      const { data, error } = await supabase.rpc(
+        'get_user_profile_with_stats',
+        { target_user_id: id },
+      );
 
       if (error) {
         console.error('Error loading user profile:', error);
@@ -90,33 +107,43 @@ export default function UserProfileScreen() {
       if (profile.is_following) {
         // Unfollow
         const { error } = await supabase.rpc('unfollow_user', {
-          target_user_id: profile.id
+          target_user_id: profile.id,
         });
 
         if (error) throw error;
 
-        setProfile(prev => prev ? { 
-          ...prev, 
-          is_following: false, 
-          follower_count: Math.max(prev.follower_count - 1, 0) 
-        } : null);
+        setProfile((prev) =>
+          prev
+            ? {
+                ...prev,
+                is_following: false,
+                follower_count: Math.max(prev.follower_count - 1, 0),
+              }
+            : null,
+        );
       } else {
         // Follow or send follow request
         const { error } = await supabase.rpc('send_follow_request', {
-          target_user_id: profile.id
+          target_user_id: profile.id,
         });
 
         if (error) throw error;
 
         if (profile.is_private) {
-          setProfile(prev => prev ? { ...prev, has_pending_request: true } : null);
+          setProfile((prev) =>
+            prev ? { ...prev, has_pending_request: true } : null,
+          );
           Alert.alert('Request Sent', 'Your follow request has been sent');
         } else {
-          setProfile(prev => prev ? { 
-            ...prev, 
-            is_following: true, 
-            follower_count: prev.follower_count + 1 
-          } : null);
+          setProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  is_following: true,
+                  follower_count: prev.follower_count + 1,
+                }
+              : null,
+          );
         }
       }
     } catch (error: any) {
@@ -147,7 +174,7 @@ export default function UserProfileScreen() {
   };
 
   const renderTopTrack = ({ item, index }: { item: any; index: number }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={styles.topTrackItem}
       onPress={() => handleTrackPress(item)}
     >
@@ -202,7 +229,10 @@ export default function UserProfileScreen() {
       >
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || 'Profile not found'}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -233,19 +263,28 @@ export default function UserProfileScreen() {
           <Text style={styles.privateText}>
             Follow {profile.display_name} to see their profile
           </Text>
-          
+
           <TouchableOpacity
-            style={[styles.followButton, isFollowLoading && styles.followButtonDisabled]}
+            style={[
+              styles.followButton,
+              isFollowLoading && styles.followButtonDisabled,
+            ]}
             onPress={handleFollow}
             disabled={isFollowLoading || profile.has_pending_request}
           >
             <LinearGradient
-              colors={profile.has_pending_request ? ['#64748b', '#64748b'] : ['#8b5cf6', '#a855f7']}
+              colors={
+                profile.has_pending_request
+                  ? ['#64748b', '#64748b']
+                  : ['#8b5cf6', '#a855f7']
+              }
               style={styles.followButtonGradient}
             >
               <UserPlus color="#ffffff" size={20} />
               <Text style={styles.followButtonText}>
-                {profile.has_pending_request ? 'Request Sent' : 'Request to Follow'}
+                {profile.has_pending_request
+                  ? 'Request Sent'
+                  : 'Request to Follow'}
               </Text>
             </LinearGradient>
           </TouchableOpacity>
@@ -266,7 +305,7 @@ export default function UserProfileScreen() {
         >
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
-        
+
         {isOwnProfile && (
           <TouchableOpacity
             style={styles.headerButton}
@@ -280,18 +319,18 @@ export default function UserProfileScreen() {
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <Image 
-            source={{ 
-              uri: profile.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
-            }} 
-            style={styles.profilePicture} 
+          <Image
+            source={{
+              uri:
+                profile.profile_picture_url ||
+                'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400',
+            }}
+            style={styles.profilePicture}
           />
-          
+
           <Text style={styles.displayName}>{profile.display_name}</Text>
-          
-          {profile.bio && (
-            <Text style={styles.bio}>{profile.bio}</Text>
-          )}
+
+          {profile.bio && <Text style={styles.bio}>{profile.bio}</Text>}
 
           {/* Privacy Indicator */}
           <View style={styles.privacyIndicator}>
@@ -303,7 +342,9 @@ export default function UserProfileScreen() {
             ) : (
               <>
                 <Globe color="#10b981" size={16} />
-                <Text style={[styles.privacyText, { color: '#10b981' }]}>Public Account</Text>
+                <Text style={[styles.privacyText, { color: '#10b981' }]}>
+                  Public Account
+                </Text>
               </>
             )}
           </View>
@@ -331,12 +372,19 @@ export default function UserProfileScreen() {
           {/* Follow Button */}
           {!isOwnProfile && (
             <TouchableOpacity
-              style={[styles.followButton, isFollowLoading && styles.followButtonDisabled]}
+              style={[
+                styles.followButton,
+                isFollowLoading && styles.followButtonDisabled,
+              ]}
               onPress={handleFollow}
               disabled={isFollowLoading}
             >
               <LinearGradient
-                colors={profile.is_following ? ['#ef4444', '#dc2626'] : ['#8b5cf6', '#a855f7']}
+                colors={
+                  profile.is_following
+                    ? ['#ef4444', '#dc2626']
+                    : ['#8b5cf6', '#a855f7']
+                }
                 style={styles.followButtonGradient}
               >
                 {profile.is_following ? (
@@ -345,7 +393,11 @@ export default function UserProfileScreen() {
                   <UserPlus color="#ffffff" size={20} />
                 )}
                 <Text style={styles.followButtonText}>
-                  {isFollowLoading ? 'Loading...' : profile.is_following ? 'Unfollow' : 'Follow'}
+                  {isFollowLoading
+                    ? 'Loading...'
+                    : profile.is_following
+                      ? 'Unfollow'
+                      : 'Follow'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>

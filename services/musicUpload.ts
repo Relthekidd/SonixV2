@@ -1,4 +1,4 @@
-import { supabase } from '../providers/AuthProvider';
+import { supabase } from './supabase';
 
 export interface UploadTrack {
   title: string;
@@ -32,10 +32,13 @@ export async function uploadMusic({
   coverUrl,
   releaseDate,
   tracks,
-}: UploadMusicParams): Promise<{ success: true; content: UploadMusicResult } | { success: false; error: any }> {
+}: UploadMusicParams): Promise<
+  { success: true; content: UploadMusicResult } | { success: false; error: any }
+> {
   try {
     const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) throw userError || new Error('User not authenticated');
+    if (userError || !userData.user)
+      throw userError || new Error('User not authenticated');
     const createdBy = userData.user.id;
 
     const now = new Date().toISOString();
@@ -128,4 +131,3 @@ export async function uploadMusic({
     return { success: false, error };
   }
 }
-
