@@ -44,16 +44,24 @@ function ProfileScreen() {
   const [newBio, setNewBio] = useState('');
 
   useEffect(() => {
-    if (user) loadProfile();
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id || user?.id;
+      if (uid) {
+        await loadProfile(uid);
+      } else {
+        setIsLoading(false);
+      }
+    };
+    fetchUser();
   }, [user]);
 
-  const loadProfile = async () => {
-    if (!user) return;
+  const loadProfile = async (uid: string) => {
     setIsLoading(true);
     try {
       const { data, error } = await supabase.rpc(
         'get_user_profile_with_stats',
-        { target_user_id: user.id },
+        { target_user_id: uid },
       );
       if (error) throw error;
       if (data && data.length) {
@@ -70,7 +78,7 @@ function ProfileScreen() {
         .select(
           'id, email, display_name, bio, profile_picture_url, is_private'
         )
-        .eq('id', user.id)
+        .eq('id', uid)
         .single();
       if (prof) {
         setProfile({

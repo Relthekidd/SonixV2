@@ -7,6 +7,7 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -150,13 +151,14 @@ export default function AdminScreen() {
     );
   }
 
+  const [showUploadMenu, setShowUploadMenu] = useState(false);
+
   const quickActions = [
     {
-      label: 'Upload Single',
+      label: 'Upload Music',
       icon: Upload,
-      route: '/admin/upload?type=single',
+      onPress: () => setShowUploadMenu(true),
     },
-    { label: 'Upload Album', icon: Plus, route: '/admin/upload?type=album' },
     { label: 'View Uploads', icon: Music, route: '/admin/uploads' },
   ] as const;
 
@@ -217,7 +219,9 @@ export default function AdminScreen() {
                 <TouchableOpacity
                   key={act.label}
                   style={styles.actionBtn}
-                  onPress={() => router.push(act.route as any)}
+                  onPress={() =>
+                    act.onPress ? act.onPress() : router.push(act.route as any)
+                  }
                 >
                   <LinearGradient
                     colors={['#8b5cf6', '#a855f7']}
@@ -286,6 +290,43 @@ export default function AdminScreen() {
           </View>
         </ScrollView>
       </SafeAreaView>
+      {showUploadMenu && (
+        <Modal
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowUploadMenu(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Upload Music</Text>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setShowUploadMenu(false);
+                  router.push('/admin/upload?type=single');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Single</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setShowUploadMenu(false);
+                  router.push('/admin/upload?type=album');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Album</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, { backgroundColor: 'transparent' }]}
+                onPress={() => setShowUploadMenu(false)}
+              >
+                <Text style={[styles.modalButtonText, { color: '#ef4444' }]}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </LinearGradient>
   );
 }
@@ -365,4 +406,39 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   toolText: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
+  modalOverlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#1f2937',
+    padding: 24,
+    borderRadius: 12,
+    width: '80%',
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: 'rgba(139,92,246,0.2)',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#8b5cf6',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
 });

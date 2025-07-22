@@ -241,9 +241,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const [trackRes, artistRes, userRes] = await Promise.all([
         supabase
           .from('tracks')
-          .select(
-            'id,title,duration,cover_url,audio_url,artist_name,album:title,genres,release_date,created_at',
-          )
+          .select(`*, artist:artist_id(*), album:album_id(*)`)
           .ilike('title', `%${term}%`)
           .eq('is_published', true)
           .limit(10),
@@ -258,10 +256,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const tracks = (trackRes.data || []).map((t: any) => ({
         id: t.id,
         title: t.title,
-        artist: t.artist_name || 'Unknown Artist',
-        album: t.album || 'Single',
+        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+        album: t.album?.title || t.album_title || 'Single',
         duration: t.duration || 0,
-        coverUrl: t.cover_url,
+        coverUrl: t.cover_url || t.album?.cover_url || '',
         audioUrl: t.audio_url,
         isLiked: likedSongs.some((l) => l.id === t.id),
         genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
