@@ -1,6 +1,8 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { supabase } from '@/services/supabase';
+import * as FileSystem from 'expo-file-system';
+import { Buffer } from 'buffer';
 import mime from 'mime';
 
 export const uploadToSupabase = async (
@@ -9,8 +11,14 @@ export const uploadToSupabase = async (
   bucket: string,
 ): Promise<string | null> => {
   try {
-    const blob = await fetch(fileUri).then((res) => res.blob());
-    const contentType = mime.getType(fileUri) || 'application/octet-stream';
+    const base64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+    const buffer = Buffer.from(base64, 'base64');
+    const blob = new Blob([buffer], {
+      type: mime.getType(fileUri) || 'application/octet-stream',
+    });
+    const contentType = blob.type;
 
     const { error } = await supabase.storage.from(bucket).upload(path, blob, {
       cacheControl: '3600',
