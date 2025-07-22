@@ -152,14 +152,18 @@ export default function AdminScreen() {
     );
   }
 
-  const quickActions = [
+  type Action =
+    | { label: string; icon: any; onPress: () => void; route?: never }
+    | { label: string; icon: any; route: string; onPress?: never };
+
+  const quickActions: Action[] = [
     {
       label: 'Upload Music',
       icon: Upload,
       onPress: () => setShowUploadMenu(true),
     },
     { label: 'View Uploads', icon: Music, route: '/admin/uploads' },
-  ] as const;
+  ];
 
   const statsCards = [
     {

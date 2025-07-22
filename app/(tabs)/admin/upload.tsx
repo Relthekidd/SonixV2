@@ -24,7 +24,8 @@ import { useAuth } from '@/providers/AuthProvider';
 export default function UploadScreen() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const { isUploading, uploadProgress, uploadSingle, uploadAlbum } = useUpload();
+  const { isUploading, uploadProgress, uploadSingle, uploadAlbum } =
+    useUpload();
 
   const [mode, setMode] = useState<'single' | 'album'>('single');
   const [title, setTitle] = useState('');
@@ -34,7 +35,9 @@ export default function UploadScreen() {
   );
   const [mainArtist, setMainArtist] = useState<any>(null);
   const [coverFile, setCoverFile] = useState<any>(null);
-  const [publishMode, setPublishMode] = useState<'now' | 'schedule' | 'draft'>('now');
+  const [publishMode, setPublishMode] = useState<'now' | 'schedule' | 'draft'>(
+    'now',
+  );
   const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [published, setPublished] = useState(false);
@@ -69,19 +72,32 @@ export default function UploadScreen() {
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
     });
-    if (!res.canceled && res.assets?.[0]) setCoverFile(res.assets[0]);
+    if (!res.canceled && res.assets?.[0]) {
+      const a = res.assets[0];
+      setCoverFile({ ...a, type: a.mimeType });
+    }
   };
 
   const pickSingleAudio = async () => {
-    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
-    if (!res.canceled && res.assets?.[0]) setAudioFile(res.assets[0]);
+    const res = await DocumentPicker.getDocumentAsync({
+      type: 'audio/*',
+      copyToCacheDirectory: true,
+    });
+    if (!res.canceled && res.assets?.[0]) {
+      const a = res.assets[0];
+      setAudioFile({ uri: a.uri, name: a.name, type: a.mimeType });
+    }
   };
 
   const pickTrackAudio = async (idx: number) => {
-    const res = await DocumentPicker.getDocumentAsync({ type: 'audio/*' });
+    const res = await DocumentPicker.getDocumentAsync({
+      type: 'audio/*',
+      copyToCacheDirectory: true,
+    });
     if (!res.canceled && res.assets?.[0]) {
+      const a = res.assets[0];
       const arr = [...tracks];
-      arr[idx].audioFile = res.assets[0];
+      arr[idx].audioFile = { uri: a.uri, name: a.name, type: a.mimeType };
       setTracks(arr);
     }
   };
@@ -180,7 +196,10 @@ export default function UploadScreen() {
   const handleDelete = async () => {
     if (!newId) return;
     try {
-      await apiService.deleteContent(mode === 'album' ? 'album' : 'track', newId);
+      await apiService.deleteContent(
+        mode === 'album' ? 'album' : 'track',
+        newId,
+      );
       Alert.alert('Deleted');
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -206,7 +225,10 @@ export default function UploadScreen() {
   };
 
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.container}
+    >
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.section, styles.card, styles.toggleRow]}>
           {['single', 'album'].map((t) => (
@@ -215,7 +237,9 @@ export default function UploadScreen() {
               style={[styles.toggleBtn, mode === t && styles.toggleBtnActive]}
               onPress={() => setMode(t as any)}
             >
-              <Text style={styles.toggleText}>{t === 'single' ? 'Single' : 'Album'}</Text>
+              <Text style={styles.toggleText}>
+                {t === 'single' ? 'Single' : 'Album'}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -344,7 +368,11 @@ export default function UploadScreen() {
               onPress={() => setPublishMode(opt as any)}
             >
               <Text style={styles.toggleText}>
-                {opt === 'now' ? 'Publish Now' : opt === 'schedule' ? 'Schedule' : 'Draft'}
+                {opt === 'now'
+                  ? 'Publish Now'
+                  : opt === 'schedule'
+                    ? 'Schedule'
+                    : 'Draft'}
               </Text>
             </TouchableOpacity>
           ))}
@@ -356,7 +384,9 @@ export default function UploadScreen() {
               onPress={() => setShowPicker(true)}
             >
               <Text style={styles.fileBtnText}>
-                {scheduledAt ? scheduledAt.toLocaleString() : 'Pick Date & Time'}
+                {scheduledAt
+                  ? scheduledAt.toLocaleString()
+                  : 'Pick Date & Time'}
               </Text>
             </TouchableOpacity>
             {showPicker && (
@@ -371,13 +401,24 @@ export default function UploadScreen() {
             )}
           </View>
         )}
-        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit} disabled={isUploading}>
-          <Text style={styles.submitText}>{isUploading ? 'Uploading...' : 'Upload'}</Text>
+        <TouchableOpacity
+          style={styles.submitBtn}
+          onPress={handleSubmit}
+          disabled={isUploading}
+        >
+          <Text style={styles.submitText}>
+            {isUploading ? 'Uploading...' : 'Upload'}
+          </Text>
         </TouchableOpacity>
         {uploadDone && isAdmin && newId && (
           <View style={styles.adminActions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={handleTogglePublish}>
-              <Text style={styles.actionText}>{published ? 'Unpublish' : 'Publish'}</Text>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={handleTogglePublish}
+            >
+              <Text style={styles.actionText}>
+                {published ? 'Unpublish' : 'Publish'}
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
               <Text style={styles.actionText}>Delete</Text>

@@ -47,12 +47,13 @@ export default function TrackDetailScreen() {
   }
 
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const id = typeof params.id === 'string' ? params.id : undefined;
-
-  if (!id) {
-    Alert.alert('Error', 'Track ID is missing');
-    return null;
+  const { id } = useLocalSearchParams();
+  if (!id || typeof id !== 'string') {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator />
+      </View>
+    );
   }
 
   const [track, setTrack] = useState<Track | null>(null);
