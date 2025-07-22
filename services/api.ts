@@ -91,12 +91,8 @@ class ApiService {
         .from('albums')
         .select(
           `
-          id,
-          title,
-          artist:artist_name,
-          cover_url,
-          description,
-          release_date,
+          *,
+          artist:artist_id(*),
           tracks (
             id,
             title,
@@ -108,7 +104,7 @@ class ApiService {
             lyrics
           )
         `,
-        ) // ← closed backtick
+        )
         .eq('id', id) // ← filter by album id
         .single(); // ← expect a single row
 
@@ -153,7 +149,7 @@ class ApiService {
   async getArtistTracks(id: string): Promise<any[]> {
     const { data, error } = await supabase
       .from('tracks')
-      .select('*')
+      .select('*, artist:artist_id(*), album:album_id(*)')
       .eq('artist_id', id)
       .order('created_at', { ascending: false });
     if (error) throw error;
