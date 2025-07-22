@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadUserProfile(uid);
       }
     },
-    [loadUserProfile, syncSession],
+    [loadUserProfile],
   );
 
   const login = useCallback(
