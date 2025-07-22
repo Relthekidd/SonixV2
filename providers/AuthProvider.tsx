@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadUserProfile(uid);
       }
     },
-    [loadUserProfile],
+    [loadUserProfile, syncSession],
   );
 
   const login = useCallback(
@@ -153,8 +153,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] signUp result', { data, error });
         if (error) throw error;
 
-        const newUser = data.user!;
-        const uid = newUser.id;
+        if (data.session) {
+          // Persist session if signUp returned one
+          await syncSession(data.session);
+        }
+
+        const uid = data.user!.id;
         const profile: Profile = {
           id: uid,
           email,
@@ -177,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] signup end');
       }
     },
-    [loadUserProfile],
+    [loadUserProfile, syncSession],
   );
 
   const logout = useCallback(async () => {
