@@ -1,8 +1,12 @@
 import 'react-native-get-random-values';
 import { v4 as uuidv4 } from 'uuid';
 // Use the shared Supabase client with persisted auth session
-import { supabase } from '../providers/AuthProvider';
-import { uploadAudio, uploadImage, deleteFile as removeFromStorage } from './supabaseStorage';
+import { supabase } from './supabase';
+import {
+  uploadAudio,
+  uploadImage,
+  deleteFile as removeFromStorage,
+} from './supabaseStorage';
 
 export interface SingleUploadData {
   title: string;
@@ -85,7 +89,7 @@ class UploadService {
     console.log('[UploadService] authenticated user', userId);
 
     const { data: profile, error: profileError } = await supabase
-      .from('profiles')
+      .from('users')
       .select('role')
       .eq('id', userId)
       .single();
@@ -95,7 +99,12 @@ class UploadService {
     }
 
     const isAdmin = profile?.role === 'admin';
-    console.log('[UploadService] user role', profile?.role, 'isAdmin=', isAdmin);
+    console.log(
+      '[UploadService] user role',
+      profile?.role,
+      'isAdmin=',
+      isAdmin,
+    );
     return { userId, isAdmin };
   }
 
@@ -104,7 +113,8 @@ class UploadService {
     if (!data.title.trim()) throw new Error('Album title is required');
     if (!data.artistId) throw new Error('Uploader ID is required');
     if (!data.mainArtistId) throw new Error('Main artist is required');
-    if (data.tracks.length < 1) throw new Error('At least one track is required');
+    if (data.tracks.length < 1)
+      throw new Error('At least one track is required');
 
     data.tracks.forEach((track, index) => {
       if (!track.title.trim()) {
@@ -120,9 +130,12 @@ class UploadService {
     file: { uri: string; name?: string; type?: string } | undefined,
     artistId: string,
     entityId: string,
-    prefix: 'singles' | 'albums'
+    prefix: 'singles' | 'albums',
   ): Promise<string | null> {
-    console.log(`[UploadService] uploadCover start for ${prefix}/${entityId}`, file);
+    console.log(
+      `[UploadService] uploadCover start for ${prefix}/${entityId}`,
+      file,
+    );
     if (!file?.uri) {
       console.log('[UploadService] no cover file provided');
       return null;
@@ -146,7 +159,7 @@ class UploadService {
     file: { uri: string; name?: string; type?: string },
     artistId: string,
     trackId: string,
-    albumId?: string
+    albumId?: string,
   ): Promise<string> {
     const base = albumId
       ? `audio/${artistId}/albums/${albumId}`
@@ -172,38 +185,48 @@ class UploadService {
 
     try {
       const { userId, isAdmin } = await this.checkUploadPermissions();
-      console.log('[UploadService] permissions for uploadSingle', { userId, isAdmin });
+      console.log('[UploadService] permissions for uploadSingle', {
+        userId,
+        isAdmin,
+      });
 
       console.log('[UploadService] comparing created_by');
       console.log('Current user:', userId);
       console.log('Data.artistId:', data.artistId);
       console.log('Match?', userId === data.artistId);
 
-      const audioUrl = await this.uploadTrackAudio(data.audioFile, data.artistId, id);
-      const coverUrl = await this.uploadCover(data.coverFile, data.artistId, id, 'singles');
+      const audioUrl = await this.uploadTrackAudio(
+        data.audioFile,
+        data.artistId,
+        id,
+      );
+      const coverUrl = await this.uploadCover(
+        data.coverFile,
+        data.artistId,
+        id,
+        'singles',
+      );
 
       console.log('[UploadService] inserting track record');
-      const { error } = await supabase
-        .from('tracks')
-        .insert({
-          id,
-          title: data.title.trim(),
-          lyrics: data.lyrics || '',
-          duration: data.duration || 0,
-          explicit: data.explicit,
-          release_date: data.releaseDate,
-          album_id: null,
-          artist_id: data.mainArtistId,
-          created_by: data.artistId,
-          featured_artist_ids: data.featuredArtistIds,
-          track_number: 1,
-          genres: data.genres,
-          description: data.description || '',
-          audio_url: audioUrl,
-          cover_url: coverUrl,
-          is_published: data.isPublished ?? false,
-          scheduled_publish_at: data.scheduledPublishAt ?? null,
-        });
+      const { error } = await supabase.from('tracks').insert({
+        id,
+        title: data.title.trim(),
+        lyrics: data.lyrics || '',
+        duration: data.duration || 0,
+        explicit: data.explicit,
+        release_date: data.releaseDate,
+        album_id: null,
+        artist_id: data.mainArtistId,
+        created_by: data.artistId,
+        featured_artist_ids: data.featuredArtistIds,
+        track_number: 1,
+        genres: data.genres,
+        description: data.description || '',
+        audio_url: audioUrl,
+        cover_url: coverUrl,
+        is_published: data.isPublished ?? false,
+        scheduled_publish_at: data.scheduledPublishAt ?? null,
+      });
       if (error) {
         console.error('[UploadService] supabase.insert track error', error);
         throw error;
@@ -226,28 +249,37 @@ class UploadService {
 
     try {
       const { userId, isAdmin } = await this.checkUploadPermissions();
-      console.log('[UploadService] permissions for uploadAlbum', { userId, isAdmin });
+      console.log('[UploadService] permissions for uploadAlbum', {
+        userId,
+        isAdmin,
+      });
 
-      const coverUrl = await this.uploadCover(data.coverFile, data.artistId, albumId, 'albums');
+      const coverUrl = await this.uploadCover(
+        data.coverFile,
+        data.artistId,
+        albumId,
+        'albums',
+      );
       console.log('[UploadService] inserting album record');
-      const { error: albumError } = await supabase
-        .from('albums')
-        .insert({
-          id: albumId,
-          title: data.title.trim(),
-          description: data.description || '',
-          release_date: data.releaseDate,
-          genres: data.genres,
-          explicit: data.explicit,
-          artist_id: data.mainArtistId,
-          created_by: data.artistId,
-          featured_artist_ids: data.featuredArtistIds,
-          cover_url: coverUrl,
-          is_published: data.isPublished ?? false,
-          scheduled_publish_at: data.scheduledPublishAt ?? null,
-        });
+      const { error: albumError } = await supabase.from('albums').insert({
+        id: albumId,
+        title: data.title.trim(),
+        description: data.description || '',
+        release_date: data.releaseDate,
+        genres: data.genres,
+        explicit: data.explicit,
+        artist_id: data.mainArtistId,
+        created_by: data.artistId,
+        featured_artist_ids: data.featuredArtistIds,
+        cover_url: coverUrl,
+        is_published: data.isPublished ?? false,
+        scheduled_publish_at: data.scheduledPublishAt ?? null,
+      });
       if (albumError) {
-        console.error('[UploadService] supabase.insert album error', albumError);
+        console.error(
+          '[UploadService] supabase.insert album error',
+          albumError,
+        );
         throw albumError;
       }
       console.log('[UploadService] album record inserted');
@@ -255,33 +287,43 @@ class UploadService {
       const trackIds: string[] = [];
       for (const track of data.tracks) {
         const trackId = uuidv4();
-        console.log('[UploadService] processing track', track.trackNumber, track);
-        const audioUrl = await this.uploadTrackAudio(track.audioFile, data.artistId, trackId, albumId);
+        console.log(
+          '[UploadService] processing track',
+          track.trackNumber,
+          track,
+        );
+        const audioUrl = await this.uploadTrackAudio(
+          track.audioFile,
+          data.artistId,
+          trackId,
+          albumId,
+        );
 
         console.log('[UploadService] inserting track for album');
-        const { error: trackError } = await supabase
-          .from('tracks')
-          .insert({
-            id: trackId,
-            album_id: albumId,
-            title: track.title.trim(),
-            lyrics: track.lyrics || '',
-            duration: track.duration || 0,
-            explicit: track.explicit,
-            release_date: data.releaseDate,
-            artist_id: data.mainArtistId,
-            created_by: data.artistId,
-            featured_artist_ids: track.featuredArtistIds,
-            track_number: track.trackNumber,
-            genres: data.genres,
-            description: data.description || '',
-            audio_url: audioUrl,
-            cover_url: null,
-            is_published: data.isPublished ?? false,
-            scheduled_publish_at: data.scheduledPublishAt ?? null,
-          });
+        const { error: trackError } = await supabase.from('tracks').insert({
+          id: trackId,
+          album_id: albumId,
+          title: track.title.trim(),
+          lyrics: track.lyrics || '',
+          duration: track.duration || 0,
+          explicit: track.explicit,
+          release_date: data.releaseDate,
+          artist_id: data.mainArtistId,
+          created_by: data.artistId,
+          featured_artist_ids: track.featuredArtistIds,
+          track_number: track.trackNumber,
+          genres: data.genres,
+          description: data.description || '',
+          audio_url: audioUrl,
+          cover_url: null,
+          is_published: data.isPublished ?? false,
+          scheduled_publish_at: data.scheduledPublishAt ?? null,
+        });
         if (trackError) {
-          console.error('[UploadService] supabase.insert track for album error', trackError);
+          console.error(
+            '[UploadService] supabase.insert track for album error',
+            trackError,
+          );
           throw trackError;
         }
         trackIds.push(trackId);

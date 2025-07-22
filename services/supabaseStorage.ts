@@ -1,6 +1,6 @@
 // Use the shared Supabase client from the AuthProvider so uploads are
 // authenticated with the current user session.
-import { supabase } from '../providers/AuthProvider';
+import { supabase } from './supabase';
 
 /**
  * Upload a file to Supabase Storage and return its public URL
@@ -8,7 +8,7 @@ import { supabase } from '../providers/AuthProvider';
 async function uploadFile(
   file: { uri: string; name?: string; type?: string },
   path: string,
-  bucket: string = 'audio-files'
+  bucket: string = 'audio-files',
 ): Promise<{ url: string }> {
   // Fetch the file URI as a blob (React Native)
   const response = await fetch(file.uri);
@@ -41,7 +41,7 @@ async function uploadFile(
  */
 export async function uploadAudio(
   file: { uri: string; name?: string; type?: string },
-  path: string
+  path: string,
 ): Promise<{ url: string }> {
   return uploadFile(file, path, 'audio-files');
 }
@@ -51,7 +51,7 @@ export async function uploadAudio(
  */
 export async function uploadImage(
   file: { uri: string; name?: string; type?: string },
-  path: string
+  path: string,
 ): Promise<{ url: string }> {
   return uploadFile(file, path, 'images');
 }
@@ -61,7 +61,7 @@ export async function uploadImage(
  */
 export async function deleteFile(
   path: string,
-  bucket: string = 'audio-files'
+  bucket: string = 'audio-files',
 ): Promise<void> {
   const { error } = await supabase.storage.from(bucket).remove([path]);
   if (error) {

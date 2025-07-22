@@ -1,6 +1,6 @@
 // Use the global Supabase client from the AuthProvider to ensure
 // authenticated requests have access to the current session.
-import { supabase } from '../providers/AuthProvider';
+import { supabase } from './supabase';
 
 // Base URL for any REST endpoints if needed
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
@@ -20,7 +20,7 @@ export interface TrackData {
 export interface AlbumDetails {
   id: string;
   title: string;
-  artist: string;              // aliased from artist_name
+  artist: string; // aliased from artist_name
   cover_url: string;
   description?: string;
   release_date?: string;
@@ -47,13 +47,18 @@ class ApiService {
     this.unauthorizedCallback = cb;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+  ): Promise<T> {
     console.log('[ApiService] request start', endpoint, options);
     const res = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers: {
         'Content-Type': 'application/json',
-        ...(this.authToken ? { Authorization: `Bearer ${this.authToken}` } : {}),
+        ...(this.authToken
+          ? { Authorization: `Bearer ${this.authToken}` }
+          : {}),
         ...(options.headers || {}),
       },
     });
@@ -84,7 +89,8 @@ class ApiService {
     try {
       const { data, error } = await supabase
         .from('albums')
-        .select(`
+        .select(
+          `
           id,
           title,
           artist:artist_name,
@@ -101,9 +107,10 @@ class ApiService {
             like_count,
             lyrics
           )
-        `) // ← closed backtick
-        .eq('id', id)   // ← filter by album id
-        .single();      // ← expect a single row
+        `,
+        ) // ← closed backtick
+        .eq('id', id) // ← filter by album id
+        .single(); // ← expect a single row
 
       if (error) {
         console.error('[ApiService] getAlbumById supabase error', error);
@@ -124,9 +131,7 @@ class ApiService {
   async getTrackById(id: string): Promise<any> {
     const { data, error } = await supabase
       .from('tracks')
-      .select(
-        `*, artist:artist_id(*), album:album_id(*)`
-      )
+      .select(`*, artist:artist_id(*), album:album_id(*)`)
       .eq('id', id)
       .single();
     if (error) throw error;
@@ -158,9 +163,21 @@ class ApiService {
   /** Recent uploads across singles, albums and tracks */
   async getRecentUploads() {
     const [singles, albums, tracks] = await Promise.all([
-      supabase.from('singles').select('*').order('created_at', { ascending: false }).limit(20),
-      supabase.from('albums').select('*').order('created_at', { ascending: false }).limit(20),
-      supabase.from('tracks').select('*').order('created_at', { ascending: false }).limit(20),
+      supabase
+        .from('singles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('albums')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase
+        .from('tracks')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20),
     ]);
     return {
       singles: singles.data || [],
@@ -189,7 +206,8 @@ class ApiService {
 
   /** Delete uploaded content by type */
   async deleteContent(type: 'single' | 'album' | 'track', id: string) {
-    const table = type === 'album' ? 'albums' : type === 'single' ? 'singles' : 'tracks';
+    const table =
+      type === 'album' ? 'albums' : type === 'single' ? 'singles' : 'tracks';
     const { error } = await supabase.from(table).delete().eq('id', id);
     if (error) throw error;
   }

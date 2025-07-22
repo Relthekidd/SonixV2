@@ -14,8 +14,17 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
-import { supabase } from '@/providers/AuthProvider';
-import { ArrowLeft, Check, X, User, Mail, Calendar, FileText, Image as ImageIcon } from 'lucide-react-native';
+import { supabase } from '@/services/supabase';
+import {
+  ArrowLeft,
+  Check,
+  X,
+  User,
+  Mail,
+  Calendar,
+  FileText,
+  Image as ImageIcon,
+} from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { supabaseStorage } from '@/services/supabaseStorage';
 
@@ -72,13 +81,20 @@ export default function AdminArtistsScreen() {
           newArtistImage.fileName ||
           newArtistImage.name ||
           `${newArtistName.replace(/[^a-zA-Z0-9]/g, '_')}.jpg`;
-        const upload = await supabaseStorage.uploadImage(newArtistImage, fileName);
+        const upload = await supabaseStorage.uploadImage(
+          newArtistImage,
+          fileName,
+        );
         imageUrl = upload.url;
       }
 
       const { data, error } = await supabase
         .from('artists')
-        .insert({ name: newArtistName.trim(), bio: newArtistBio || null, image_url: imageUrl })
+        .insert({
+          name: newArtistName.trim(),
+          bio: newArtistBio || null,
+          image_url: imageUrl,
+        })
         .select('id')
         .single();
 
@@ -108,7 +124,7 @@ export default function AdminArtistsScreen() {
   const loadPendingArtists = async () => {
     try {
       setIsLoading(true);
-      
+
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -140,9 +156,13 @@ export default function AdminArtistsScreen() {
     }
   }, []);
 
-  const handleArtistAction = async (artistId: string, isVerified: boolean, artistName: string) => {
+  const handleArtistAction = async (
+    artistId: string,
+    isVerified: boolean,
+    artistName: string,
+  ) => {
     const action = isVerified ? 'approve' : 'reject';
-    
+
     Alert.alert(
       `${isVerified ? 'Approve' : 'Reject'} Artist`,
       `Are you sure you want to ${action} ${artistName}?`,
@@ -151,15 +171,19 @@ export default function AdminArtistsScreen() {
         {
           text: isVerified ? 'Approve' : 'Reject',
           style: isVerified ? 'default' : 'destructive',
-          onPress: () => processArtistAction(artistId, isVerified, artistName)
-        }
-      ]
+          onPress: () => processArtistAction(artistId, isVerified, artistName),
+        },
+      ],
     );
   };
 
-  const processArtistAction = async (artistId: string, isVerified: boolean, artistName: string) => {
-    setProcessingIds(prev => new Set(prev).add(artistId));
-    
+  const processArtistAction = async (
+    artistId: string,
+    isVerified: boolean,
+    artistName: string,
+  ) => {
+    setProcessingIds((prev) => new Set(prev).add(artistId));
+
     try {
       if (isVerified) {
         // Approve artist
@@ -173,27 +197,32 @@ export default function AdminArtistsScreen() {
         // Reject artist - change role back to listener
         const { error } = await supabase
           .from('users')
-          .update({ 
+          .update({
             role: 'listener',
-            artist_verified: false 
+            artist_verified: false,
           })
           .eq('id', artistId);
 
         if (error) throw error;
       }
-      
+
       // Remove from pending list
-      setPendingArtists(prev => prev.filter(artist => artist.id !== artistId));
-      
+      setPendingArtists((prev) =>
+        prev.filter((artist) => artist.id !== artistId),
+      );
+
       Alert.alert(
         'Success',
-        `${artistName} has been ${isVerified ? 'approved' : 'rejected'} successfully.`
+        `${artistName} has been ${isVerified ? 'approved' : 'rejected'} successfully.`,
       );
     } catch (error) {
       console.error('Error updating artist status:', error);
-      Alert.alert('Error', `Failed to ${isVerified ? 'approve' : 'reject'} artist`);
+      Alert.alert(
+        'Error',
+        `Failed to ${isVerified ? 'approve' : 'reject'} artist`,
+      );
     } finally {
-      setProcessingIds(prev => {
+      setProcessingIds((prev) => {
         const newSet = new Set(prev);
         newSet.delete(artistId);
         return newSet;
@@ -240,17 +269,28 @@ export default function AdminArtistsScreen() {
       <View style={styles.formGroup}>
         <Text style={styles.label}>Image</Text>
         <TouchableOpacity
-          style={[styles.fileButton, newArtistImage && styles.fileButtonSelected]}
+          style={[
+            styles.fileButton,
+            newArtistImage && styles.fileButtonSelected,
+          ]}
           onPress={pickArtistImage}
         >
           <ImageIcon color={newArtistImage ? '#8b5cf6' : '#64748b'} size={20} />
-          <Text style={[styles.fileButtonText, newArtistImage && styles.fileButtonTextSelected]}>
+          <Text
+            style={[
+              styles.fileButtonText,
+              newArtistImage && styles.fileButtonTextSelected,
+            ]}
+          >
             {newArtistImage ? 'Image Selected' : 'Select Image'}
           </Text>
           {newArtistImage && <Check color="#8b5cf6" size={20} />}
         </TouchableOpacity>
         {newArtistImage && (
-          <Image source={{ uri: newArtistImage.uri }} style={styles.imagePreview} />
+          <Image
+            source={{ uri: newArtistImage.uri }}
+            style={styles.imagePreview}
+          />
         )}
       </View>
 
@@ -270,7 +310,7 @@ export default function AdminArtistsScreen() {
 
   const renderArtistItem = ({ item }: { item: PendingArtist }) => {
     const isProcessing = processingIds.has(item.id);
-    
+
     return (
       <View style={styles.artistCard}>
         <View style={styles.artistHeader}>
@@ -280,10 +320,9 @@ export default function AdminArtistsScreen() {
           <View style={styles.artistInfo}>
             <Text style={styles.artistName}>{item.display_name}</Text>
             <Text style={styles.artistDisplayName}>
-              {item.first_name && item.last_name 
-                ? `${item.first_name} ${item.last_name}` 
-                : item.email
-              }
+              {item.first_name && item.last_name
+                ? `${item.first_name} ${item.last_name}`
+                : item.email}
             </Text>
           </View>
         </View>
@@ -293,10 +332,12 @@ export default function AdminArtistsScreen() {
             <Mail color="#94a3b8" size={16} />
             <Text style={styles.detailText}>{item.email}</Text>
           </View>
-          
+
           <View style={styles.detailRow}>
             <Calendar color="#94a3b8" size={16} />
-            <Text style={styles.detailText}>Applied {formatDate(item.created_at)}</Text>
+            <Text style={styles.detailText}>
+              Applied {formatDate(item.created_at)}
+            </Text>
           </View>
 
           {item.bio && (
@@ -310,7 +351,9 @@ export default function AdminArtistsScreen() {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.actionButton, styles.rejectButton]}
-            onPress={() => handleArtistAction(item.id, false, item.display_name)}
+            onPress={() =>
+              handleArtistAction(item.id, false, item.display_name)
+            }
             disabled={isProcessing}
           >
             {isProcessing ? (

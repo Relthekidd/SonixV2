@@ -6,26 +6,16 @@ import React, {
   useCallback,
   useRef,
 } from 'react';
-import { createClient, Session } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Session } from '@supabase/supabase-js';
 import { apiService } from '../services/api';
-
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+import { supabase } from '../services/supabase';
 
 type Profile = {
   id: string;
   email: string;
   display_name?: string;
+  bio?: string;
+  profile_picture_url?: string;
   role?: 'listener' | 'artist' | 'admin';
   [key: string]: any;
 };
@@ -42,7 +32,7 @@ type AuthContextType = {
     password: string,
     displayName: string,
     role?: 'listener' | 'artist' | 'admin',
-    additionalData?: Partial<Profile>
+    additionalData?: Partial<Profile>,
   ) => Promise<void>;
   logout: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
@@ -67,23 +57,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[Auth] loadUserProfile start for', uid);
     try {
       const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
+        .from('users')
+        .select(
+          'id, email, display_name, bio, role, profile_picture_url'
+        )
         .eq('id', uid)
         .single();
       if (error) throw error;
 
-      setUser(prev => {
+      setUser((prev) => {
         // Only update if profile actually changed
         if (
-          prev && prev.id === data.id && prev.role === data.role &&
+          prev &&
+          prev.id === data.id &&
+          prev.role === data.role &&
           JSON.stringify(prev) === JSON.stringify(data)
         ) {
           console.log('[Auth] loadUserProfile: no changes, skip');
           return prev;
         }
         console.log('[Auth] loadUserProfile success, role:', data.role);
-        return data as Profile;
+        return {
+          id: data.id,
+          email: data.email,
+          display_name: data.display_name ?? data.email,
+          bio: data.bio ?? '',
+          profile_picture_url: data.profile_picture_url ?? '',
+          role: data.role ?? 'listener',
+        } as Profile;
       });
     } catch (err) {
       console.error('[Auth] loadUserProfile error', err);
@@ -110,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadUserProfile(uid);
       }
     },
-    [loadUserProfile]
+    [loadUserProfile],
   );
 
   const login = useCallback(
@@ -118,7 +119,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] login start', email);
       setIsLoading(true);
       try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
         console.log('[Auth] signInWithPassword result', { data, error });
         if (error) throw error;
 
@@ -131,7 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] login end');
       }
     },
-    [syncSession]
+    [syncSession],
   );
 
   const signup = useCallback(
@@ -140,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: string,
       displayName: string,
       role: 'listener' | 'artist' | 'admin' = 'listener',
-      additionalData: Partial<Profile> = {}
+      additionalData: Partial<Profile> = {},
     ) => {
       console.log('[Auth] signup start', email);
       setIsLoading(true);
@@ -151,8 +155,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const newUser = data.user!;
         const uid = newUser.id;
-        const profile: Profile = { id: uid, email, display_name: displayName, role, ...additionalData };
-        const { error: upError } = await supabase.from('profiles').insert(profile);
+        const profile: Profile = {
+          id: uid,
+          email,
+          display_name: displayName,
+          role,
+          ...additionalData,
+        };
+        const { error: upError } = await supabase
+          .from('users')
+          .insert(profile);
         if (upError) throw upError;
         console.log('[Auth] profile insert success');
 
@@ -165,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] signup end');
       }
     },
-    [loadUserProfile]
+    [loadUserProfile],
   );
 
   const logout = useCallback(async () => {
@@ -195,10 +207,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) throw new Error('No user to update');
       setIsLoading(true);
       try {
-        const { error } = await supabase.from('profiles').update(updates).eq('id', user.id);
+        const { error } = await supabase
+          .from('users')
+          .update(updates)
+          .eq('id', user.id);
         console.log('[Auth] updateProfile result', { error });
         if (error) throw error;
-        setUser(prev => (prev ? { ...prev, ...updates } : prev));
+        setUser((prev) => (prev ? { ...prev, ...updates } : prev));
       } catch (err) {
         console.error('[Auth] updateProfile error', err);
         throw err;
@@ -207,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] updateProfile end');
       }
     },
-    [user]
+    [user],
   );
 
   const resetPassword = useCallback(async (email: string) => {
@@ -232,7 +247,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { error } = await supabase.auth.signUp({ email, password: '' });
       console.log('[Auth] resendConfirmation result', { error });
-      if (error) console.warn('[Auth] resendConfirmation warning', error.message);
+      if (error)
+        console.warn('[Auth] resendConfirmation warning', error.message);
     } catch (err) {
       console.error('[Auth] resendConfirmation error', err);
     } finally {
@@ -247,15 +263,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let mounted = true;
 
     // Initial session fetch
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
-      console.log('[Auth] initial getSession', initialSession);
-      if (!mounted) return;
-      await syncSession(initialSession);
-      setIsLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session: initialSession } }) => {
+        console.log('[Auth] initial getSession', initialSession);
+        if (!mounted) return;
+        await syncSession(initialSession);
+        setIsLoading(false);
+      });
 
     // Listen to auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, sess) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, sess) => {
       console.log('[Auth] onAuthStateChange', event);
       if (!mounted) return;
 

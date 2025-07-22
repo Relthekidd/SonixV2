@@ -13,7 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 // Use the shared Supabase client with the active auth session
-import { supabase } from '@/providers/AuthProvider';
+import { supabase } from '@/services/supabase';
 import {
   Users,
   Music,
@@ -96,14 +96,19 @@ export default function AdminScreen() {
         supabase.from('song_plays').select('*', { count: 'exact', head: true }),
       ]);
       const today = new Date().toISOString().split('T')[0];
-      const [
-        { count: nu },
-        { count: nt },
-        { count: pt },
-      ] = await Promise.all([
-        supabase.from('users').select('*', { count: 'exact', head: true }).gte('created_at', today),
-        supabase.from('tracks').select('*', { count: 'exact', head: true }).gte('created_at', today),
-        supabase.from('song_plays').select('*', { count: 'exact', head: true }).gte('created_at', today),
+      const [{ count: nu }, { count: nt }, { count: pt }] = await Promise.all([
+        supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
+        supabase
+          .from('tracks')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
+        supabase
+          .from('song_plays')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', today),
       ]);
       setStats({
         totalUsers: u || 0,
@@ -146,16 +151,40 @@ export default function AdminScreen() {
   }
 
   const quickActions = [
-    { label: 'Upload Single', icon: Upload, route: '/admin/upload?type=single' },
+    {
+      label: 'Upload Single',
+      icon: Upload,
+      route: '/admin/upload?type=single',
+    },
     { label: 'Upload Album', icon: Plus, route: '/admin/upload?type=album' },
     { label: 'View Uploads', icon: Music, route: '/admin/uploads' },
   ] as const;
 
   const statsCards = [
-    { title: 'Users', value: stats.totalUsers, subtitle: `${stats.newUsersToday} today`, icon: Users },
-    { title: 'Tracks', value: stats.totalTracks, subtitle: `${stats.newTracksToday} today`, icon: Music },
-    { title: 'Plays', value: stats.totalPlays, subtitle: `${stats.playsToday} today`, icon: PlayCircle },
-    { title: 'Artists', value: stats.totalArtists, subtitle: 'Active', icon: Users },
+    {
+      title: 'Users',
+      value: stats.totalUsers,
+      subtitle: `${stats.newUsersToday} today`,
+      icon: Users,
+    },
+    {
+      title: 'Tracks',
+      value: stats.totalTracks,
+      subtitle: `${stats.newTracksToday} today`,
+      icon: Music,
+    },
+    {
+      title: 'Plays',
+      value: stats.totalPlays,
+      subtitle: `${stats.playsToday} today`,
+      icon: PlayCircle,
+    },
+    {
+      title: 'Artists',
+      value: stats.totalArtists,
+      subtitle: 'Active',
+      icon: Users,
+    },
   ];
 
   return (
@@ -175,73 +204,86 @@ export default function AdminScreen() {
             />
           }
         >
-        <View style={styles.header}>
-          <Text style={styles.title}>Admin Dashboard</Text>
-          <Text style={styles.subtitle}>Overview & Tools</Text>
-        </View>
+          <View style={styles.header}>
+            <Text style={styles.title}>Admin Dashboard</Text>
+            <Text style={styles.subtitle}>Overview & Tools</Text>
+          </View>
 
-        {/* Quick Actions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsRow}>
-            {quickActions.map((act) => (
-              <TouchableOpacity
-                key={act.label}
-                style={styles.actionBtn}
-                onPress={() => router.push(act.route as any)}
-              >
-                <LinearGradient
-                  colors={["#8b5cf6", "#a855f7"]}
-                  style={styles.actionGradient}
+          {/* Quick Actions */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Quick Actions</Text>
+            <View style={styles.actionsRow}>
+              {quickActions.map((act) => (
+                <TouchableOpacity
+                  key={act.label}
+                  style={styles.actionBtn}
+                  onPress={() => router.push(act.route as any)}
                 >
-                  <act.icon color="#fff" size={24} />
-                </LinearGradient>
-                <Text style={styles.actionText}>{act.label}</Text>
-              </TouchableOpacity>
-            ))}
+                  <LinearGradient
+                    colors={['#8b5cf6', '#a855f7']}
+                    style={styles.actionGradient}
+                  >
+                    <act.icon color="#fff" size={24} />
+                  </LinearGradient>
+                  <Text style={styles.actionText}>{act.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
 
-        {/* Stats Overview */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Platform Stats</Text>
-          <View style={styles.statsGrid}>
-            {statsCards.map((card) => (
-              <View key={card.title} style={styles.card}>
-                <View style={styles.cardIcon}>
-                  <card.icon color="#8b5cf6" size={24} />
+          {/* Stats Overview */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Platform Stats</Text>
+            <View style={styles.statsGrid}>
+              {statsCards.map((card) => (
+                <View key={card.title} style={styles.card}>
+                  <View style={styles.cardIcon}>
+                    <card.icon color="#8b5cf6" size={24} />
+                  </View>
+                  <Text style={styles.cardValue}>
+                    {card.value.toLocaleString()}
+                  </Text>
+                  <Text style={styles.cardTitle}>{card.title}</Text>
+                  <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
                 </View>
-                <Text style={styles.cardValue}>{card.value.toLocaleString()}</Text>
-                <Text style={styles.cardTitle}>{card.title}</Text>
-                <Text style={styles.cardSubtitle}>{card.subtitle}</Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
-        </View>
 
-        {/* Admin Tools */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Admin Tools</Text>
-          <View style={styles.toolsList}>
-            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/uploads')}>
-              <Music color="#8b5cf6" size={24} />
-              <Text style={styles.toolText}>Manage Uploads</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/verify-artists')}>
-              <Check color="#8b5cf6" size={24} />
-              <Text style={styles.toolText}>Verify Artists</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/users')}>
-              <Users color="#8b5cf6" size={24} />
-              <Text style={styles.toolText}>Manage Users</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.toolCard} onPress={() => router.push('/admin/analytics')}>
-              <BarChart3 color="#8b5cf6" size={24} />
-              <Text style={styles.toolText}>View Analytics</Text>
-            </TouchableOpacity>
+          {/* Admin Tools */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Admin Tools</Text>
+            <View style={styles.toolsList}>
+              <TouchableOpacity
+                style={styles.toolCard}
+                onPress={() => router.push('/admin/uploads')}
+              >
+                <Music color="#8b5cf6" size={24} />
+                <Text style={styles.toolText}>Manage Uploads</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolCard}
+                onPress={() => router.push('/admin/verify-artists')}
+              >
+                <Check color="#8b5cf6" size={24} />
+                <Text style={styles.toolText}>Verify Artists</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolCard}
+                onPress={() => router.push('/admin/users')}
+              >
+                <Users color="#8b5cf6" size={24} />
+                <Text style={styles.toolText}>Manage Users</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.toolCard}
+                onPress={() => router.push('/admin/analytics')}
+              >
+                <BarChart3 color="#8b5cf6" size={24} />
+                <Text style={styles.toolText}>View Analytics</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-
         </ScrollView>
       </SafeAreaView>
     </LinearGradient>
@@ -258,8 +300,17 @@ const styles = StyleSheet.create({
   title: { fontSize: 28, color: '#fff', fontFamily: 'Poppins-Bold' },
   subtitle: { fontSize: 16, color: '#94a3b8', marginTop: 4 },
   section: { marginBottom: 32, paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16, fontFamily: 'Poppins-SemiBold' },
-  actionsRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  sectionTitle: {
+    fontSize: 20,
+    color: '#fff',
+    marginBottom: 16,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
   actionBtn: {
     flex: 1,
     borderRadius: 16,
@@ -276,7 +327,11 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   actionText: { color: '#fff', fontFamily: 'Inter-Medium', fontSize: 12 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
   card: {
     width: '47%',
     backgroundColor: 'rgba(255,255,255,0.05)',
