@@ -54,6 +54,7 @@ export default function AdminScreen() {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showUploadMenu, setShowUploadMenu] = useState(false);
 
   // Redirect non-admins
   useEffect(() => {
@@ -150,8 +151,6 @@ export default function AdminScreen() {
       </LinearGradient>
     );
   }
-
-  const [showUploadMenu, setShowUploadMenu] = useState(false);
 
   const quickActions = [
     {
@@ -321,7 +320,9 @@ export default function AdminScreen() {
                 style={[styles.modalButton, { backgroundColor: 'transparent' }]}
                 onPress={() => setShowUploadMenu(false)}
               >
-                <Text style={[styles.modalButtonText, { color: '#ef4444' }]}>Cancel</Text>
+                <Text style={[styles.modalButtonText, { color: '#ef4444' }]}>
+                  Cancel
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
