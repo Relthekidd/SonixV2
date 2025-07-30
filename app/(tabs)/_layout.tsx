@@ -1,6 +1,6 @@
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { useEffect, useMemo } from 'react';
+import { useEffect } from 'react';
 import { router } from 'expo-router';
 import {
   Chrome as Home,
@@ -15,7 +15,6 @@ import { View, StyleSheet } from 'react-native';
 
 export default function TabLayout() {
   const { user, isLoading } = useAuth();
-  const role = user?.role;
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -23,11 +22,6 @@ export default function TabLayout() {
     }
   }, [user, isLoading]);
 
-  useEffect(() => {
-    if (user) {
-      console.log('[Tabs] user role', role);
-    }
-  }, [role, user]);
 
   if (isLoading || !user) {
     return null; // Or <LoadingScreen />
@@ -37,17 +31,8 @@ export default function TabLayout() {
     { name: 'index', title: 'Home', icon: Home },
     { name: 'search', title: 'Search', icon: Search },
     { name: 'library', title: 'Library', icon: Library },
+    { name: 'profile', title: 'Profile', icon: User },
   ];
-
-  if (role === 'artist') {
-    screens.push({ name: 'artist-dashboard', title: 'Upload', icon: Upload });
-  }
-
-  if (role === 'admin') {
-    screens.push({ name: 'admin', title: 'Admin', icon: Settings });
-  }
-
-  screens.push({ name: 'profile', title: 'Profile', icon: User });
 
   return (
     <View style={styles.container}>

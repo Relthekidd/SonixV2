@@ -26,7 +26,6 @@ export default function SignupScreen() {
   const [lastName, setLastName] = useState('');
   const [bio, setBio] = useState('');
   const [profilePicture, setProfilePicture] = useState<any>(null);
-  const [selectedRole, setSelectedRole] = useState<'listener' | 'artist'>('listener');
   const [isPrivate, setIsPrivate] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -64,10 +63,6 @@ export default function SignupScreen() {
       return;
     }
 
-    if (selectedRole === 'artist' && !bio?.trim()) {
-      setError('Bio is required for artist accounts');
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -96,7 +91,7 @@ export default function SignupScreen() {
         profilePictureUrl: profilePicture?.uri,
       };
 
-      await signup(email.trim(), password, displayName.trim(), selectedRole, additionalData);
+      await signup(email.trim(), password, displayName.trim(), additionalData);
       
       console.log('✅ Signup completed successfully');
       
@@ -104,15 +99,7 @@ export default function SignupScreen() {
       
       // Redirect after a short delay to show success message
       setTimeout(() => {
-        if (selectedRole === 'artist') {
-          Alert.alert(
-            'Application Submitted', 
-            'Your artist application has been submitted and is pending admin approval. You will be notified once your application is reviewed.',
-            [{ text: 'OK', onPress: () => router.replace('/(tabs)') }]
-          );
-        } else {
-          router.replace('/(tabs)');
-        }
+        router.replace('/(tabs)');
       }, 1000); // Reduced delay for better UX
       
     } catch (error) {
@@ -176,49 +163,6 @@ export default function SignupScreen() {
               <Text style={styles.profilePictureLabel}>Profile Picture (Optional)</Text>
             </View>
 
-            {/* Role Selection */}
-            <View style={styles.roleSection}>
-              <Text style={styles.roleLabel}>Account Type</Text>
-              <View style={styles.roleContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    selectedRole === 'listener' && styles.roleOptionSelected
-                  ]}
-                  onPress={() => setSelectedRole('listener')}
-                >
-                  <View style={[
-                    styles.roleRadio,
-                    selectedRole === 'listener' && styles.roleRadioSelected
-                  ]}>
-                    {selectedRole === 'listener' && <View style={styles.roleRadioDot} />}
-                  </View>
-                  <View style={styles.roleTextContainer}>
-                    <Text style={styles.roleTitle}>Music Listener</Text>
-                    <Text style={styles.roleDescription}>Discover and enjoy music</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.roleOption,
-                    selectedRole === 'artist' && styles.roleOptionSelected
-                  ]}
-                  onPress={() => setSelectedRole('artist')}
-                >
-                  <View style={[
-                    styles.roleRadio,
-                    selectedRole === 'artist' && styles.roleRadioSelected
-                  ]}>
-                    {selectedRole === 'artist' && <View style={styles.roleRadioDot} />}
-                  </View>
-                  <View style={styles.roleTextContainer}>
-                    <Text style={styles.roleTitle}>Artist</Text>
-                    <Text style={styles.roleDescription}>Upload and share your music</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </View>
 
             <View style={styles.form}>
               {/* Name Fields */}
@@ -282,7 +226,7 @@ export default function SignupScreen() {
                 <FileText color="#8b5cf6" size={20} style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, styles.bioInput]}
-                  placeholder={selectedRole === 'artist' ? "Tell us about your music and artistic background... *" : "Bio (Optional)"}
+                  placeholder="Bio (Optional)"
                   placeholderTextColor="#64748b"
                   value={bio}
                   onChangeText={setBio}
@@ -362,13 +306,6 @@ export default function SignupScreen() {
                 </TouchableOpacity>
               </View>
 
-              {selectedRole === 'artist' && (
-                <View style={styles.artistNotice}>
-                  <Text style={styles.artistNoticeText}>
-                    Artist accounts require admin approval. You'll be notified once your application is reviewed.
-                  </Text>
-                </View>
-              )}
 
               <TouchableOpacity
                 style={[styles.signupButton, (isLoading || success) && styles.signupButtonDisabled]}
@@ -384,9 +321,7 @@ export default function SignupScreen() {
                       ? 'Creating Account...' 
                       : success
                         ? 'Account Created!'
-                        : selectedRole === 'artist' 
-                          ? 'Submit Application' 
-                          : 'Create Account'
+                        : 'Create Account'
                     }
                   </Text>
                 </LinearGradient>
@@ -521,64 +456,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
   },
-  roleSection: {
-    marginBottom: 24,
-  },
-  roleLabel: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 12,
-  },
-  roleContainer: {
-    gap: 12,
-  },
-  roleOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.2)',
-  },
-  roleOptionSelected: {
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    borderColor: '#8b5cf6',
-  },
-  roleRadio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#64748b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  roleRadioSelected: {
-    borderColor: '#8b5cf6',
-  },
-  roleRadioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#8b5cf6',
-  },
-  roleTextContainer: {
-    flex: 1,
-  },
-  roleTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  roleDescription: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-  },
   form: {
     gap: 16,
   },
@@ -650,20 +527,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
-    lineHeight: 20,
-  },
-  artistNotice: {
-    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  artistNoticeText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#8b5cf6',
-    textAlign: 'center',
     lineHeight: 20,
   },
   signupButton: {
