@@ -16,7 +16,6 @@ type Profile = {
   display_name?: string;
   bio?: string;
   profile_picture_url?: string;
-  role?: 'listener' | 'artist' | 'admin';
   [key: string]: any;
 };
 
@@ -31,7 +30,6 @@ type AuthContextType = {
     email: string,
     password: string,
     displayName: string,
-    role?: 'listener' | 'artist' | 'admin',
     additionalData?: Partial<Profile>,
   ) => Promise<void>;
   logout: () => Promise<void>;
@@ -58,32 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select(
-          'id, email, display_name, bio, role, profile_picture_url'
-        )
+        .select('id, email, display_name, bio, profile_picture_url')
         .eq('id', uid)
         .single();
       if (error) throw error;
 
       setUser((prev) => {
         // Only update if profile actually changed
-        if (
-          prev &&
-          prev.id === data.id &&
-          prev.role === data.role &&
-          JSON.stringify(prev) === JSON.stringify(data)
-        ) {
+        if (prev && prev.id === data.id && JSON.stringify(prev) === JSON.stringify(data)) {
           console.log('[Auth] loadUserProfile: no changes, skip');
           return prev;
         }
-        console.log('[Auth] loadUserProfile success, role:', data.role);
+        console.log('[Auth] loadUserProfile success');
         return {
           id: data.id,
           email: data.email,
           display_name: data.display_name ?? data.email,
           bio: data.bio ?? '',
           profile_picture_url: data.profile_picture_url ?? '',
-          role: data.role ?? 'listener',
         } as Profile;
       });
     } catch (err) {
@@ -143,7 +133,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       email: string,
       password: string,
       displayName: string,
-      role: 'listener' | 'artist' | 'admin' = 'listener',
       additionalData: Partial<Profile> = {},
     ) => {
       console.log('[Auth] signup start', email);
@@ -163,7 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: uid,
           email,
           display_name: displayName,
-          role,
           ...additionalData,
         };
         const { error: upError } = await supabase

@@ -125,7 +125,7 @@ function SearchScreen() {
       <View style={styles.resultInfo}>
         <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
         <View style={styles.userMeta}>
-          <Text style={styles.resultSubtitle}>{item.role} • {item.follower_count} followers</Text>
+          <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
           <View style={styles.privacyIndicator}>
             {item.is_private ? <Lock size={12} /> : <Globe size={12} />}
           </View>
