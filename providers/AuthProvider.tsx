@@ -13,9 +13,12 @@ import { supabase } from '../services/supabase';
 type Profile = {
   id: string;
   email: string;
-  display_name?: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
   bio?: string;
-  profile_picture_url?: string;
+  avatar_url?: string;
+  is_private?: boolean;
   [key: string]: any;
 };
 
@@ -55,15 +58,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('[Auth] loadUserProfile start for', uid);
     try {
       const { data, error } = await supabase
-        .from('users')
-        .select('id, email, display_name, bio, profile_picture_url')
+        .from('profiles')
+        .select(
+          'id, email, username, first_name, last_name, bio, avatar_url, is_private',
+        )
         .eq('id', uid)
         .single();
       if (error) throw error;
 
       setUser((prev) => {
         // Only update if profile actually changed
-        if (prev && prev.id === data.id && JSON.stringify(prev) === JSON.stringify(data)) {
+        if (
+          prev &&
+          prev.id === data.id &&
+          JSON.stringify(prev) === JSON.stringify(data)
+        ) {
           console.log('[Auth] loadUserProfile: no changes, skip');
           return prev;
         }
@@ -71,9 +80,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return {
           id: data.id,
           email: data.email,
-          display_name: data.display_name ?? data.email,
+          username: data.username ?? data.email,
+          first_name: data.first_name ?? '',
+          last_name: data.last_name ?? '',
           bio: data.bio ?? '',
-          profile_picture_url: data.profile_picture_url ?? '',
+          avatar_url: data.avatar_url ?? '',
+          is_private: data.is_private ?? false,
         } as Profile;
       });
     } catch (err) {
@@ -116,6 +128,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         console.log('[Auth] signInWithPassword result', { data, error });
         if (error) throw error;
 
+        const {
+          data: { user: authUser },
+        } = await supabase.auth.getUser();
+        if (authUser) {
+          const { data: profile, error: pErr } = await supabase
+            .from('profiles')
+            .select(
+              'id, email, username, first_name, last_name, bio, avatar_url, is_private',
+            )
+            .eq('id', authUser.id)
+            .single();
+          if (pErr) throw pErr;
+          setUser(profile as Profile);
+        }
+
         await syncSession(data.session!);
       } catch (err) {
         console.error('[Auth] login error', err);
@@ -138,27 +165,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[Auth] signup start', email);
       setIsLoading(true);
       try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const {
+          first_name,
+          last_name,
+          bio,
+          is_private,
+          avatar_url,
+          profilePictureUrl,
+          firstName,
+          lastName,
+          isPrivate,
+        } = additionalData as any;
+
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              username: displayName,
+              first_name: first_name ?? firstName,
+              last_name: last_name ?? lastName,
+              bio,
+              is_private: is_private ?? isPrivate,
+              avatar_url: avatar_url ?? profilePictureUrl,
+            },
+          },
+        });
         console.log('[Auth] signUp result', { data, error });
         if (error) throw error;
 
         if (data.session) {
-          // Persist session if signUp returned one
           await syncSession(data.session);
         }
 
         const uid = data.user!.id;
-        const profile: Profile = {
-          id: uid,
-          email,
-          display_name: displayName,
-          ...additionalData,
-        };
         const { error: upError } = await supabase
-          .from('users')
-          .insert(profile);
+          .from('profiles')
+          .update({
+            username: displayName,
+            first_name: first_name ?? firstName,
+            last_name: last_name ?? lastName,
+            bio,
+            is_private: is_private ?? isPrivate,
+            avatar_url: avatar_url ?? profilePictureUrl,
+          })
+          .eq('id', uid);
         if (upError) throw upError;
-        console.log('[Auth] profile insert success');
+        console.log('[Auth] profile update success');
 
         await loadUserProfile(uid);
       } catch (err) {
@@ -200,7 +253,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       try {
         const { error } = await supabase
-          .from('users')
+          .from('profiles')
           .update(updates)
           .eq('id', user.id);
         console.log('[Auth] updateProfile result', { error });
