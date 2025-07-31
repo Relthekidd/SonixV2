@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useMusic } from '@/providers/MusicProvider';
+import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import {
   ArrowLeft,
@@ -27,23 +27,7 @@ import {
   MoveVertical as MoreVertical,
 } from 'lucide-react-native';
 
-interface SingleData {
-  id: string;
-  title: string;
-  artist: string;
-  album: string;
-  duration: number;
-  coverUrl: string;
-  audioUrl: string;
-  isLiked: boolean;
-  genre: string;
-  releaseDate: string;
-  playCount?: number;
-  likeCount?: number;
-  lyrics?: string;
-  description?: string;
-  genres?: string[];
-}
+interface SingleData extends Track {}
 
 export default function SingleDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -59,7 +43,7 @@ export default function SingleDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, toggleLike, likedSongs } = useMusic();
 
   useEffect(() => {
     if (id) loadSingleDetails();
@@ -74,13 +58,20 @@ export default function SingleDetailScreen() {
       const prepared: SingleData = {
         id: singleData.id,
         title: singleData.title,
-        artist: singleData.artist?.name || singleData.artist_name || 'Unknown Artist',
+        artist:
+          singleData.artist?.name || singleData.artist_name || 'Unknown Artist',
+        artistId: singleData.artist_id,
         album: singleData.album?.title || singleData.album || 'Single',
         duration: singleData.duration || 0,
-        coverUrl: singleData.cover_url || singleData.album?.cover_url || '',
-        audioUrl: singleData.audio_url || '',
-        isLiked: false,
-        genre: Array.isArray(singleData.genres) ? singleData.genres[0] : singleData.genre || '',
+        coverUrl: apiService.getPublicUrl(
+          'cover-images',
+          singleData.cover_url || singleData.album?.cover_url || '',
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', singleData.audio_url),
+        isLiked: likedSongs.some((l) => l.id === singleData.id),
+        genre: Array.isArray(singleData.genres)
+          ? singleData.genres[0]
+          : singleData.genre || '',
         releaseDate: singleData.release_date || '',
         playCount: singleData.play_count,
         likeCount: singleData.like_count,
@@ -107,7 +98,10 @@ export default function SingleDetailScreen() {
   }
 
   function handleLike() {
-    Alert.alert('Feature coming soon');
+    if (track) {
+      toggleLike(track.id);
+      setTrack({ ...track, isLiked: !track.isLiked });
+    }
   }
 
   function handleAddToQueue() {
@@ -124,7 +118,10 @@ export default function SingleDetailScreen() {
 
   if (isLoading) {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#8b5cf6" />
           <Text style={styles.loadingText}>Loading single...</Text>
@@ -135,10 +132,16 @@ export default function SingleDetailScreen() {
 
   if (error || !track) {
     return (
-      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+      <LinearGradient
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        style={styles.container}
+      >
         <View style={styles.centered}>
           <Text style={styles.errorText}>{error || 'Single not found'}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -146,11 +149,15 @@ export default function SingleDetailScreen() {
     );
   }
 
-  const formatDuration = (sec: number) => `${Math.floor(sec/60)}:${(sec%60).toString().padStart(2,'0')}`;
+  const formatDuration = (sec: number) =>
+    `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`;
   const formatDate = (d: string) => new Date(d).toLocaleDateString();
 
   return (
-    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+    <LinearGradient
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.iconBtn}>
           <ArrowLeft color="#fff" size={24} />
@@ -166,9 +173,16 @@ export default function SingleDetailScreen() {
           <Text style={styles.artist}>{track.artist}</Text>
         </View>
         <View style={styles.metaRow}>
-          <Calendar color="#94a3b8" size={16} /><Text style={styles.metaText}>{formatDate(track.releaseDate)}</Text>
-          <Clock color="#94a3b8" size={16} /><Text style={styles.metaText}>{formatDuration(track.duration)}</Text>
-          {track.playCount != null && <><Music color="#94a3b8" size={16} /><Text style={styles.metaText}>{track.playCount}</Text></>}
+          <Calendar color="#94a3b8" size={16} />
+          <Text style={styles.metaText}>{formatDate(track.releaseDate)}</Text>
+          <Clock color="#94a3b8" size={16} />
+          <Text style={styles.metaText}>{formatDuration(track.duration)}</Text>
+          {track.playCount != null && (
+            <>
+              <Music color="#94a3b8" size={16} />
+              <Text style={styles.metaText}>{track.playCount}</Text>
+            </>
+          )}
         </View>
         <View style={styles.controls}>
           <TouchableOpacity onPress={handleLike} style={styles.controlBtn}>
@@ -181,7 +195,10 @@ export default function SingleDetailScreen() {
               <Play color="#fff" size={32} />
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleAddToQueue} style={styles.controlBtn}>
+          <TouchableOpacity
+            onPress={handleAddToQueue}
+            style={styles.controlBtn}
+          >
             <Plus color="#fff" size={24} />
           </TouchableOpacity>
           <TouchableOpacity onPress={handleShare} style={styles.controlBtn}>
@@ -205,20 +222,59 @@ const styles = StyleSheet.create({
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { color: '#94a3b8', marginTop: 16 },
   errorText: { color: '#ef4444', marginBottom: 16 },
-  backButton: { padding: 12, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 8 },
+  backButton: {
+    padding: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+  },
   backButtonText: { color: '#8b5cf6' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 20, paddingTop: 60 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    paddingTop: 60,
+  },
   iconBtn: { padding: 8 },
   content: { flex: 1 },
   coverContainer: { alignItems: 'center', padding: 24 },
   cover: { width: 280, height: 280, borderRadius: 16, marginBottom: 24 },
   title: { color: '#fff', fontSize: 28, textAlign: 'center', marginBottom: 8 },
-  artist: { color: '#a855f7', fontSize: 20, textAlign: 'center', marginBottom: 16 },
-  metaRow: { flexDirection: 'row', justifyContent: 'center', gap: 16, marginBottom: 24 },
+  artist: {
+    color: '#a855f7',
+    fontSize: 20,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: 24,
+  },
   metaText: { color: '#94a3b8', marginHorizontal: 6 },
-  controls: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16, marginBottom: 32 },
-  controlBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.1)', justifyContent: 'center', alignItems: 'center' },
-  playBtn: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#8b5cf6', justifyContent: 'center', alignItems: 'center' },
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 32,
+  },
+  controlBtn: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#8b5cf6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   lyricsSection: { padding: 24 },
   lyricsTitle: { color: '#fff', fontSize: 20, marginBottom: 12 },
   lyricsText: { color: '#cbd5e1', lineHeight: 24 },

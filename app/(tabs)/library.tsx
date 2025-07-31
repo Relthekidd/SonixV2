@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -22,8 +22,10 @@ import {
   X,
 } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
+import { useLocalSearchParams } from 'expo-router';
 
 function LibraryScreen() {
+  const { playlist } = useLocalSearchParams<{ playlist?: string }>();
   const [activeTab, setActiveTab] = useState('playlists');
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
@@ -38,7 +40,12 @@ function LibraryScreen() {
     playTrack,
     pauseTrack,
     createPlaylist,
+    toggleLike,
   } = useMusic();
+
+  useEffect(() => {
+    if (playlist) setActiveTab('playlists');
+  }, [playlist]);
 
   const handleCreatePlaylist = () => {
     if (!playlistName.trim()) {
@@ -64,6 +71,7 @@ function LibraryScreen() {
     <TouchableOpacity
       style={styles.trackItem}
       onPress={() => handleTrackPress(item)}
+      onLongPress={() => toggleLike(item.id)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
       <View style={styles.trackInfo}>
@@ -140,10 +148,7 @@ function LibraryScreen() {
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[
-              styles.tab,
-              activeTab === tab.id && styles.activeTab,
-            ]}
+            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
             onPress={() => setActiveTab(tab.id)}
           >
             <tab.icon

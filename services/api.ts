@@ -32,6 +32,22 @@ class ApiService {
   private unauthorizedCallback: (() => void) | null = null;
 
   /**
+   * Helper to convert a storage path into a public URL
+   */
+  getPublicUrl(bucket: string, path: string): string {
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  async recordPlay(trackId: string, artistId: string) {
+    try {
+      await supabase.from('song_plays').insert({ track_id: trackId, artist_id: artistId });
+    } catch (err) {
+      console.error('[ApiService] recordPlay error', err);
+    }
+  }
+
+  /**
    * Set the authorization token used for REST requests
    */
   setAuthToken(token: string) {
@@ -114,7 +130,13 @@ class ApiService {
       }
 
       console.log('[ApiService] getAlbumById success', data);
-      return data as AlbumDetails;
+      const album = data as any;
+      album.cover_url = this.getPublicUrl('cover-images', album.cover_url);
+      album.tracks = (album.tracks || []).map((t: any) => ({
+        ...t,
+        audio_url: this.getPublicUrl('audio-files', t.audio_url),
+      }));
+      return album as AlbumDetails;
     } catch (err) {
       console.error('[ApiService] getAlbumById error', err);
       throw err;
@@ -131,7 +153,10 @@ class ApiService {
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data;
+    const track = data as any;
+    track.audio_url = this.getPublicUrl('audio-files', track.audio_url);
+    track.cover_url = this.getPublicUrl('cover-images', track.cover_url);
+    return track;
   }
 
   /**
@@ -144,7 +169,12 @@ class ApiService {
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data;
+    const single = data as any;
+    single.cover_url = this.getPublicUrl('cover-images', single.cover_url);
+    if (single.track) {
+      single.track.audio_url = this.getPublicUrl('audio-files', single.track.audio_url);
+    }
+    return single;
   }
 
   /** Get artist info */
