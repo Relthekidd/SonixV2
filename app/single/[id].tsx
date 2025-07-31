@@ -28,7 +28,7 @@ import {
   MoveVertical as MoreVertical,
 } from 'lucide-react-native';
 
-interface SingleData extends Track {}
+type SingleData = Track;
 
 export default function SingleDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -44,7 +44,14 @@ export default function SingleDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack, toggleLike, likedSongs } = useMusic();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    toggleLike,
+    likedSongs,
+  } = useMusic();
 
   useEffect(() => {
     if (id) loadSingleDetails();
@@ -77,8 +84,7 @@ export default function SingleDetailScreen() {
       const prepared: SingleData = {
         id: data.id,
         title: data.title,
-        artist:
-          data.artist?.name || data.artist_name || 'Unknown Artist',
+        artist: data.artist?.name || data.artist_name || 'Unknown Artist',
         artistId: data.artist_id,
         album: data.album?.title || data.album_title || 'Single',
         duration: data.duration || 0,
@@ -108,7 +114,11 @@ export default function SingleDetailScreen() {
   function handlePlayPause() {
     if (!track?.audioUrl) return;
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, [track]);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, [track]);
+      }
     } else {
       playTrack(track, [track]);
     }

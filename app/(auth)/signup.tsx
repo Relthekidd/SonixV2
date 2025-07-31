@@ -15,7 +15,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { Eye, EyeOff, Mail, Lock, User, FileText, CircleAlert as AlertCircle, Camera, CircleCheck as CheckCircle } from 'lucide-react-native';
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  User,
+  FileText,
+  CircleAlert as AlertCircle,
+  Camera,
+  CircleCheck as CheckCircle,
+} from 'lucide-react-native';
 
 export default function SignupScreen() {
   const [email, setEmail] = useState('');
@@ -25,7 +35,7 @@ export default function SignupScreen() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [bio, setBio] = useState('');
-  const [profilePicture, setProfilePicture] = useState<any>(null);
+  const [profilePicture, setProfilePicture] = useState<ImagePicker.ImagePickerAsset | null>(null);
   const [isPrivate, setIsPrivate] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -58,11 +68,15 @@ export default function SignupScreen() {
     setSuccess(null);
 
     // Client-side validation
-    if (!email?.trim() || !password || !confirmPassword || !displayName?.trim()) {
+    if (
+      !email?.trim() ||
+      !password ||
+      !confirmPassword ||
+      !displayName?.trim()
+    ) {
       setError('Please fill in all required fields');
       return;
     }
-
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
@@ -82,7 +96,7 @@ export default function SignupScreen() {
     setIsLoading(true);
     try {
       console.log('🚀 Starting signup process from UI');
-      
+
       const additionalData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
@@ -92,20 +106,22 @@ export default function SignupScreen() {
       };
 
       await signup(email.trim(), password, displayName.trim(), additionalData);
-      
+
       console.log('✅ Signup completed successfully');
-      
+
       setSuccess('Account created successfully! Welcome to Sonix!');
-      
+
       // Redirect after a short delay to show success message
       setTimeout(() => {
         router.replace('/(tabs)');
       }, 1000); // Reduced delay for better UX
-      
     } catch (error) {
       console.error('❌ Signup failed in UI:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred during signup';
+
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'An unexpected error occurred during signup';
       setError(errorMessage);
     } finally {
       setIsLoading(false);
@@ -121,7 +137,7 @@ export default function SignupScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
-        <ScrollView 
+        <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
@@ -133,7 +149,11 @@ export default function SignupScreen() {
             {/* Success Message */}
             {success && (
               <View style={styles.successContainer}>
-                <CheckCircle color="#10b981" size={16} style={styles.successIcon} />
+                <CheckCircle
+                  color="#10b981"
+                  size={16}
+                  style={styles.successIcon}
+                />
                 <Text style={styles.successText}>{success}</Text>
               </View>
             )}
@@ -141,16 +161,26 @@ export default function SignupScreen() {
             {/* Error Display */}
             {error && (
               <View style={styles.errorContainer}>
-                <AlertCircle color="#ef4444" size={16} style={styles.errorIcon} />
+                <AlertCircle
+                  color="#ef4444"
+                  size={16}
+                  style={styles.errorIcon}
+                />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
 
             {/* Profile Picture */}
             <View style={styles.profilePictureSection}>
-              <TouchableOpacity style={styles.profilePictureContainer} onPress={pickProfilePicture}>
+              <TouchableOpacity
+                style={styles.profilePictureContainer}
+                onPress={pickProfilePicture}
+              >
                 {profilePicture ? (
-                  <Image source={{ uri: profilePicture.uri }} style={styles.profilePicture} />
+                  <Image
+                    source={{ uri: profilePicture.uri }}
+                    style={styles.profilePicture}
+                  />
                 ) : (
                   <View style={styles.profilePicturePlaceholder}>
                     <User color="#8b5cf6" size={32} />
@@ -160,9 +190,10 @@ export default function SignupScreen() {
                   <Camera color="#ffffff" size={16} />
                 </View>
               </TouchableOpacity>
-              <Text style={styles.profilePictureLabel}>Profile Picture (Optional)</Text>
+              <Text style={styles.profilePictureLabel}>
+                Profile Picture (Optional)
+              </Text>
             </View>
-
 
             <View style={styles.form}>
               {/* Name Fields */}
@@ -294,7 +325,12 @@ export default function SignupScreen() {
                   onPress={() => setIsPrivate(!isPrivate)}
                   disabled={isLoading}
                 >
-                  <View style={[styles.checkbox, isPrivate && styles.checkboxChecked]}>
+                  <View
+                    style={[
+                      styles.checkbox,
+                      isPrivate && styles.checkboxChecked,
+                    ]}
+                  >
                     {isPrivate && <Eye color="#ffffff" size={16} />}
                   </View>
                   <View style={styles.checkboxTextContainer}>
@@ -306,34 +342,46 @@ export default function SignupScreen() {
                 </TouchableOpacity>
               </View>
 
-
               <TouchableOpacity
-                style={[styles.signupButton, (isLoading || success) && styles.signupButtonDisabled]}
+                style={[
+                  styles.signupButton,
+                  (isLoading || success) && styles.signupButtonDisabled,
+                ]}
                 onPress={handleSignup}
                 disabled={isLoading || !!success}
               >
                 <LinearGradient
-                  colors={isLoading || success ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
+                  colors={
+                    isLoading || success
+                      ? ['#64748b', '#64748b', '#64748b']
+                      : ['#8b5cf6', '#a855f7', '#c084fc']
+                  }
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.signupButtonText}>
-                    {isLoading 
-                      ? 'Creating Account...' 
+                    {isLoading
+                      ? 'Creating Account...'
                       : success
                         ? 'Account Created!'
-                        : 'Create Account'
-                    }
+                        : 'Create Account'}
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
 
               <View style={styles.loginContainer}>
                 <Text style={styles.loginText}>Already have an account? </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => router.push('/(auth)/login')}
                   disabled={isLoading}
                 >
-                  <Text style={[styles.loginLink, isLoading && styles.loginLinkDisabled]}>Sign In</Text>
+                  <Text
+                    style={[
+                      styles.loginLink,
+                      isLoading && styles.loginLinkDisabled,
+                    ]}
+                  >
+                    Sign In
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>

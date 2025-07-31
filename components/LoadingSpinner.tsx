@@ -1,6 +1,6 @@
 // components/LoadingSpinner.tsx
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 export default function LoadingSpinner() {

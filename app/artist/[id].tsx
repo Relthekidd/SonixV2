@@ -11,23 +11,36 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
-import { useMusic } from '@/providers/MusicProvider';
+import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Users, Music, Heart, MoveVertical as MoreVertical } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  Users,
+  Music,
+  Heart,
+  MoveVertical as MoreVertical,
+} from 'lucide-react-native';
+
+interface Artist {
+  id: string;
+  stage_name: string;
+  avatar_url?: string;
+  bio?: string;
+  monthly_listeners?: number;
+  total_plays?: number;
+  genres?: string[];
+}
 
 export default function ArtistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [artist, setArtist] = useState<any>(null);
-  const [tracks, setTracks] = useState<any[]>([]);
+  const [artist, setArtist] = useState<Artist | null>(null);
+  const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const { 
-    currentTrack, 
-    isPlaying, 
-    playTrack, 
-    pauseTrack 
-  } = useMusic();
+
+  const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
 
   useEffect(() => {
     if (id) {
@@ -38,13 +51,13 @@ export default function ArtistDetailScreen() {
   const loadArtistDetails = async () => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const [artistData, tracksData] = await Promise.all([
         apiService.getArtistById(id!),
-        apiService.getArtistTracks(id!)
+        apiService.getArtistTracks(id!),
       ]);
-      
+
       setArtist(artistData);
       setTracks(tracksData.map(transformTrack));
     } catch (err) {
@@ -55,27 +68,33 @@ export default function ArtistDetailScreen() {
     }
   };
 
-  const transformTrack = (apiTrack: any) => ({
-    id: apiTrack.id,
-    title: apiTrack.title,
-    artist:
-      apiTrack.artist?.name ||
-      apiTrack.artist_name ||
-      apiTrack.artist ||
-      apiTrack.artist_id ||
-      'Unknown Artist',
-    album: apiTrack.album || 'Unknown Album',
-    duration: apiTrack.duration,
-    coverUrl: apiTrack.cover_url || 'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-    audioUrl: apiTrack.audio_url,
-    isLiked: apiTrack.is_liked || false,
-    genre: Array.isArray(apiTrack.genres) ? apiTrack.genres[0] : apiTrack.genre || 'Unknown',
-    releaseDate: apiTrack.created_at || apiTrack.release_date || new Date().toISOString(),
-    playCount: apiTrack.play_count,
-    likeCount: apiTrack.like_count,
-  });
+  const transformTrack = (apiTrack: unknown): Track => {
+    const t = apiTrack as Record<string, unknown>;
+    return {
+      id: t.id,
+      title: t.title,
+      artist:
+        t.artist?.name ||
+        t.artist_name ||
+        t.artist ||
+        t.artist_id ||
+        'Unknown Artist',
+      album: t.album || 'Unknown Album',
+      duration: t.duration,
+      coverUrl:
+        t.cover_url ||
+        'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+      audioUrl: t.audio_url,
+      isLiked: t.is_liked || false,
+      genre: Array.isArray(t.genres) ? t.genres[0] : t.genre || 'Unknown',
+      releaseDate:
+        t.created_at || t.release_date || new Date().toISOString(),
+      playCount: t.play_count,
+      likeCount: t.like_count,
+    };
+  };
 
-  const handleTrackPress = (track: any) => {
+  const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
         pauseTrack();
@@ -93,8 +112,8 @@ export default function ArtistDetailScreen() {
     }
   };
 
-  const renderTrackItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
+  const renderTrackItem = ({ item }: { item: Track }) => (
+    <TouchableOpacity
       style={styles.trackItem}
       onPress={() => handleTrackPress(item)}
     >
@@ -144,7 +163,10 @@ export default function ArtistDetailScreen() {
       >
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error || 'Artist not found'}</Text>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
@@ -164,7 +186,7 @@ export default function ArtistDetailScreen() {
         >
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
-        
+
         <TouchableOpacity style={styles.headerButton}>
           <MoreVertical color="#ffffff" size={24} />
         </TouchableOpacity>
@@ -172,34 +194,36 @@ export default function ArtistDetailScreen() {
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.artistHeader}>
-          <Image 
-            source={{ 
-              uri: artist.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400' 
-            }} 
-            style={styles.artistImage} 
+          <Image
+            source={{
+              uri:
+                artist.avatar_url ||
+                'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400',
+            }}
+            style={styles.artistImage}
           />
-          
+
           <Text style={styles.artistName}>{artist.stage_name}</Text>
-          
-          {artist.bio && (
-            <Text style={styles.artistBio}>{artist.bio}</Text>
-          )}
+
+          {artist.bio && <Text style={styles.artistBio}>{artist.bio}</Text>}
 
           <View style={styles.statsContainer}>
             <View style={styles.statItem}>
               <Users color="#8b5cf6" size={20} />
               <Text style={styles.statValue}>
-                {artist.monthly_listeners ? artist.monthly_listeners.toLocaleString() : '0'}
+                {artist.monthly_listeners
+                  ? artist.monthly_listeners.toLocaleString()
+                  : '0'}
               </Text>
               <Text style={styles.statLabel}>Monthly Listeners</Text>
             </View>
-            
+
             <View style={styles.statItem}>
               <Music color="#8b5cf6" size={20} />
               <Text style={styles.statValue}>{tracks.length}</Text>
               <Text style={styles.statLabel}>Tracks</Text>
             </View>
-            
+
             <View style={styles.statItem}>
               <Heart color="#8b5cf6" size={20} />
               <Text style={styles.statValue}>
@@ -224,7 +248,10 @@ export default function ArtistDetailScreen() {
           <View style={styles.tracksSectionHeader}>
             <Text style={styles.sectionTitle}>Popular Tracks</Text>
             {tracks.length > 0 && (
-              <TouchableOpacity style={styles.playAllButton} onPress={handlePlayAll}>
+              <TouchableOpacity
+                style={styles.playAllButton}
+                onPress={handlePlayAll}
+              >
                 <Play color="#ffffff" size={16} />
                 <Text style={styles.playAllText}>Play All</Text>
               </TouchableOpacity>
@@ -242,7 +269,9 @@ export default function ArtistDetailScreen() {
             <View style={styles.emptyState}>
               <Music color="#64748b" size={48} />
               <Text style={styles.emptyText}>No tracks available</Text>
-              <Text style={styles.emptySubtext}>This artist hasn't uploaded any tracks yet</Text>
+              <Text style={styles.emptySubtext}>
+                This artist hasn&apos;t uploaded any tracks yet
+              </Text>
             </View>
           )}
         </View>

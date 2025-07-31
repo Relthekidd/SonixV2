@@ -9,40 +9,39 @@ import {
   StatusBar,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import { 
-  ChevronDown, 
-  Play, 
-  Pause, 
-  SkipBack, 
-  SkipForward, 
+import {
+  ChevronDown,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
   Heart,
   Shuffle,
   Repeat,
-  MoreHorizontal 
+  MoreHorizontal,
 } from 'lucide-react-native';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withTiming 
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
 } from 'react-native-reanimated';
 
 const { width, height } = Dimensions.get('window');
 
 export default function PlayerScreen() {
-  const { 
-    currentTrack, 
-    isPlaying, 
+  const {
+    currentTrack,
+    isPlaying,
     currentTime,
     duration,
-    playTrack, 
-    pauseTrack, 
+    playTrack,
+    pauseTrack,
     nextTrack,
     previousTrack,
     toggleLike,
-    likedSongs 
+    likedSongs,
   } = useMusic();
 
   const [isShuffled, setIsShuffled] = useState(false);
@@ -64,7 +63,7 @@ export default function PlayerScreen() {
     return null;
   }
 
-  const isLiked = likedSongs.some(track => track.id === currentTrack.id);
+  const isLiked = likedSongs.some((track) => track.id === currentTrack.id);
   const progress = duration > 0 ? currentTime / duration : 0;
 
   const handlePlayPause = () => {
@@ -88,13 +87,13 @@ export default function PlayerScreen() {
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      
-      <Image 
-        source={{ uri: currentTrack.coverUrl }} 
+
+      <Image
+        source={{ uri: currentTrack.coverUrl }}
         style={styles.backgroundImage}
         blurRadius={20}
       />
-      
+
       <LinearGradient
         colors={['rgba(0,0,0,0.6)', 'rgba(0,0,0,0.9)']}
         style={styles.overlay}
@@ -107,9 +106,9 @@ export default function PlayerScreen() {
         >
           <ChevronDown color="#ffffff" size={28} />
         </TouchableOpacity>
-        
+
         <Text style={styles.headerTitle}>Now Playing</Text>
-        
+
         <TouchableOpacity style={styles.headerButton}>
           <MoreHorizontal color="#ffffff" size={24} />
         </TouchableOpacity>
@@ -117,9 +116,9 @@ export default function PlayerScreen() {
 
       <View style={styles.content}>
         <Animated.View style={[styles.albumArtContainer, animatedStyle]}>
-          <Image 
-            source={{ uri: currentTrack.coverUrl }} 
-            style={styles.albumArt} 
+          <Image
+            source={{ uri: currentTrack.coverUrl }}
+            style={styles.albumArt}
           />
         </Animated.View>
 
@@ -131,8 +130,12 @@ export default function PlayerScreen() {
 
         <View style={styles.progressContainer}>
           <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-            <View style={[styles.progressThumb, { left: `${progress * 100}%` }]} />
+            <View
+              style={[styles.progressFill, { width: `${progress * 100}%` }]}
+            />
+            <View
+              style={[styles.progressThumb, { left: `${progress * 100}%` }]}
+            />
           </View>
           <View style={styles.timeContainer}>
             <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
@@ -145,10 +148,7 @@ export default function PlayerScreen() {
             style={styles.controlButton}
             onPress={() => setIsShuffled(!isShuffled)}
           >
-            <Shuffle 
-              color={isShuffled ? '#8b5cf6' : '#ffffff'} 
-              size={24} 
-            />
+            <Shuffle color={isShuffled ? '#8b5cf6' : '#ffffff'} size={24} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -158,10 +158,7 @@ export default function PlayerScreen() {
             <SkipBack color="#ffffff" size={32} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.playButton}
-            onPress={handlePlayPause}
-          >
+          <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
             <LinearGradient
               colors={['#8b5cf6', '#a855f7']}
               style={styles.playButtonGradient}
@@ -174,24 +171,13 @@ export default function PlayerScreen() {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={nextTrack}
-          >
+          <TouchableOpacity style={styles.controlButton} onPress={nextTrack}>
             <SkipForward color="#ffffff" size={32} />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={handleRepeat}
-          >
-            <Repeat 
-              color={repeatMode > 0 ? '#8b5cf6' : '#ffffff'} 
-              size={24} 
-            />
-            {repeatMode === 2 && (
-              <View style={styles.repeatOneDot} />
-            )}
+          <TouchableOpacity style={styles.controlButton} onPress={handleRepeat}>
+            <Repeat color={repeatMode > 0 ? '#8b5cf6' : '#ffffff'} size={24} />
+            {repeatMode === 2 && <View style={styles.repeatOneDot} />}
           </TouchableOpacity>
         </View>
 
@@ -200,8 +186,8 @@ export default function PlayerScreen() {
             style={styles.bottomButton}
             onPress={() => toggleLike(currentTrack.id)}
           >
-            <Heart 
-              color={isLiked ? '#ef4444' : '#ffffff'} 
+            <Heart
+              color={isLiked ? '#ef4444' : '#ffffff'}
               size={24}
               fill={isLiked ? '#ef4444' : 'transparent'}
             />
