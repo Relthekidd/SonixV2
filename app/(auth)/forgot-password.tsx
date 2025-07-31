@@ -9,7 +9,12 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Mail, ArrowLeft, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
+import {
+  Mail,
+  ArrowLeft,
+  CircleAlert as AlertCircle,
+  CircleCheck as CheckCircle,
+} from 'lucide-react-native';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -20,7 +25,7 @@ export default function ForgotPasswordScreen() {
 
   const handleResetPassword = async () => {
     setError(null);
-    
+
     if (!email.trim()) {
       setError('Please enter your email address');
       return;
@@ -35,9 +40,10 @@ export default function ForgotPasswordScreen() {
     try {
       await resetPassword(email.trim());
       setEmailSent(true);
-    } catch (error: any) {
-      console.error('Reset password error:', error);
-      setError(error.message || 'Failed to send reset email');
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Reset password error:', err);
+      setError(err.message || 'Failed to send reset email');
     } finally {
       setIsLoading(false);
     }
@@ -62,13 +68,18 @@ export default function ForgotPasswordScreen() {
           <>
             <Text style={styles.title}>Reset Password</Text>
             <Text style={styles.subtitle}>
-              Enter your email address and we'll send you a link to reset your password
+              Enter your email address and we&apos;ll send you a link to reset your
+              password
             </Text>
 
             {/* Error Display */}
             {error && (
               <View style={styles.errorContainer}>
-                <AlertCircle color="#ef4444" size={16} style={styles.errorIcon} />
+                <AlertCircle
+                  color="#ef4444"
+                  size={16}
+                  style={styles.errorIcon}
+                />
                 <Text style={styles.errorText}>{error}</Text>
               </View>
             )}
@@ -90,12 +101,19 @@ export default function ForgotPasswordScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.resetButton, isLoading && styles.resetButtonDisabled]}
+                style={[
+                  styles.resetButton,
+                  isLoading && styles.resetButtonDisabled,
+                ]}
                 onPress={handleResetPassword}
                 disabled={isLoading}
               >
                 <LinearGradient
-                  colors={isLoading ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
+                  colors={
+                    isLoading
+                      ? ['#64748b', '#64748b', '#64748b']
+                      : ['#8b5cf6', '#a855f7', '#c084fc']
+                  }
                   style={styles.buttonGradient}
                 >
                   <Text style={styles.resetButtonText}>
@@ -111,11 +129,12 @@ export default function ForgotPasswordScreen() {
               <CheckCircle color="#10b981" size={64} />
               <Text style={styles.successTitle}>Check Your Email</Text>
               <Text style={styles.successSubtitle}>
-                We've sent a password reset link to
+                We&apos;ve sent a password reset link to
               </Text>
               <Text style={styles.emailText}>{email}</Text>
               <Text style={styles.instructionText}>
-                Click the link in the email to reset your password. If you don't see the email, check your spam folder.
+                  Click the link in the email to reset your password. If you don&apos;t
+                see the email, check your spam folder.
               </Text>
             </View>
 
@@ -139,7 +158,7 @@ export default function ForgotPasswordScreen() {
               }}
             >
               <Text style={styles.resendButtonText}>
-                Didn't receive the email? Try again
+                  Didn&apos;t receive the email? Try again
               </Text>
             </TouchableOpacity>
           </>

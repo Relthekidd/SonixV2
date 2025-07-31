@@ -14,21 +14,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/services/supabase';
-import { useMusic } from '@/providers/MusicProvider';
+import { useMusic, Track } from '@/providers/MusicProvider';
 import {
   ArrowLeft,
   Settings,
   UserPlus,
   UserMinus,
   Lock,
-  Music,
   Play,
   Pause,
-  Heart,
-  Users,
   Calendar,
   Globe,
-  MessageCircle,
 } from 'lucide-react-native';
 
 interface UserProfile {
@@ -42,8 +38,8 @@ interface UserProfile {
   follower_count: number;
   following_count: number;
   created_at: string;
-  top_artists: any[];
-  top_songs: any[];
+  top_artists: { id: string; name: string; avatar_url: string }[];
+  top_songs: Track[];
   status_text?: string;
   pinned_content_type?: string;
   pinned_content_id?: string;
@@ -146,15 +142,16 @@ export default function UserProfileScreen() {
           );
         }
       }
-    } catch (error: any) {
-      console.error('Error handling follow:', error);
-      Alert.alert('Error', error.message || 'Failed to update follow status');
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Error handling follow:', err);
+      Alert.alert('Error', err.message || 'Failed to update follow status');
     } finally {
       setIsFollowLoading(false);
     }
   };
 
-  const handleTrackPress = (track: any) => {
+  const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
         pauseTrack();
@@ -173,7 +170,7 @@ export default function UserProfileScreen() {
     });
   };
 
-  const renderTopTrack = ({ item, index }: { item: any; index: number }) => (
+  const renderTopTrack = ({ item, index }: { item: Track; index: number }) => (
     <TouchableOpacity
       style={styles.topTrackItem}
       onPress={() => handleTrackPress(item)}
@@ -198,7 +195,7 @@ export default function UserProfileScreen() {
     </TouchableOpacity>
   );
 
-  const renderTopArtist = ({ item }: { item: any }) => (
+  const renderTopArtist = ({ item }: { item: { id: string; name: string; avatar_url: string } }) => (
     <TouchableOpacity style={styles.topArtistItem}>
       <Image source={{ uri: item.avatar_url }} style={styles.topArtistAvatar} />
       <Text style={styles.topArtistName} numberOfLines={1}>

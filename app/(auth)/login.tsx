@@ -5,14 +5,20 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
-import { Eye, EyeOff, Mail, Lock, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
+import {
+  Eye,
+  EyeOff,
+  Mail,
+  Lock,
+  CircleAlert as AlertCircle,
+  CircleCheck as CheckCircle,
+} from 'lucide-react-native';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -36,14 +42,15 @@ export default function LoginScreen() {
     try {
       await login(email, password);
       setSuccess('Login successful! Welcome back!');
-      
+
       // Small delay to show success message
       setTimeout(() => {
         router.replace('/(tabs)');
       }, 1000);
-    } catch (error: any) {
-      console.error('Login error:', error);
-      setError(error.message || 'Login failed');
+    } catch (error: unknown) {
+      const err = error as Error;
+      console.error('Login error:', err);
+      setError(err.message || 'Login failed');
     } finally {
       setIsLoading(false);
     }
@@ -65,7 +72,11 @@ export default function LoginScreen() {
           {/* Success Message */}
           {success && (
             <View style={styles.successContainer}>
-              <CheckCircle color="#10b981" size={16} style={styles.successIcon} />
+              <CheckCircle
+                color="#10b981"
+                size={16}
+                style={styles.successIcon}
+              />
               <Text style={styles.successText}>{success}</Text>
             </View>
           )}
@@ -123,33 +134,51 @@ export default function LoginScreen() {
               onPress={() => router.push('/(auth)/forgot-password')}
               disabled={isLoading}
             >
-              <Text style={[styles.forgotPassword, isLoading && styles.disabledText]}>
+              <Text
+                style={[
+                  styles.forgotPassword,
+                  isLoading && styles.disabledText,
+                ]}
+              >
                 Forgot Password?
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.loginButton, (isLoading || success) && styles.loginButtonDisabled]}
+              style={[
+                styles.loginButton,
+                (isLoading || success) && styles.loginButtonDisabled,
+              ]}
               onPress={handleLogin}
               disabled={isLoading || !!success}
             >
               <LinearGradient
-                colors={isLoading || success ? ['#64748b', '#64748b', '#64748b'] : ['#8b5cf6', '#a855f7', '#c084fc']}
+                colors={
+                  isLoading || success
+                    ? ['#64748b', '#64748b', '#64748b']
+                    : ['#8b5cf6', '#a855f7', '#c084fc']
+                }
                 style={styles.buttonGradient}
               >
                 <Text style={styles.loginButtonText}>
-                  {isLoading ? 'Signing In...' : success ? 'Success!' : 'Sign In'}
+                  {isLoading
+                    ? 'Signing In...'
+                    : success
+                      ? 'Success!'
+                      : 'Sign In'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
 
             <View style={styles.signupContainer}>
-              <Text style={styles.signupText}>Don't have an account? </Text>
-              <TouchableOpacity 
+              <Text style={styles.signupText}>Don&apos;t have an account? </Text>
+              <TouchableOpacity
                 onPress={() => router.push('/(auth)/signup')}
                 disabled={isLoading}
               >
-                <Text style={[styles.signupLink, isLoading && styles.disabledText]}>
+                <Text
+                  style={[styles.signupLink, isLoading && styles.disabledText]}
+                >
                   Sign Up
                 </Text>
               </TouchableOpacity>

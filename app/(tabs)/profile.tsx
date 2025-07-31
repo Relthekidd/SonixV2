@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
-import { Track } from '@/providers/MusicProvider';
+import { Track, Playlist } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
 import { Edit3, LogOut } from 'lucide-react-native';
@@ -42,8 +42,7 @@ function ProfileScreen() {
   const [bio, setBio] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [topSongs, setTopSongs] = useState<Track[]>([]);
-  const [topArtists, setTopArtists] = useState<any[]>([]);
-  const [publicPlaylists, setPublicPlaylists] = useState<any[]>([]);
+  const [publicPlaylists, setPublicPlaylists] = useState<Playlist[]>([]);
 
   useEffect(() => {
     loadProfile();
@@ -87,23 +86,29 @@ function ProfileScreen() {
           .eq('user_id', uid)
           .eq('is_public', true),
       ]);
+      interface SongRow {
+        track: Track & { artist?: { name?: string } | null };
+      }
+
       setTopSongs(
-        (songsRes.data || []).map((r: any) => ({
+        (songsRes.data || []).map((r: SongRow) => ({
           id: r.track.id,
           title: r.track.title,
           artist: r.track.artist?.name || '',
           artistId: r.track.artist_id,
           album: r.track.album_title || 'Single',
           duration: r.track.duration || 0,
-          coverUrl: apiService.getPublicUrl('cover-images', r.track.cover_url || ''),
+          coverUrl: apiService.getPublicUrl(
+            'cover-images',
+            r.track.cover_url || '',
+          ),
           audioUrl: apiService.getPublicUrl('audio-files', r.track.audio_url),
           isLiked: false,
           genre: '',
           releaseDate: r.track.release_date || '',
-        }))
+        })),
       );
-      setTopArtists((artistsRes.data || []).map((r: any) => r.artist));
-      setPublicPlaylists(playlistsRes.data || []);
+      setPublicPlaylists((playlistsRes.data || []) as Playlist[]);
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to load profile');

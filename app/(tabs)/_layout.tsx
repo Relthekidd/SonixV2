@@ -1,14 +1,12 @@
+import React, { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { useEffect } from 'react';
 import { router } from 'expo-router';
 import {
   Chrome as Home,
   Search,
   Library,
   User,
-  Upload,
-  Settings,
 } from 'lucide-react-native';
 import { MiniPlayer } from '@/components/MiniPlayer';
 import { View, StyleSheet } from 'react-native';
@@ -21,7 +19,6 @@ export default function TabLayout() {
       router.replace('/(auth)/login');
     }
   }, [user, isLoading]);
-
 
   if (isLoading || !user) {
     return null; // Or <LoadingScreen />

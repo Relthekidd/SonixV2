@@ -5,29 +5,26 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import { Play, Pause, SkipForward, Heart } from 'lucide-react-native';
 
-const { width } = Dimensions.get('window');
-
 export function MiniPlayer() {
-  const { 
-    currentTrack, 
-    isPlaying, 
-    playTrack, 
-    pauseTrack, 
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
     nextTrack,
     toggleLike,
-    likedSongs 
+    likedSongs,
   } = useMusic();
 
   if (!currentTrack) return null;
 
-  const isLiked = likedSongs.some(track => track.id === currentTrack.id);
+  const isLiked = likedSongs.some((track) => track.id === currentTrack.id);
 
   const handlePlayPause = () => {
     if (isPlaying) {
@@ -47,16 +44,16 @@ export function MiniPlayer() {
         colors={['rgba(139, 92, 246, 0.9)', 'rgba(168, 85, 247, 0.9)']}
         style={styles.gradient}
       >
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.content}
           onPress={openFullPlayer}
           activeOpacity={0.8}
         >
-          <Image 
-            source={{ uri: currentTrack.coverUrl }} 
-            style={styles.albumArt} 
+          <Image
+            source={{ uri: currentTrack.coverUrl }}
+            style={styles.albumArt}
           />
-          
+
           <View style={styles.trackInfo}>
             <Text style={styles.title} numberOfLines={1}>
               {currentTrack.title}
@@ -71,8 +68,8 @@ export function MiniPlayer() {
               style={styles.controlButton}
               onPress={() => toggleLike(currentTrack.id)}
             >
-              <Heart 
-                color={isLiked ? '#ef4444' : '#ffffff'} 
+              <Heart
+                color={isLiked ? '#ef4444' : '#ffffff'}
                 size={20}
                 fill={isLiked ? '#ef4444' : 'transparent'}
               />
@@ -89,10 +86,7 @@ export function MiniPlayer() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.controlButton}
-              onPress={nextTrack}
-            >
+            <TouchableOpacity style={styles.controlButton} onPress={nextTrack}>
               <SkipForward color="#ffffff" size={20} />
             </TouchableOpacity>
           </View>

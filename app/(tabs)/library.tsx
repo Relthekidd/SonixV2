@@ -11,7 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMusic } from '@/providers/MusicProvider';
+import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
 import {
@@ -33,12 +33,11 @@ function LibraryScreen() {
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
 
-  const [savedAlbums, setSavedAlbums] = useState<any[]>([]);
+  const [savedAlbums, setSavedAlbums] = useState<Track[]>([]);
 
   const {
     likedSongs,
     playlists,
-    albums,
     currentTrack,
     isPlaying,
     playTrack,
@@ -62,18 +61,31 @@ function LibraryScreen() {
     const uid = authData.user?.id;
     if (!uid) return;
 
-    const { data } = await supabase
+  const { data } = await supabase
       .from('favorites')
       .select('album:album_id(*, artist:artist_id(*))')
       .eq('user_id', uid)
       .not('album_id', 'is', null);
 
-    const mapped = (data || []).map((r: any) => ({
+    interface FavoriteAlbumRow {
+      album: {
+        id: string;
+        title: string;
+        artist?: { name?: string } | null;
+        release_year?: string | null;
+        cover_url?: string | null;
+      };
+    }
+
+    const mapped = (data || []).map((r: FavoriteAlbumRow) => ({
       id: r.album.id,
       title: r.album.title,
       artist: r.album.artist?.name || '',
       year: r.album.release_year || '',
-      coverUrl: apiService.getPublicUrl('cover-images', r.album.cover_url || ''),
+      coverUrl: apiService.getPublicUrl(
+        'cover-images',
+        r.album.cover_url || '',
+      ),
     }));
     setSavedAlbums(mapped);
   }
@@ -90,7 +102,7 @@ function LibraryScreen() {
     Alert.alert('Success', 'Playlist created successfully!');
   };
 
-  const handleTrackPress = (track: any) => {
+  const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
       isPlaying ? pauseTrack() : playTrack(track, likedSongs);
     } else {
@@ -98,7 +110,7 @@ function LibraryScreen() {
     }
   };
 
-  const renderTrackItem = ({ item }: { item: any }) => (
+  const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
       style={styles.trackItem}
       onPress={() => handleTrackPress(item)}
@@ -123,7 +135,7 @@ function LibraryScreen() {
     </TouchableOpacity>
   );
 
-  const renderPlaylistItem = ({ item }: { item: any }) => (
+  const renderPlaylistItem = ({ item }: { item: Playlist }) => (
     <TouchableOpacity style={styles.playlistItem}>
       <Image source={{ uri: item.coverUrl }} style={styles.playlistCover} />
       <View style={styles.playlistInfo}>
@@ -140,7 +152,7 @@ function LibraryScreen() {
     </TouchableOpacity>
   );
 
-  const renderAlbumItem = ({ item }: { item: any }) => (
+  const renderAlbumItem = ({ item }: { item: Track }) => (
     <TouchableOpacity style={styles.albumItem}>
       <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
       <View style={styles.albumInfo}>
