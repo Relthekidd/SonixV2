@@ -17,12 +17,9 @@ import {
   Search,
   Play,
   Pause,
-  Music,
-  User,
-  Disc,
-  Users,
   Lock,
   Globe,
+  Heart,
 } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 
@@ -49,16 +46,14 @@ function SearchScreen() {
   const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>(
     'relevance',
   );
-  const [genre, setGenre] = useState<string | null>(null);
 
   const {
     currentTrack,
     isPlaying,
     playTrack,
     pauseTrack,
-    trendingTracks,
     searchMusic,
-    error,
+    toggleLike,
   } = useMusic();
 
   useEffect(() => {
@@ -90,7 +85,7 @@ function SearchScreen() {
     }
     const timer = setTimeout(() => handleSearch(query), 300);
     return () => clearTimeout(timer);
-  }, [query, sort, genre]);
+  }, [query, sort]);
 
   const handleSearch = async (searchQuery: string) => {
     setIsSearching(true);
@@ -127,6 +122,16 @@ function SearchScreen() {
     }
   };
 
+  const handleToggleLike = (trackId: string) => {
+    toggleLike(trackId);
+    setResults((prev) => ({
+      ...prev,
+      tracks: prev.tracks.map((t) =>
+        t.id === trackId ? { ...t, isLiked: !t.isLiked } : t,
+      ),
+    }));
+  };
+
   const renderTrackItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={styles.resultItem}
@@ -141,6 +146,16 @@ function SearchScreen() {
           {item.artist} • Song
         </Text>
       </View>
+      <TouchableOpacity
+        style={styles.likeButton}
+        onPress={() => handleToggleLike(item.id)}
+      >
+        <Heart
+          color={item.isLiked ? '#ef4444' : '#94a3b8'}
+          size={18}
+          fill={item.isLiked ? '#ef4444' : 'transparent'}
+        />
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.playButton}
         onPress={() => handleTrackPress(item)}
@@ -377,6 +392,7 @@ const styles = StyleSheet.create({
   resultInfo: { flex: 1, marginLeft: 12 },
   resultTitle: { color: '#fff' },
   resultSubtitle: { color: '#94a3b8' },
+  likeButton: { padding: 8 },
   playButton: { padding: 8 },
   userMeta: {
     flexDirection: 'row',

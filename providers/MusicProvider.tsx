@@ -254,7 +254,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
           .or(
-            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{${term}}`
+            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{\"${term}\"}`
           )
           .eq('is_published', true)
           .order(sort === 'popular' ? 'play_count' : 'created_at', {
