@@ -8,12 +8,14 @@ import React, {
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
+import { apiService } from '@/services/api';
 import { useAuth } from './AuthProvider';
 
 export interface Track {
   id: string;
   title: string;
   artist: string;
+  artistId?: string;
   album: string;
   duration: number;
   coverUrl: string;
@@ -50,7 +52,7 @@ interface MusicContextType {
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
   refreshData: () => Promise<void>;
-  searchMusic: (query: string) => Promise<{
+  searchMusic: (query: string, sort?: 'recent' | 'popular') => Promise<{
     tracks: Track[];
     albums: any[];
     singles: Track[];
@@ -168,6 +170,9 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       });
       statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
       setCurrentTrack(track);
+      if (user && track.artistId) {
+        apiService.recordPlay(track.id, track.artistId);
+      }
       setQueue(queueParam.length ? queueParam : [track]);
     } catch (err) {
       console.error('playTrack error', err);
@@ -234,7 +239,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const searchMusic = async (query: string) => {
+  const searchMusic = async (
+    query: string,
+    sort: 'recent' | 'popular' = 'recent',
+  ) => {
     const term = query.trim();
     if (!term) {
       return { tracks: [], albums: [], singles: [], artists: [], users: [] };
@@ -245,8 +253,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
-          .ilike('title', `%${term}%`)
+          .or(
+            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{${term}}`
+          )
           .eq('is_published', true)
+          .order(sort === 'popular' ? 'play_count' : 'created_at', {
+            ascending: false,
+          })
           .limit(10),
         supabase
           .from('artists')
@@ -260,10 +273,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         id: t.id,
         title: t.title,
         artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+        artistId: t.artist_id,
         album: t.album?.title || t.album_title || 'Single',
         duration: t.duration || 0,
-        coverUrl: t.cover_url || t.album?.cover_url || '',
-        audioUrl: t.audio_url,
+        coverUrl: apiService.getPublicUrl(
+          'cover-images',
+          t.cover_url || t.album?.cover_url || '',
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
         isLiked: likedSongs.some((l) => l.id === t.id),
         genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
         releaseDate: t.release_date || t.created_at,
