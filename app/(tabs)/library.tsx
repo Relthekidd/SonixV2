@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
+import { supabase } from '@/services/supabase';
+import { apiService } from '@/services/api';
 import {
   Heart,
   Music,
@@ -31,6 +33,8 @@ function LibraryScreen() {
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
 
+  const [savedAlbums, setSavedAlbums] = useState<any[]>([]);
+
   const {
     likedSongs,
     playlists,
@@ -41,11 +45,38 @@ function LibraryScreen() {
     pauseTrack,
     createPlaylist,
     toggleLike,
+    refreshData,
   } = useMusic();
 
   useEffect(() => {
     if (playlist) setActiveTab('playlists');
   }, [playlist]);
+
+  useEffect(() => {
+    refreshData();
+    fetchSavedAlbums();
+  }, []);
+
+  async function fetchSavedAlbums() {
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) return;
+
+    const { data } = await supabase
+      .from('favorites')
+      .select('album:album_id(*, artist:artist_id(*))')
+      .eq('user_id', uid)
+      .not('album_id', 'is', null);
+
+    const mapped = (data || []).map((r: any) => ({
+      id: r.album.id,
+      title: r.album.title,
+      artist: r.album.artist?.name || '',
+      year: r.album.release_year || '',
+      coverUrl: apiService.getPublicUrl('cover-images', r.album.cover_url || ''),
+    }));
+    setSavedAlbums(mapped);
+  }
 
   const handleCreatePlaylist = () => {
     if (!playlistName.trim()) {
@@ -206,7 +237,7 @@ function LibraryScreen() {
 
         {activeTab === 'albums' && (
           <FlatList
-            data={albums}
+            data={savedAlbums}
             renderItem={renderAlbumItem}
             keyExtractor={(item) => item.id}
             scrollEnabled={false}
