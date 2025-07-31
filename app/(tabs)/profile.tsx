@@ -1,149 +1,124 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
   Image,
+  TextInput,
   Switch,
   ActivityIndicator,
-  RefreshControl,
   Alert,
-  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/services/supabase';
-import { useMusic } from '@/providers/MusicProvider';
-import { Edit3, LogOut, Play, Pause } from 'lucide-react-native';
+import { Edit3, LogOut } from 'lucide-react-native';
 
-interface UserProfile {
+interface Profile {
   id: string;
-  display_name: string;
+  email: string;
+  username?: string;
+  first_name?: string;
+  last_name?: string;
   bio?: string;
-  profile_picture_url?: string;
-  is_private: boolean;
-  follower_count: number;
-  following_count: number;
-  top_artists: any[];
-  top_songs: any[];
+  avatar_url?: string;
+  is_private?: boolean;
 }
 
 function ProfileScreen() {
-  const { user, logout } = useAuth();
-  const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
-
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { logout } = useAuth();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [username, setUsername] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [bio, setBio] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newBio, setNewBio] = useState('');
 
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      const uid = data.user?.id || user?.id;
-      if (uid) {
-        await loadProfile(uid);
-      } else {
-        setIsLoading(false);
-      }
-    };
-    fetchUser();
-  }, [user]);
+    loadProfile();
+  }, []);
 
-  const loadProfile = async (uid: string) => {
-    setIsLoading(true);
+  const loadProfile = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase.rpc(
-        'get_user_profile_with_stats',
-        { target_user_id: uid },
-      );
-      if (error) throw error;
-      if (data && data.length) {
-        const p = data[0] as UserProfile;
-        setProfile(p);
-        setIsPrivate(p.is_private);
-        setNewName(p.display_name);
-        setNewBio(p.bio || '');
-        return;
-      }
-      // fallback to basic profile
-      const { data: prof } = await supabase
-        .from('users')
-        .select('id, email, display_name, bio, profile_picture_url, is_private')
+      const { data: authData } = await supabase.auth.getUser();
+      const uid = authData.user?.id;
+      if (!uid) throw new Error('No user');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
         .eq('id', uid)
         .single();
-      if (prof) {
-        setProfile({
-          id: prof.id,
-          display_name: prof.display_name || prof.email,
-          bio: prof.bio || '',
-          profile_picture_url: prof.profile_picture_url || '',
-          is_private: prof.is_private || false,
-          follower_count: 0,
-          following_count: 0,
-          top_artists: [],
-          top_songs: [],
-        });
-        setIsPrivate(!!prof.is_private);
-        setNewName(prof.display_name || prof.email);
-        setNewBio(prof.bio || '');
-      }
+      if (error) throw error;
+      setProfile(data);
+      setUsername(data.username ?? '');
+      setFirstName(data.first_name ?? '');
+      setLastName(data.last_name ?? '');
+      setBio(data.bio ?? '');
+      setIsPrivate(data.is_private ?? false);
     } catch (err) {
+      console.error(err);
       Alert.alert('Error', 'Failed to load profile');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    if (user?.id) {
-      await loadProfile(user.id);
+  const saveProfile = async () => {
+    if (!profile) return;
+    setLoading(true);
+    try {
+      const updates = {
+        username,
+        first_name: firstName,
+        last_name: lastName,
+        bio,
+        is_private: isPrivate,
+      };
+      const { error } = await supabase
+        .from('profiles')
+        .update(updates)
+        .eq('id', profile.id);
+      if (error) throw error;
+      setProfile({ ...profile, ...updates });
+      setEditing(false);
+    } catch (err) {
+      console.error(err);
+      Alert.alert('Error', 'Failed to update profile');
+    } finally {
+      setLoading(false);
     }
-    setIsRefreshing(false);
-  }, [user]);
+  };
 
   const togglePrivacy = async () => {
-    if (!user) return;
+    if (!profile) return;
     const newVal = !isPrivate;
     setIsPrivate(newVal);
-    await supabase
-      .from('users')
+    const { error } = await supabase
+      .from('profiles')
       .update({ is_private: newVal })
-      .eq('id', user.id);
+      .eq('id', profile.id);
+    if (!error) setProfile({ ...profile, is_private: newVal });
   };
 
-  const handleTrackPress = (track: any) => {
-    if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, profile?.top_songs || []);
-    } else {
-      playTrack(track, profile?.top_songs || []);
-    }
-  };
-
-  if (isLoading) {
+  if (loading) {
     return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <ActivityIndicator size="large" color="#8b5cf6" />
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#8b5cf6" />
+        </View>
       </LinearGradient>
     );
   }
 
   if (!profile) {
     return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
+      <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
         <View style={styles.centered}>
           <Text style={styles.errorText}>Profile not found</Text>
         </View>
@@ -152,139 +127,70 @@ function ProfileScreen() {
   }
 
   return (
-    <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
-      style={styles.container}
-    >
-      <ScrollView
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />
-        }
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+    <LinearGradient colors={['#1a1a2e', '#16213e', '#0f3460']} style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Image
             source={{
               uri:
-                profile.profile_picture_url ||
+                profile.avatar_url ||
                 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
             }}
             style={styles.avatar}
           />
-          {isEditing ? (
+          {editing ? (
             <>
               <TextInput
                 style={[styles.input, { marginBottom: 8 }]}
-                value={newName}
-                onChangeText={setNewName}
-                placeholder="Display name"
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Username"
+                placeholderTextColor="#64748b"
+              />
+              <TextInput
+                style={[styles.input, { marginBottom: 8 }]}
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder="First name"
+                placeholderTextColor="#64748b"
+              />
+              <TextInput
+                style={[styles.input, { marginBottom: 8 }]}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder="Last name"
                 placeholderTextColor="#64748b"
               />
               <TextInput
                 style={[styles.input, { height: 80 }]}
                 multiline
-                value={newBio}
-                onChangeText={setNewBio}
+                value={bio}
+                onChangeText={setBio}
                 placeholder="Bio"
                 placeholderTextColor="#64748b"
               />
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <TouchableOpacity
-                  style={[styles.editButton, { backgroundColor: '#8b5cf6' }]}
-                  onPress={async () => {
-                    if (!user) return;
-                    await supabase
-                      .from('users')
-                      .update({ display_name: newName, bio: newBio })
-                      .eq('id', user.id);
-                    setProfile({
-                      ...(profile as UserProfile),
-                      display_name: newName,
-                      bio: newBio,
-                    });
-                    setIsEditing(false);
-                  }}
-                >
+              <View style={styles.editRow}>
+                <TouchableOpacity style={[styles.editButton, { backgroundColor: '#8b5cf6' }]} onPress={saveProfile}>
                   <Text style={styles.editText}>Save</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => setIsEditing(false)}
-                >
+                <TouchableOpacity style={styles.editButton} onPress={() => setEditing(false)}>
                   <Text style={styles.editText}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </>
           ) : (
             <>
-              <Text style={styles.name}>{profile.display_name}</Text>
-              {profile.bio ? (
-                <Text style={styles.bio}>{profile.bio}</Text>
-              ) : null}
-              <TouchableOpacity
-                style={styles.editButton}
-                onPress={() => setIsEditing(true)}
-              >
+              <Text style={styles.name}>{username}</Text>
+              <Text style={styles.fullName}>{`${firstName} ${lastName}`.trim()}</Text>
+              {bio ? <Text style={styles.bio}>{bio}</Text> : null}
+              <Text style={styles.email}>{profile.email}</Text>
+              <TouchableOpacity style={styles.editButton} onPress={() => setEditing(true)}>
                 <Edit3 color="#fff" size={16} />
                 <Text style={styles.editText}>Edit Profile</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
-
-        {/* Favorites */}
-        {profile.top_songs?.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Favorite Songs</Text>
-            {profile.top_songs.slice(0, 5).map((song) => (
-              <TouchableOpacity
-                key={song.id}
-                style={styles.songRow}
-                onPress={() => handleTrackPress(song)}
-              >
-                <Image
-                  source={{ uri: song.cover_url }}
-                  style={styles.songCover}
-                />
-                <View style={styles.songInfo}>
-                  <Text style={styles.songTitle} numberOfLines={1}>
-                    {song.title}
-                  </Text>
-                  <Text style={styles.songArtist} numberOfLines={1}>
-                    {song.artist}
-                  </Text>
-                </View>
-                <TouchableOpacity>
-                  {currentTrack?.id === song.id && isPlaying ? (
-                    <Pause color="#8b5cf6" size={20} />
-                  ) : (
-                    <Play color="#8b5cf6" size={20} />
-                  )}
-                </TouchableOpacity>
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {profile.top_artists?.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Followed Artists</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {profile.top_artists.slice(0, 5).map((artist) => (
-                <View key={artist.id} style={styles.artistCard}>
-                  <Image
-                    source={{ uri: artist.avatar_url }}
-                    style={styles.artistAvatar}
-                  />
-                  <Text style={styles.artistName} numberOfLines={1}>
-                    {artist.name}
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Settings</Text>
@@ -294,11 +200,7 @@ function ProfileScreen() {
           </View>
           <TouchableOpacity style={styles.settingRow} onPress={logout}>
             <LogOut color="#ef4444" size={20} />
-            <Text
-              style={[styles.settingLabel, { color: '#ef4444', marginLeft: 8 }]}
-            >
-              Logout
-            </Text>
+            <Text style={[styles.settingLabel, { color: '#ef4444', marginLeft: 8 }]}>Logout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -310,16 +212,14 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#fff' },
-  scrollContent: { paddingBottom: 120 },
+  content: { paddingBottom: 80 },
   header: { alignItems: 'center', padding: 24, paddingTop: 60 },
   avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
   name: { fontSize: 24, fontFamily: 'Poppins-Bold', color: '#fff' },
-  bio: {
-    color: '#94a3b8',
-    fontFamily: 'Inter-Regular',
-    textAlign: 'center',
-    marginTop: 8,
-  },
+  fullName: { fontSize: 16, color: '#94a3b8', fontFamily: 'Inter-Regular', marginTop: 4 },
+  email: { color: '#94a3b8', fontFamily: 'Inter-Regular', marginTop: 4 },
+  bio: { color: '#94a3b8', fontFamily: 'Inter-Regular', textAlign: 'center', marginTop: 8 },
+  editRow: { flexDirection: 'row', gap: 12 },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -330,33 +230,8 @@ const styles = StyleSheet.create({
   },
   editText: { color: '#fff', fontFamily: 'Inter-Medium', marginLeft: 6 },
   section: { marginBottom: 32, paddingHorizontal: 24 },
-  sectionTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#fff',
-    marginBottom: 16,
-  },
-  songRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    padding: 12,
-    borderRadius: 12,
-  },
-  songCover: { width: 50, height: 50, borderRadius: 6 },
-  songInfo: { flex: 1, marginLeft: 12 },
-  songTitle: { color: '#fff', fontFamily: 'Inter-SemiBold' },
-  songArtist: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 12 },
-  artistCard: { alignItems: 'center', marginRight: 16, width: 80 },
-  artistAvatar: { width: 60, height: 60, borderRadius: 30, marginBottom: 8 },
-  artistName: { color: '#fff', fontSize: 12, textAlign: 'center' },
-  settingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
+  sectionTitle: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: '#fff', marginBottom: 16 },
+  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   settingLabel: { color: '#fff', fontFamily: 'Inter-Regular', fontSize: 16 },
   input: {
     backgroundColor: 'rgba(255,255,255,0.1)',
