@@ -13,6 +13,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
+import { supabase } from '@/services/supabase';
 import {
   Search,
   Play,
@@ -52,8 +53,8 @@ function SearchScreen() {
     isPlaying,
     playTrack,
     pauseTrack,
-    searchMusic,
     toggleLike,
+    likedSongs,
   } = useMusic();
 
   useEffect(() => {
@@ -91,17 +92,37 @@ function SearchScreen() {
     setIsSearching(true);
     setErrorMessage(null);
     try {
-      const musicResults = await searchMusic(
-        searchQuery,
-        sort === 'popular' ? 'popular' : 'recent',
-      );
-      setResults({
-        tracks: musicResults.tracks || [],
-        albums: musicResults.albums || [],
-        singles: musicResults.singles || [],
-        artists: musicResults.artists || [],
-        users: musicResults.users || [],
-      });
+      const { data, error } = await supabase
+        .from('tracks')
+        .select(
+          `*, artist:artist_id(name), album:album_id(*)`
+        )
+        .ilike('title', `%${searchQuery}%`)
+        .eq('is_published', true)
+        .order(sort === 'popular' ? 'play_count' : 'created_at', {
+          ascending: false,
+        });
+
+      if (error) throw error;
+
+      const tracks = (data || []).map((t: any) => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+        artistId: t.artist_id,
+        album: t.album?.title || t.album_title || 'Single',
+        duration: t.duration || 0,
+        coverUrl: apiService.getPublicUrl(
+          'cover-images',
+          t.cover_url || t.album?.cover_url || ''
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+        isLiked: likedSongs.some((l) => l.id === t.id),
+        genre: Array.isArray(t.genres) ? t.genres[0] : t.genre || '',
+        releaseDate: t.release_date || t.created_at,
+      }));
+
+      setResults({ tracks, albums: [], singles: [], artists: [], users: [] });
     } catch (err) {
       console.error('search error', err);
       setErrorMessage('Something went wrong');

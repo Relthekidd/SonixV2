@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
+import { supabase } from '@/services/supabase';
 import {
   ArrowLeft,
   Play,
@@ -54,37 +55,50 @@ export default function TrackDetailScreen() {
     setError(null);
 
     try {
-      const singleData = await apiService.getTrackById(id);
+      const { data, error } = await supabase
+        .from('tracks')
+        .select(`*, artist:artist_id(*), album:album_id(*)`)
+        .eq('id', id)
+        .single();
+
+      if (error || !data) throw error;
+
+      // If this track isn't part of an album, check if it's registered as a single
+      let singleExtra: any = null;
+      if (!data.album_id) {
+        const { data: s } = await supabase
+          .from('singles')
+          .select('*')
+          .eq('track_id', data.id)
+          .single();
+        singleExtra = s || null;
+      }
+
       const transformedTrack: Track = {
-        id: singleData.id,
-        title: singleData.title,
+        id: data.id,
+        title: data.title,
         artist:
-          singleData.artist?.name ||
-          singleData.artist_name ||
-          singleData.artist ||
+          data.artist?.name ||
+          data.artist_name ||
+          data.artist ||
           'Unknown Artist',
-        artistId: singleData.artist_id,
-        album: singleData.album?.title || singleData.album || 'Single',
-        duration: singleData.duration || 180,
-        coverUrl:
-          apiService.getPublicUrl(
-            'cover-images',
-            singleData.cover_url || singleData.album?.cover_url || '',
-          ),
-        audioUrl: apiService.getPublicUrl('audio-files', singleData.audio_url),
-        isLiked: likedSongs.some((l) => l.id === singleData.id),
-        genre: Array.isArray(singleData.genres)
-          ? singleData.genres[0]
-          : singleData.genre || 'Unknown',
+        artistId: data.artist_id,
+        album: data.album?.title || data.album_title || 'Single',
+        duration: data.duration || 180,
+        coverUrl: apiService.getPublicUrl(
+          'cover-images',
+          data.cover_url || data.album?.cover_url || '',
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
+        isLiked: likedSongs.some((l) => l.id === data.id),
+        genre: Array.isArray(data.genres) ? data.genres[0] : data.genre || 'Unknown',
         releaseDate:
-          singleData.release_date ||
-          singleData.created_at ||
-          new Date().toISOString(),
-        playCount: singleData.play_count,
-        likeCount: singleData.like_count,
-        lyrics: singleData.lyrics,
-        description: singleData.description,
-        genres: singleData.genres,
+          data.release_date || singleExtra?.release_date || data.created_at,
+        playCount: data.play_count,
+        likeCount: data.like_count,
+        lyrics: data.lyrics || singleExtra?.lyrics || '',
+        description: data.description || singleExtra?.description || '',
+        genres: data.genres,
       };
       setTrack(transformedTrack);
     } catch (err) {
