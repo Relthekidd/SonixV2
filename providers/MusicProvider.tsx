@@ -23,7 +23,10 @@ export interface Track {
   audioUrl: string;
   isLiked: boolean;
   genre: string;
+  genres?: string[];
   releaseDate: string;
+  year?: string;
+  description?: string;
   playCount?: number;
   trackNumber?: number;
   lyrics?: string;
@@ -32,9 +35,58 @@ export interface Track {
 
 export interface Playlist {
   id: string;
-  name: string;
+  title: string;
   tracks: Track[];
   coverUrl?: string;
+}
+
+interface TrackRow {
+  id: string;
+  title: string;
+  artist_id?: string | null;
+  artist?: { name?: string } | null;
+  artist_name?: string | null;
+  album_id?: string | null;
+  album?: { title?: string; cover_url?: string | null } | null;
+  album_title?: string | null;
+  duration?: number | null;
+  cover_url?: string | null;
+  audio_url: string;
+  genres?: string[] | string | null;
+  release_date?: string | null;
+  created_at?: string;
+  play_count?: number | null;
+  track_number?: number | null;
+  like_count?: number | null;
+  description?: string | null;
+  lyrics?: string | null;
+}
+
+interface PlaylistTrackRow {
+  track: TrackRow;
+}
+
+interface PlaylistRow {
+  id: string;
+  title: string;
+  cover_url?: string | null;
+  playlist_tracks?: PlaylistTrackRow[];
+}
+
+interface LikedSongRow {
+  track: TrackRow;
+}
+
+interface Artist {
+  id: string;
+  name: string;
+  avatar_url?: string | null;
+}
+
+interface UserProfile {
+  id: string;
+  display_name: string;
+  profile_picture_url?: string | null;
 }
 
 interface MusicContextType {
@@ -60,16 +112,16 @@ interface MusicContextType {
     sort?: 'recent' | 'popular',
   ) => Promise<{
     tracks: Track[];
-    albums: any[];
+    albums: Track[];
     singles: Track[];
-    artists: any[];
-    users: any[];
+    artists: Artist[];
+    users: UserProfile[];
   }>;
   // Library-related state & actions
   likedSongs: Track[];
   playlists: Playlist[];
   albums: Track[];
-  createPlaylist: (name: string, description?: string) => Promise<void>;
+  createPlaylist: (title: string, description?: string) => Promise<void>;
   toggleLike: (trackId: string) => void;
   addToPlaylist: (playlistId: string, track: Track) => void;
   setVolume: (value: number) => void;
@@ -99,17 +151,48 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [albums, setAlbums] = useState<Track[]>([]);
 
-  const createPlaylist = async (name: string, description = '') => {
+  const mapTrack = (t: TrackRow, liked = false): Track => ({
+    id: t.id,
+    title: t.title,
+    artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+    artistId: t.artist_id || undefined,
+    album: t.album?.title || t.album_title || 'Single',
+    albumId: t.album_id || undefined,
+    duration: t.duration ?? 0,
+    coverUrl: apiService.getPublicUrl(
+      'images',
+      t.cover_url || t.album?.cover_url || '',
+    ),
+    audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+    isLiked: liked || likedSongs.some((l) => l.id === t.id),
+    genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
+    genres: Array.isArray(t.genres)
+      ? (t.genres as string[])
+      : typeof t.genres === 'string'
+        ? [t.genres]
+        : [],
+    releaseDate: t.release_date || t.created_at || '',
+    year: t.release_date
+      ? new Date(t.release_date).getFullYear().toString()
+      : undefined,
+    description: t.description || '',
+    playCount: t.play_count || undefined,
+    trackNumber: t.track_number || undefined,
+    lyrics: t.lyrics || undefined,
+    likeCount: t.like_count || undefined,
+  });
+
+  const createPlaylist = async (title: string, description = '') => {
     if (!user) return;
     const { data, error } = await supabase
       .from('playlists')
-      .insert({ name, description, user_id: user.id })
+      .insert({ title, description, user_id: user.id })
       .select()
       .single();
     if (!error && data) {
       const newPL: Playlist = {
         id: data.id,
-        name: data.name,
+        title: data.title,
         tracks: [],
         coverUrl: data.cover_url || '',
       };
@@ -243,60 +326,39 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      const promises: any[] = [trendingQuery, newQuery];
+      const promises: PromiseLike<unknown>[] = [trendingQuery, newQuery];
       if (user) {
         promises.push(
           supabase
             .from('liked_songs')
-            .select('track:tracks(*)')
+            .select('track:tracks!fk_liked_songs_track(*)')
             .eq('user_id', user.id),
           supabase
             .from('playlists')
-            .select('id,name,cover_url,playlist_tracks(track:tracks(*))')
+            .select(
+              'id,title,cover_url,playlist_tracks:playlist_tracks!fk_playlist_tracks_playlist(track:tracks!fk_playlist_tracks_track(*))',
+            )
             .eq('user_id', user.id),
         );
       }
       const [trendingRes, newRes, likedRes, playlistRes] =
         await Promise.all(promises);
 
-      const mapTrack = (t: any): Track => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
-        artistId: t.artist_id,
-        album: t.album?.title || t.album_title || 'Single',
-        albumId: t.album_id,
-        duration: t.duration || 0,
-        coverUrl: apiService.getPublicUrl(
-          'images',
-          t.cover_url || t.album?.cover_url || '',
-        ),
-        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-        isLiked: likedSongs.some((l) => l.id === t.id),
-        genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
-        releaseDate: t.release_date || t.created_at,
-        playCount: t.play_count,
-        trackNumber: t.track_number,
-        likeCount: t.like_count,
-      });
-
-      setTrendingTracks((trendingRes.data || []).map(mapTrack));
-      setNewReleases((newRes.data || []).map(mapTrack));
+      setTrendingTracks((trendingRes.data || []).map((t: TrackRow) => mapTrack(t)));
+      setNewReleases((newRes.data || []).map((t: TrackRow) => mapTrack(t)));
 
       if (user && likedRes && playlistRes) {
-        const liked = (likedRes.data || []).map((r: any) => ({
-          ...r.track,
-          id: r.track.id,
-        })) as Track[];
+        const liked = (likedRes.data || []).map((r: LikedSongRow) =>
+          mapTrack(r.track, true),
+        );
         setLikedSongs(liked);
-        const pls = (playlistRes.data || []).map((p: any) => ({
+        const pls = (playlistRes.data || []).map((p: PlaylistRow) => ({
           id: p.id,
-          name: p.name,
+          title: p.title,
           coverUrl: p.cover_url || '',
-          tracks: (p.playlist_tracks || []).map((pt: any) => ({
-            ...pt.track,
-            id: pt.track.id,
-          })),
+          tracks: (p.playlist_tracks || []).map((pt: PlaylistTrackRow) =>
+            mapTrack(pt.track),
+          ),
         }));
         setPlaylists(pls);
       }
@@ -337,30 +399,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         supabase.rpc('search_users', { search_query: term, limit_count: 10 }),
       ]);
 
-      const tracks = (trackRes.data || []).map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
-        artistId: t.artist_id,
-        album: t.album?.title || t.album_title || 'Single',
-        albumId: t.album_id,
-        duration: t.duration || 0,
-        coverUrl: apiService.getPublicUrl(
-          'images',
-          t.cover_url || t.album?.cover_url || '',
-        ),
-        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-        isLiked: likedSongs.some((l) => l.id === t.id),
-        genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
-        releaseDate: t.release_date || t.created_at,
-      }));
+      const tracks = (trackRes.data || []).map((t: TrackRow) => mapTrack(t));
 
       return {
         tracks,
         albums: [],
         singles: [],
-        artists: artistRes.data || [],
-        users: userRes.data || [],
+        artists: (artistRes.data || []) as Artist[],
+        users: (userRes.data || []) as UserProfile[],
       };
     } catch (err) {
       console.error('searchMusic error', err);

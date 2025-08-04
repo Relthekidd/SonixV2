@@ -29,7 +29,6 @@ import {
 } from 'lucide-react-native';
 
 export default function TrackDetailScreen() {
-
   const router = useRouter();
   const { id } = useLocalSearchParams();
   if (!id || typeof id !== 'string') {
@@ -44,7 +43,14 @@ export default function TrackDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack, toggleLike, likedSongs } = useMusic();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    toggleLike,
+    likedSongs,
+  } = useMusic();
 
   useEffect(() => {
     if (id) loadTrackDetails();
@@ -64,7 +70,11 @@ export default function TrackDetailScreen() {
       if (error || !data) throw error;
 
       // If this track isn't part of an album, check if it's registered as a single
-      let singleExtra: any = null;
+      let singleExtra: {
+        release_date?: string;
+        lyrics?: string;
+        description?: string;
+      } | null = null;
       if (!data.album_id) {
         const { data: s } = await supabase
           .from('singles')
@@ -91,9 +101,18 @@ export default function TrackDetailScreen() {
         ),
         audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
         isLiked: likedSongs.some((l) => l.id === data.id),
-        genre: Array.isArray(data.genres) ? data.genres[0] : data.genre || 'Unknown',
+        genre: Array.isArray(data.genres)
+          ? data.genres[0]
+          : data.genre || 'Unknown',
         releaseDate:
           data.release_date || singleExtra?.release_date || data.created_at,
+        year: (data.release_date || singleExtra?.release_date)
+          ? new Date(
+              data.release_date || singleExtra?.release_date || data.created_at,
+            )
+              .getFullYear()
+              .toString()
+          : undefined,
         playCount: data.play_count,
         likeCount: data.like_count,
         lyrics: data.lyrics || singleExtra?.lyrics || '',

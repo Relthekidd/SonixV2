@@ -11,20 +11,51 @@ export interface TrackData {
   title: string;
   duration: number;
   audio_url: string;
-  track_number: number;
-  play_count: number;
-  like_count: number;
-  lyrics: string;
+  track_number: number | null;
+  play_count: number | null;
+  like_count: number | null;
+  lyrics: string | null;
 }
 
 export interface AlbumDetails {
   id: string;
   title: string;
   artist: string; // aliased from artist_name
+  artist_id?: string | null;
   cover_url: string;
   description?: string;
   release_date?: string;
   tracks: TrackData[];
+}
+
+export interface TrackDetails {
+  id: string;
+  title: string;
+  duration: number | null;
+  audio_url: string;
+  track_number?: number | null;
+  play_count?: number | null;
+  like_count?: number | null;
+  lyrics?: string | null;
+  cover_url?: string | null;
+  artist_id?: string | null;
+  artist?: { name?: string } | null;
+  album_id?: string | null;
+  album?: { title?: string; cover_url?: string | null } | null;
+  description?: string | null;
+  release_date?: string | null;
+  genres?: string[] | null;
+}
+
+export interface SingleDetails {
+  id: string;
+  title: string;
+  artist_id?: string | null;
+  artist?: { name?: string } | null;
+  track?: TrackDetails | null;
+  cover_url: string;
+  description?: string | null;
+  release_date?: string | null;
 }
 
 class ApiService {
@@ -41,7 +72,9 @@ class ApiService {
 
   async recordPlay(trackId: string, artistId: string) {
     try {
-      await supabase.from('song_plays').insert({ track_id: trackId, artist_id: artistId });
+      await supabase
+        .from('song_plays')
+        .insert({ track_id: trackId, artist_id: artistId });
     } catch (err) {
       console.error('[ApiService] recordPlay error', err);
     }
@@ -130,13 +163,20 @@ class ApiService {
       }
 
       console.log('[ApiService] getAlbumById success', data);
-      const album = data as any;
-      album.cover_url = this.getPublicUrl('images', album.cover_url);
-      album.tracks = (album.tracks || []).map((t: any) => ({
-        ...t,
-        audio_url: this.getPublicUrl('audio-files', t.audio_url),
-      }));
-      return album as AlbumDetails;
+      const album: AlbumDetails = {
+        id: data.id,
+        title: data.title,
+        artist: data.artist?.name || data.artist_name || '',
+        artist_id: data.artist_id,
+        cover_url: this.getPublicUrl('images', data.cover_url),
+        description: data.description || undefined,
+        release_date: data.release_date || undefined,
+        tracks: (data.tracks || []).map((t: TrackData) => ({
+          ...t,
+          audio_url: this.getPublicUrl('audio-files', t.audio_url),
+        })),
+      };
+      return album;
     } catch (err) {
       console.error('[ApiService] getAlbumById error', err);
       throw err;
@@ -146,39 +186,64 @@ class ApiService {
   /**
    * Fetch track by ID with related artist and album
    */
-  async getTrackById(id: string): Promise<any> {
+  async getTrackById(id: string): Promise<TrackDetails> {
     const { data, error } = await supabase
       .from('tracks')
       .select(`*, artist:artist_id(*), album:album_id(*)`)
       .eq('id', id)
       .single();
     if (error) throw error;
-    const track = data as any;
-    track.audio_url = this.getPublicUrl('audio-files', track.audio_url);
-    track.cover_url = this.getPublicUrl('images', track.cover_url);
+    const track: TrackDetails = {
+      id: data.id,
+      title: data.title,
+      duration: data.duration,
+      audio_url: this.getPublicUrl('audio-files', data.audio_url),
+      track_number: data.track_number,
+      play_count: data.play_count,
+      like_count: data.like_count,
+      lyrics: data.lyrics,
+      cover_url: this.getPublicUrl('images', data.cover_url),
+      artist_id: data.artist_id,
+      artist: data.artist,
+      album_id: data.album_id,
+      album: data.album,
+      description: data.description,
+      release_date: data.release_date,
+      genres: data.genres,
+    };
     return track;
   }
 
   /**
    * Fetch single by ID and join its track
    */
-  async getSingleById(id: string): Promise<any> {
+  async getSingleById(id: string): Promise<SingleDetails> {
     const { data, error } = await supabase
       .from('singles')
       .select(`*, artist:artist_id(*), track:track_id(*)`)
       .eq('id', id)
       .single();
     if (error) throw error;
-    const single = data as any;
-    single.cover_url = this.getPublicUrl('images', single.cover_url);
-    if (single.track) {
-      single.track.audio_url = this.getPublicUrl('audio-files', single.track.audio_url);
-    }
+    const single: SingleDetails = {
+      id: data.id,
+      title: data.title,
+      artist_id: data.artist_id,
+      artist: data.artist,
+      track: data.track
+        ? {
+            ...data.track,
+            audio_url: this.getPublicUrl('audio-files', data.track.audio_url),
+          }
+        : null,
+      cover_url: this.getPublicUrl('images', data.cover_url),
+      description: data.description,
+      release_date: data.release_date,
+    };
     return single;
   }
 
   /** Get artist info */
-  async getArtistById(id: string): Promise<any> {
+  async getArtistById(id: string): Promise<{ id: string; name: string; avatar_url?: string | null }> {
     const { data, error } = await supabase
       .from('artists')
       .select('*')
@@ -189,14 +254,31 @@ class ApiService {
   }
 
   /** Get tracks for an artist */
-  async getArtistTracks(id: string): Promise<any[]> {
+  async getArtistTracks(id: string): Promise<TrackDetails[]> {
     const { data, error } = await supabase
       .from('tracks')
       .select('*, artist:artist_id(*), album:album_id(*)')
       .eq('artist_id', id)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []).map((t: TrackDetails) => ({
+      id: t.id,
+      title: t.title,
+      duration: t.duration,
+      audio_url: this.getPublicUrl('audio-files', t.audio_url),
+      track_number: t.track_number,
+      play_count: t.play_count,
+      like_count: t.like_count,
+      lyrics: t.lyrics,
+      cover_url: this.getPublicUrl('images', t.cover_url || ''),
+      artist_id: t.artist_id,
+      artist: t.artist,
+      album_id: t.album_id,
+      album: t.album,
+      description: t.description,
+      release_date: t.release_date,
+      genres: t.genres,
+    }));
   }
 
   /** Recent uploads across singles, albums and tracks */

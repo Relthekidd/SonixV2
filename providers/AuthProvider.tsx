@@ -19,7 +19,7 @@ type Profile = {
   bio?: string;
   avatar_url?: string;
   is_private?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 type AuthContextType = {
@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           firstName,
           lastName,
           isPrivate,
-        } = additionalData as any;
+        } = additionalData as Partial<Profile>;
 
         const { data, error } = await supabase.auth.signUp({
           email,

@@ -11,12 +11,18 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
-import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Heart, MoveVertical as MoreVertical, Share as ShareIcon } from 'lucide-react-native';
+import { apiService, AlbumDetails, TrackData } from '@/services/api';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  Heart,
+  MoveVertical as MoreVertical,
+} from 'lucide-react-native';
 
 function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [album, setAlbum] = useState<any>(null);
+  const [album, setAlbum] = useState<AlbumDetails | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,8 +34,6 @@ function AlbumDetailScreen() {
     pauseTrack,
     toggleLike,
     likedSongs,
-    addToPlaylist,
-    playlists,
   } = useMusic();
 
   useEffect(() => {
@@ -45,26 +49,32 @@ function AlbumDetailScreen() {
       setAlbum(albumData);
 
       const transformed = (albumData.tracks || []).map(
-        (t: any, idx: number) =>
-          ({
-            id: t.id,
-            title: t.title,
-            artist: albumData.artist || 'Unknown',
-            artistId: t.artist_id || albumData.artist_id,
-            album: albumData.title,
-            duration: t.duration || 0,
-            coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
-            audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-            isLiked: likedSongs.some((l) => l.id === t.id),
-            trackNumber: t.track_number ?? idx + 1,
-            playCount: t.play_count,
-            likeCount: t.like_count,
-            lyrics: t.lyrics,
-          }) as Track,
+        (t: TrackData, idx: number): Track => ({
+          id: t.id,
+          title: t.title,
+          artist: albumData.artist || 'Unknown',
+          artistId: albumData.artist_id,
+          album: albumData.title,
+          duration: t.duration,
+          coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
+          audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+          isLiked: likedSongs.some((l) => l.id === t.id),
+          trackNumber: t.track_number ?? idx + 1,
+          playCount: t.play_count,
+          likeCount: t.like_count,
+          lyrics: t.lyrics,
+          genre: '',
+          releaseDate: albumData.release_date || '',
+          year: albumData.release_date
+            ? new Date(albumData.release_date).getFullYear().toString()
+            : undefined,
+          description: '',
+        }),
       );
 
-      // sort with explicit any types
-      transformed.sort((a: any, b: any) => a.trackNumber - b.trackNumber);
+      transformed.sort(
+        (a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0),
+      );
 
       setTracks(transformed);
     } catch (err) {
@@ -77,7 +87,11 @@ function AlbumDetailScreen() {
 
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, tracks);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, tracks);
+      }
     } else {
       playTrack(track, tracks);
     }
