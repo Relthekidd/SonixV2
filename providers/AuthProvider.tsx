@@ -7,8 +7,8 @@ import React, {
   useRef,
 } from 'react';
 import { Session } from '@supabase/supabase-js';
-import { apiService } from '../services/api';
-import { supabase } from '../services/supabase';
+import { apiService } from '@/services/api';
+import { supabase } from '@/services/supabase';
 
 type Profile = {
   id: string;
