@@ -7,6 +7,7 @@ import {
   Image,
   Dimensions,
   StatusBar,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
@@ -21,6 +22,8 @@ import {
   Shuffle,
   Repeat,
   MoreHorizontal,
+  Volume1,
+  Volume2,
 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
@@ -42,6 +45,9 @@ export default function PlayerScreen() {
     previousTrack,
     toggleLike,
     likedSongs,
+    queue,
+    volume,
+    setVolume,
   } = useMusic();
 
   const [isShuffled, setIsShuffled] = useState(false);
@@ -193,6 +199,52 @@ export default function PlayerScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        <View style={styles.volumeContainer}>
+          <TouchableOpacity
+            style={styles.volumeButton}
+            onPress={() => setVolume(volume - 0.1)}
+          >
+            <Volume1 color="#ffffff" size={20} />
+          </TouchableOpacity>
+          <View style={styles.volumeBar}>
+            <View
+              style={[styles.volumeFill, { width: `${volume * 100}%` }]}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.volumeButton}
+            onPress={() => setVolume(volume + 0.1)}
+          >
+            <Volume2 color="#ffffff" size={20} />
+          </TouchableOpacity>
+        </View>
+
+        {queue.length > 1 && (
+          <View style={styles.queueContainer}>
+            <Text style={styles.queueTitle}>Up Next</Text>
+            <FlatList
+              data={queue.filter((t) => t.id !== currentTrack.id)}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={styles.queueItem}>
+                  <Image
+                    source={{ uri: item.coverUrl }}
+                    style={styles.queueCover}
+                  />
+                  <View style={styles.queueInfo}>
+                    <Text style={styles.queueItemTitle} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={styles.queueItemArtist} numberOfLines={1}>
+                      {item.artist}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            />
+          </View>
+        )}
       </View>
     </View>
   );
@@ -357,5 +409,62 @@ const styles = StyleSheet.create({
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  volumeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  volumeButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  volumeBar: {
+    flex: 1,
+    height: 4,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 2,
+    marginHorizontal: 10,
+  },
+  volumeFill: {
+    height: '100%',
+    backgroundColor: '#8b5cf6',
+    borderRadius: 2,
+  },
+  queueContainer: {
+    marginTop: 10,
+    maxHeight: 120,
+  },
+  queueTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 8,
+  },
+  queueItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  queueCover: {
+    width: 40,
+    height: 40,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  queueInfo: {
+    flex: 1,
+  },
+  queueItemTitle: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+  },
+  queueItemArtist: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
   },
 });
