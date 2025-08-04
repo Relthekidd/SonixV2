@@ -131,7 +131,7 @@ class ApiService {
 
       console.log('[ApiService] getAlbumById success', data);
       const album = data as any;
-      album.cover_url = this.getPublicUrl('cover-images', album.cover_url);
+      album.cover_url = this.getPublicUrl('images', album.cover_url);
       album.tracks = (album.tracks || []).map((t: any) => ({
         ...t,
         audio_url: this.getPublicUrl('audio-files', t.audio_url),
@@ -155,7 +155,7 @@ class ApiService {
     if (error) throw error;
     const track = data as any;
     track.audio_url = this.getPublicUrl('audio-files', track.audio_url);
-    track.cover_url = this.getPublicUrl('cover-images', track.cover_url);
+    track.cover_url = this.getPublicUrl('images', track.cover_url);
     return track;
   }
 
@@ -170,7 +170,7 @@ class ApiService {
       .single();
     if (error) throw error;
     const single = data as any;
-    single.cover_url = this.getPublicUrl('cover-images', single.cover_url);
+    single.cover_url = this.getPublicUrl('images', single.cover_url);
     if (single.track) {
       single.track.audio_url = this.getPublicUrl('audio-files', single.track.audio_url);
     }

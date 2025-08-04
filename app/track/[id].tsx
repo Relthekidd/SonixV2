@@ -86,7 +86,7 @@ export default function TrackDetailScreen() {
         album: data.album?.title || data.album_title || 'Single',
         duration: data.duration || 180,
         coverUrl: apiService.getPublicUrl(
-          'cover-images',
+          'images',
           data.cover_url || data.album?.cover_url || '',
         ),
         audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),

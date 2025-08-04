@@ -60,7 +60,7 @@ function AlbumDetailScreen() {
             artistId: t.artist_id || albumData.artist_id,
             album: albumData.title,
             duration: t.duration || 0,
-            coverUrl: apiService.getPublicUrl('cover-images', albumData.cover_url),
+            coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
             audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
             isLiked: likedSongs.some((l) => l.id === t.id),
             trackNumber: t.track_number ?? idx + 1,
