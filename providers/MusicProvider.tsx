@@ -42,6 +42,7 @@ interface MusicContextType {
   currentTime: number;
   duration: number;
   queue: Track[];
+  volume: number;
   recentlyPlayed: Track[];
   trendingTracks: Track[];
   newReleases: Track[];
@@ -66,6 +67,7 @@ interface MusicContextType {
   createPlaylist: (name: string, description?: string) => Promise<void>;
   toggleLike: (trackId: string) => void;
   addToPlaylist: (playlistId: string, track: Track) => void;
+  setVolume: (value: number) => void;
 }
 
 const MusicContext = createContext<MusicContextType | null>(null);
@@ -81,6 +83,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [volume, setVolumeState] = useState(1);
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [newReleases, setNewReleases] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -149,7 +152,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (user) refreshData();
+    refreshData();
   }, [user]);
 
   const playTrack = async (track: Track, queueParam: Track[] = []) => {
@@ -159,7 +162,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       }
       const { sound } = await Audio.Sound.createAsync(
         { uri: track.audioUrl },
-        { shouldPlay: true },
+        { shouldPlay: true, volume },
       );
       soundRef.current = sound;
       sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
@@ -174,6 +177,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         apiService.recordPlay(track.id, track.artistId);
       }
       setQueue(queueParam.length ? queueParam : [track]);
+      setRecentlyPlayed((prev) => {
+        const filtered = prev.filter((t) => t.id !== track.id);
+        return [track, ...filtered].slice(0, 20);
+      });
     } catch (err) {
       console.error('playTrack error', err);
       Alert.alert('Playback Error', 'Unable to play this track.');
@@ -200,13 +207,33 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     await playTrack(prev, queue);
   };
 
+  const setVolume = (value: number) => {
+    const vol = Math.min(1, Math.max(0, value));
+    setVolumeState(vol);
+    try {
+      soundRef.current?.setVolumeAsync(vol);
+    } catch {}
+  };
+
   const refreshData = async () => {
     setIsLoading(true);
     try {
-      setTrendingTracks([]);
-      setNewReleases([]);
+      const trendingQuery = supabase
+        .from('tracks')
+        .select(`*, artist:artist_id(*), album:album_id(*)`)
+        .eq('is_published', true)
+        .order('play_count', { ascending: false })
+        .limit(20);
+      const newQuery = supabase
+        .from('tracks')
+        .select(`*, artist:artist_id(*), album:album_id(*)`)
+        .eq('is_published', true)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      const promises: any[] = [trendingQuery, newQuery];
       if (user) {
-        const [likedRes, playlistRes] = await Promise.all([
+        promises.push(
           supabase
             .from('liked_songs')
             .select('track:tracks(*)')
@@ -215,7 +242,34 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
             .from('playlists')
             .select('id,name,cover_url,playlist_tracks(track:tracks(*))')
             .eq('user_id', user.id),
-        ]);
+        );
+      }
+      const [trendingRes, newRes, likedRes, playlistRes] = await Promise.all(promises);
+
+      const mapTrack = (t: any): Track => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+        artistId: t.artist_id,
+        album: t.album?.title || t.album_title || 'Single',
+        duration: t.duration || 0,
+        coverUrl: apiService.getPublicUrl(
+          'images',
+          t.cover_url || t.album?.cover_url || '',
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+        isLiked: likedSongs.some((l) => l.id === t.id),
+        genre: Array.isArray(t.genres) ? t.genres[0] : t.genres || '',
+        releaseDate: t.release_date || t.created_at,
+        playCount: t.play_count,
+        trackNumber: t.track_number,
+        likeCount: t.like_count,
+      });
+
+      setTrendingTracks((trendingRes.data || []).map(mapTrack));
+      setNewReleases((newRes.data || []).map(mapTrack));
+
+      if (user && likedRes && playlistRes) {
         const liked = (likedRes.data || []).map((r: any) => ({
           ...r.track,
           id: r.track.id,
@@ -307,6 +361,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         currentTime,
         duration,
         queue,
+        volume,
         recentlyPlayed,
         trendingTracks,
         newReleases,
@@ -324,6 +379,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         createPlaylist,
         toggleLike,
         addToPlaylist,
+        setVolume,
       }}
     >
       {children}
