@@ -99,7 +99,7 @@ function ProfileScreen() {
           album: r.track.album_title || 'Single',
           duration: r.track.duration || 0,
           coverUrl: apiService.getPublicUrl(
-            'cover-images',
+            'images',
             r.track.cover_url || '',
           ),
           audioUrl: apiService.getPublicUrl('audio-files', r.track.audio_url),

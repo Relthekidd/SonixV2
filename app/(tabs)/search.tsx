@@ -113,7 +113,7 @@ function SearchScreen() {
         album: t.album?.title || t.album_title || 'Single',
         duration: t.duration || 0,
         coverUrl: apiService.getPublicUrl(
-          'cover-images',
+          'images',
           t.cover_url || t.album?.cover_url || ''
         ),
         audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),

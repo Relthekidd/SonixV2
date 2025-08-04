@@ -83,7 +83,7 @@ function LibraryScreen() {
       artist: r.album.artist?.name || '',
       year: r.album.release_year || '',
       coverUrl: apiService.getPublicUrl(
-        'cover-images',
+        'images',
         r.album.cover_url || '',
       ),
     }));
