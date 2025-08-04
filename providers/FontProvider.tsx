@@ -51,4 +51,4 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useFontContext = () => useContext(FontContext);
+const useFontContext = () => useContext(FontContext);

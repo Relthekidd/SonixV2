@@ -28,7 +28,7 @@ export interface AlbumDetails {
   tracks: TrackData[];
 }
 
-export interface TrackDetails {
+interface TrackDetails {
   id: string;
   title: string;
   duration: number | null;
@@ -47,7 +47,7 @@ export interface TrackDetails {
   genres?: string[] | null;
 }
 
-export interface SingleDetails {
+interface SingleDetails {
   id: string;
   title: string;
   artist_id?: string | null;
