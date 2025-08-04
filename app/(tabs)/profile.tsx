@@ -67,7 +67,7 @@ function ProfileScreen() {
       setBio(data.bio ?? '');
       setIsPrivate(data.is_private ?? false);
 
-      const [songsRes, artistsRes, playlistsRes] = await Promise.all([
+      const [songsRes, , playlistsRes] = await Promise.all([
         supabase
           .from('user_top_songs')
           .select('play_count, track:track_id(*, artist:artist_id(*))')
@@ -75,14 +75,8 @@ function ProfileScreen() {
           .order('play_count', { ascending: false })
           .limit(5),
         supabase
-          .from('user_top_artists')
-          .select('play_count, artist:artist_id(*)')
-          .eq('user_id', uid)
-          .order('play_count', { ascending: false })
-          .limit(5),
-        supabase
           .from('playlists')
-          .select('id,name,cover_url')
+          .select('id,title,cover_url')
           .eq('user_id', uid)
           .eq('is_public', true),
       ]);
@@ -98,17 +92,22 @@ function ProfileScreen() {
           artistId: r.track.artist_id,
           album: r.track.album_title || 'Single',
           duration: r.track.duration || 0,
-          coverUrl: apiService.getPublicUrl(
-            'images',
-            r.track.cover_url || '',
-          ),
+          coverUrl: apiService.getPublicUrl('images', r.track.cover_url || ''),
           audioUrl: apiService.getPublicUrl('audio-files', r.track.audio_url),
           isLiked: false,
           genre: '',
           releaseDate: r.track.release_date || '',
         })),
       );
-      setPublicPlaylists((playlistsRes.data || []) as Playlist[]);
+      const publicPls = (playlistsRes.data || []).map(
+        (p: { id: string; title: string; cover_url?: string | null }) => ({
+          id: p.id,
+          title: p.title,
+          tracks: [],
+          coverUrl: p.cover_url || '',
+        }),
+      );
+      setPublicPlaylists(publicPls);
     } catch (err) {
       console.error(err);
       Alert.alert('Error', 'Failed to load profile');
@@ -282,7 +281,7 @@ function ProfileScreen() {
                 key={p.id}
                 onPress={() => router.push(`/library?playlist=${p.id}`)}
               >
-                <Text style={{ color: '#8b5cf6' }}>{p.name}</Text>
+                <Text style={{ color: '#8b5cf6' }}>{p.title}</Text>
               </TouchableOpacity>
             ))}
           </View>

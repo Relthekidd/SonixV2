@@ -14,7 +14,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { Heart, Music, Plus, Play, Pause, MoveVertical as MoreVertical, X } from 'lucide-react-native';
+import {
+  Heart,
+  Music,
+  Plus,
+  Play,
+  Pause,
+  MoveVertical as MoreVertical,
+  X,
+} from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useLocalSearchParams } from 'expo-router';
 
@@ -53,7 +61,7 @@ function LibraryScreen() {
     const uid = authData.user?.id;
     if (!uid) return;
 
-  const { data } = await supabase
+    const { data } = await supabase
       .from('favorites')
       .select('album:album_id(*, artist:artist_id(*))')
       .eq('user_id', uid)
@@ -74,10 +82,7 @@ function LibraryScreen() {
       title: r.album.title,
       artist: r.album.artist?.name || '',
       year: r.album.release_year || '',
-      coverUrl: apiService.getPublicUrl(
-        'images',
-        r.album.cover_url || '',
-      ),
+      coverUrl: apiService.getPublicUrl('images', r.album.cover_url || ''),
     }));
     setSavedAlbums(mapped);
   }
@@ -96,7 +101,11 @@ function LibraryScreen() {
 
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, likedSongs);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, likedSongs);
+      }
     } else {
       playTrack(track, likedSongs);
     }
@@ -132,7 +141,7 @@ function LibraryScreen() {
       <Image source={{ uri: item.coverUrl }} style={styles.playlistCover} />
       <View style={styles.playlistInfo}>
         <Text style={styles.playlistTitle} numberOfLines={1}>
-          {item.name}
+          {item.title}
         </Text>
         <Text style={styles.playlistDescription} numberOfLines={1}>
           {item.tracks.length} songs

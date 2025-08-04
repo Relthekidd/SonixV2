@@ -11,26 +11,48 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useMusic } from '@/providers/MusicProvider';
+import { useMusic, Track } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
-import {
-  Search,
-  Play,
-  Pause,
-  Lock,
-  Globe,
-  Heart,
-} from 'lucide-react-native';
+import { Search, Play, Pause, Lock, Globe, Heart } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { apiService } from '@/services/api';
 
+interface ArtistResult {
+  id: string;
+  name: string;
+  avatar_url?: string | null;
+}
+
+interface UserResult {
+  id: string;
+  display_name: string;
+  follower_count: number;
+  is_private: boolean;
+  profile_picture_url?: string | null;
+}
+
+interface TrackRow {
+  id: string;
+  title: string;
+  artist_id?: string | null;
+  artist?: { name?: string } | null;
+  album_id?: string | null;
+  album?: { title?: string; cover_url?: string | null } | null;
+  duration?: number | null;
+  cover_url?: string | null;
+  audio_url: string;
+  genres?: string[] | string | null;
+  release_date?: string | null;
+  created_at?: string;
+}
+
 interface SearchResults {
-  tracks: any[];
-  albums: any[];
-  singles: any[];
-  artists: any[];
-  users: any[];
+  tracks: Track[];
+  albums: Track[];
+  singles: Track[];
+  artists: ArtistResult[];
+  users: UserResult[];
 }
 
 function SearchScreen() {
@@ -95,9 +117,7 @@ function SearchScreen() {
     try {
       const { data, error } = await supabase
         .from('tracks')
-        .select(
-          `*, artist:artist_id(name), album:album_id(*)`
-        )
+        .select(`*, artist:artist_id(name), album:album_id(*)`)
         .ilike('title', `%${searchQuery}%`)
         .eq('is_published', true)
         .order(sort === 'popular' ? 'play_count' : 'created_at', {
@@ -106,22 +126,36 @@ function SearchScreen() {
 
       if (error) throw error;
 
-      const tracks = (data || []).map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist?.name || t.artist_name || 'Unknown Artist',
-        artistId: t.artist_id,
-        album: t.album?.title || t.album_title || 'Single',
-        duration: t.duration || 0,
-        coverUrl: apiService.getPublicUrl(
-          'images',
-          t.cover_url || t.album?.cover_url || ''
-        ),
-        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-        isLiked: likedSongs.some((l) => l.id === t.id),
-        genre: Array.isArray(t.genres) ? t.genres[0] : t.genre || '',
-        releaseDate: t.release_date || t.created_at,
-      }));
+      const tracks = (data || []).map(
+        (t: TrackRow): Track => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist?.name || 'Unknown Artist',
+          artistId: t.artist_id || undefined,
+          album: t.album?.title || 'Single',
+          albumId: t.album_id || undefined,
+          duration: t.duration || 0,
+          coverUrl: apiService.getPublicUrl(
+            'images',
+            t.cover_url || t.album?.cover_url || '',
+          ),
+          audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+          isLiked: likedSongs.some((l) => l.id === t.id),
+          genre: Array.isArray(t.genres)
+            ? t.genres[0]
+            : (t.genres as string) || '',
+          genres: Array.isArray(t.genres)
+            ? (t.genres as string[])
+            : typeof t.genres === 'string'
+              ? [t.genres]
+              : [],
+          releaseDate: t.release_date || t.created_at || '',
+          year: t.release_date
+            ? new Date(t.release_date).getFullYear().toString()
+            : undefined,
+          description: '',
+        }),
+      );
 
       setResults({ tracks, albums: [], singles: [], artists: [], users: [] });
     } catch (err) {
@@ -136,9 +170,13 @@ function SearchScreen() {
     setQuery(trending);
   };
 
-  const handleTrackPress = (track: any) => {
+  const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, results.tracks);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, results.tracks);
+      }
     } else {
       playTrack(track, results.tracks);
     }
@@ -154,7 +192,7 @@ function SearchScreen() {
     }));
   };
 
-  const renderTrackItem = ({ item }: { item: any }) => (
+  const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
       style={styles.resultItem}
       onPress={() => router.push(`/track/${item.id}`)}
@@ -191,7 +229,7 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderUserItem = ({ item }: { item: any }) => (
+  const renderUserItem = ({ item }: { item: UserResult }) => (
     <TouchableOpacity
       style={styles.resultItem}
       onPress={() => router.push(`/user/${item.id}`)}
@@ -220,7 +258,7 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderArtistItem = ({ item }: { item: any }) => (
+  const renderArtistItem = ({ item }: { item: ArtistResult }) => (
     <TouchableOpacity
       style={styles.artistItem}
       onPress={() => router.push(`/artist/${item.id}`)}
@@ -264,7 +302,7 @@ function SearchScreen() {
                 styles.filterOption,
                 sort === f && styles.filterOptionActive,
               ]}
-              onPress={() => setSort(f as any)}
+            onPress={() => setSort(f as 'relevance' | 'recent' | 'popular')}
             >
               <Text style={styles.filterText}>
                 {f.charAt(0).toUpperCase() + f.slice(1)}
