@@ -14,15 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import {
-  Heart,
-  Music,
-  Plus,
-  Play,
-  Pause,
-  MoreVertical,
-  X,
-} from 'lucide-react-native';
+import { Heart, Music, Plus, Play, Pause, MoveVertical as MoreVertical, X } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useLocalSearchParams } from 'expo-router';
 

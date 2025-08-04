@@ -17,7 +17,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { Track, Playlist } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { Edit3, LogOut } from 'lucide-react-native';
+import { CreditCard as Edit3, LogOut } from 'lucide-react-native';
 import { router } from 'expo-router';
 
 interface Profile {

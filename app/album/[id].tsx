@@ -12,14 +12,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import {
-  ArrowLeft,
-  Play,
-  Pause,
-  Heart,
-  MoreVertical,
-  Share as ShareIcon,
-} from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Heart, MoveVertical as MoreVertical, Share as ShareIcon } from 'lucide-react-native';
 
 function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
