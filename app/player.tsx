@@ -8,8 +8,11 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
+  Alert,
 } from 'react-native';
+import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import {
@@ -43,6 +46,7 @@ export default function PlayerScreen() {
     pauseTrack,
     nextTrack,
     previousTrack,
+    seekTo,
     toggleLike,
     likedSongs,
     queue,
@@ -52,6 +56,7 @@ export default function PlayerScreen() {
 
   const [isShuffled, setIsShuffled] = useState(false);
   const [repeatMode, setRepeatMode] = useState(0); // 0: off, 1: all, 2: one
+  const [seekTime, setSeekTime] = useState<number | null>(null);
   const scaleValue = useSharedValue(1);
 
   useEffect(() => {
@@ -70,9 +75,9 @@ export default function PlayerScreen() {
   }
 
   const isLiked = likedSongs.some((track) => track.id === currentTrack.id);
-  const progress = duration > 0 ? currentTime / duration : 0;
 
   const handlePlayPause = () => {
+    Haptics.selectionAsync();
     if (isPlaying) {
       pauseTrack();
     } else {
@@ -115,7 +120,10 @@ export default function PlayerScreen() {
 
         <Text style={styles.headerTitle}>Now Playing</Text>
 
-        <TouchableOpacity style={styles.headerButton}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => Alert.alert('More actions coming soon')}
+        >
           <MoreHorizontal color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
@@ -130,21 +138,42 @@ export default function PlayerScreen() {
 
         <View style={styles.trackInfo}>
           <Text style={styles.title}>{currentTrack.title}</Text>
-          <Text style={styles.artist}>{currentTrack.artist}</Text>
-          <Text style={styles.album}>{currentTrack.album}</Text>
+          <TouchableOpacity
+            onPress={() =>
+              currentTrack.artistId &&
+              router.push(`/artist/${currentTrack.artistId}`)
+            }
+          >
+            <Text style={styles.artist}>{currentTrack.artist}</Text>
+          </TouchableOpacity>
+          {currentTrack.albumId && (
+            <TouchableOpacity
+              onPress={() => router.push(`/album/${currentTrack.albumId}`)}
+            >
+              <Text style={styles.album}>{currentTrack.album}</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         <View style={styles.progressContainer}>
-          <View style={styles.progressBar}>
-            <View
-              style={[styles.progressFill, { width: `${progress * 100}%` }]}
-            />
-            <View
-              style={[styles.progressThumb, { left: `${progress * 100}%` }]}
-            />
-          </View>
+          <Slider
+            style={styles.progressSlider}
+            minimumValue={0}
+            maximumValue={duration}
+            value={seekTime !== null ? seekTime : currentTime}
+            minimumTrackTintColor="#8b5cf6"
+            maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+            thumbTintColor="#8b5cf6"
+            onValueChange={(value) => setSeekTime(value)}
+            onSlidingComplete={(value) => {
+              seekTo(value);
+              setSeekTime(null);
+            }}
+          />
           <View style={styles.timeContainer}>
-            <Text style={styles.timeText}>{formatTime(currentTime)}</Text>
+            <Text style={styles.timeText}>
+              {formatTime(seekTime !== null ? seekTime : currentTime)}
+            </Text>
             <Text style={styles.timeText}>{formatTime(duration)}</Text>
           </View>
         </View>
@@ -190,7 +219,10 @@ export default function PlayerScreen() {
         <View style={styles.bottomControls}>
           <TouchableOpacity
             style={styles.bottomButton}
-            onPress={() => toggleLike(currentTrack.id)}
+            onPress={() => {
+              toggleLike(currentTrack.id);
+              Haptics.selectionAsync();
+            }}
           >
             <Heart
               color={isLiked ? '#ef4444' : '#ffffff'}
@@ -201,23 +233,18 @@ export default function PlayerScreen() {
         </View>
 
         <View style={styles.volumeContainer}>
-          <TouchableOpacity
-            style={styles.volumeButton}
-            onPress={() => setVolume(volume - 0.1)}
-          >
-            <Volume1 color="#ffffff" size={20} />
-          </TouchableOpacity>
-          <View style={styles.volumeBar}>
-            <View
-              style={[styles.volumeFill, { width: `${volume * 100}%` }]}
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.volumeButton}
-            onPress={() => setVolume(volume + 0.1)}
-          >
-            <Volume2 color="#ffffff" size={20} />
-          </TouchableOpacity>
+          <Volume1 color="#ffffff" size={20} />
+          <Slider
+            style={styles.volumeSlider}
+            minimumValue={0}
+            maximumValue={1}
+            value={volume}
+            minimumTrackTintColor="#8b5cf6"
+            maximumTrackTintColor="rgba(255, 255, 255, 0.2)"
+            thumbTintColor="#8b5cf6"
+            onValueChange={setVolume}
+          />
+          <Volume2 color="#ffffff" size={20} />
         </View>
 
         {queue.length > 1 && (
@@ -333,26 +360,10 @@ const styles = StyleSheet.create({
   progressContainer: {
     marginBottom: 40,
   },
-  progressBar: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 2,
+  progressSlider: {
+    width: '100%',
+    height: 40,
     marginBottom: 12,
-    position: 'relative',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#8b5cf6',
-    borderRadius: 2,
-  },
-  progressThumb: {
-    position: 'absolute',
-    top: -6,
-    width: 16,
-    height: 16,
-    backgroundColor: '#8b5cf6',
-    borderRadius: 8,
-    marginLeft: -8,
   },
   timeContainer: {
     flexDirection: 'row',
@@ -415,23 +426,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  volumeButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  volumeBar: {
+  volumeSlider: {
     flex: 1,
-    height: 4,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
+    height: 40,
     marginHorizontal: 10,
-  },
-  volumeFill: {
-    height: '100%',
-    backgroundColor: '#8b5cf6',
-    borderRadius: 2,
   },
   queueContainer: {
     marginTop: 10,
