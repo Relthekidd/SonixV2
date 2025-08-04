@@ -23,6 +23,7 @@ import {
   Heart,
 } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
+import { apiService } from '@/services/api';
 
 interface SearchResults {
   tracks: any[];
