@@ -17,6 +17,7 @@ export interface Track {
   artist: string;
   artistId?: string;
   album: string;
+  albumId?: string;
   duration: number;
   coverUrl: string;
   audioUrl: string;
@@ -52,8 +53,12 @@ interface MusicContextType {
   pauseTrack: () => Promise<void>;
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
+  seekTo: (seconds: number) => Promise<void>;
   refreshData: () => Promise<void>;
-  searchMusic: (query: string, sort?: 'recent' | 'popular') => Promise<{
+  searchMusic: (
+    query: string,
+    sort?: 'recent' | 'popular',
+  ) => Promise<{
     tracks: Track[];
     albums: any[];
     singles: Track[];
@@ -215,6 +220,13 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   };
 
+  const seekTo = async (seconds: number) => {
+    try {
+      await soundRef.current?.setPositionAsync(seconds * 1000);
+      setCurrentTime(seconds);
+    } catch {}
+  };
+
   const refreshData = async () => {
     setIsLoading(true);
     try {
@@ -244,7 +256,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
             .eq('user_id', user.id),
         );
       }
-      const [trendingRes, newRes, likedRes, playlistRes] = await Promise.all(promises);
+      const [trendingRes, newRes, likedRes, playlistRes] =
+        await Promise.all(promises);
 
       const mapTrack = (t: any): Track => ({
         id: t.id,
@@ -252,6 +265,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         artist: t.artist?.name || t.artist_name || 'Unknown Artist',
         artistId: t.artist_id,
         album: t.album?.title || t.album_title || 'Single',
+        albumId: t.album_id,
         duration: t.duration || 0,
         coverUrl: apiService.getPublicUrl(
           'images',
@@ -308,7 +322,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
           .or(
-            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{\"${term}\"}`
+            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{\"${term}\"}`,
           )
           .eq('is_published', true)
           .order(sort === 'popular' ? 'play_count' : 'created_at', {
@@ -329,6 +343,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         artist: t.artist?.name || t.artist_name || 'Unknown Artist',
         artistId: t.artist_id,
         album: t.album?.title || t.album_title || 'Single',
+        albumId: t.album_id,
         duration: t.duration || 0,
         coverUrl: apiService.getPublicUrl(
           'images',
@@ -371,6 +386,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         pauseTrack,
         nextTrack,
         previousTrack,
+        seekTo,
         refreshData,
         searchMusic,
         likedSongs,
