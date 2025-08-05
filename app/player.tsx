@@ -15,7 +15,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import { ChevronDown, Play, Pause, SkipBack, SkipForward, Heart, Shuffle, Repeat, MoveHorizontal as MoreHorizontal, Volume1, Volume2 } from 'lucide-react-native';
+import {
+  ChevronDown,
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Heart,
+  Shuffle,
+  Repeat,
+  MoveHorizontal as MoreHorizontal,
+  Volume1,
+  Volume2,
+} from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,6 +42,7 @@ export default function PlayerScreen() {
     isPlaying,
     currentTime,
     duration,
+    playTrack,
     resumeTrack,
     pauseTrack,
     nextTrack,
@@ -206,7 +219,10 @@ export default function PlayerScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.controlButton} onPress={handleRepeat}>
-            <Repeat color={repeatMode !== 'off' ? '#8b5cf6' : '#ffffff'} size={24} />
+            <Repeat
+              color={repeatMode !== 'off' ? '#8b5cf6' : '#ffffff'}
+              size={24}
+            />
             {repeatMode === 'one' && <View style={styles.repeatOneDot} />}
           </TouchableOpacity>
         </View>
@@ -249,16 +265,11 @@ export default function PlayerScreen() {
               data={queue.filter((t) => t.id !== currentTrack.id)}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.queueItem}
                   onPress={() => {
-                    // Find the track in the original queue and play it
-                    const trackIndex = queue.findIndex(t => t.id === item.id);
-                    if (trackIndex !== -1) {
-                      // This will be handled by the enhanced playTrack in MusicProvider
-                      // For now, we can just play the track directly
-                      Alert.alert('Queue', `Playing ${item.title}`);
-                    }
+                    Haptics.selectionAsync();
+                    playTrack(item);
                   }}
                 >
                   <Image
