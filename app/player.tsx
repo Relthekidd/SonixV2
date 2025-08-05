@@ -33,6 +33,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
+import QueueModal from '@/components/QueueModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,6 +58,9 @@ export default function PlayerScreen() {
     isShuffled,
     repeatMode,
   } = useMusic();
+
+const [queueVisible, setQueueVisible] = useState(false);
+
 
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const scaleValue = useSharedValue(1);
@@ -129,11 +133,11 @@ export default function PlayerScreen() {
         <Text style={styles.headerTitle}>Now Playing</Text>
 
         <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => Alert.alert('More actions coming soon')}
-        >
-          <MoreHorizontal color="#ffffff" size={24} />
-        </TouchableOpacity>
+  style={styles.headerButton}
+  onPress={() => setQueueVisible(true)}
+>
+  <MoreHorizontal color="#ffffff" size={24} />
+</TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -290,6 +294,7 @@ export default function PlayerScreen() {
           </View>
         )}
       </View>
+      <QueueModal visible={queueVisible} onClose={() => setQueueVisible(false)} />
     </View>
   );
 }
