@@ -162,14 +162,4 @@ function SearchScreen() {
         <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
         <View style={styles.userMeta}>
           <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
-          <View style={styles.privacyIndicator}>{item.is_private ? <Lock size={12} /> : <Globe size={12} />}</View>
-        </View>
-      </View>
-    </TouchableOpacity>
-  );
-
-  return (
-    <LinearGradient colors={[ '#0f172a', '#1e293b', '#0f172a' ]} style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.delay(100)} style={styles.header}>
-          <Text style={styles.title}>Search</n
+          <View style={styles.privacyIndicator}>{item.is_private ? <Lock size={12} /> : <Globe size={12} />}</n
