@@ -95,6 +95,20 @@ function AlbumDetailScreen() {
     }
   };
 
+  const handlePlayAll = () => {
+    if (!tracks.length) return;
+    const first = tracks[0];
+    if (currentTrack?.id === first.id) {
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(first, tracks);
+      }
+    } else {
+      playTrack(first, tracks);
+    }
+  };
+
   if (isLoading) {
     return (
       <LinearGradient
@@ -147,6 +161,28 @@ function AlbumDetailScreen() {
           style={styles.headerButton}
         >
           <MoreVertical size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.playAllContainer}>
+        <TouchableOpacity
+          style={[
+            styles.playAllButton,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+          onPress={handlePlayAll}
+        >
+          {currentTrack?.id === tracks[0]?.id && isPlaying ? (
+            <Pause size={24} color="#8b5cf6" />
+          ) : (
+            <Play size={24} color="#8b5cf6" />
+          )}
+          <Text style={styles.playAllText}>
+            {currentTrack?.id === tracks[0]?.id && isPlaying
+              ? 'Pause'
+              : 'Play All'}
+          </Text>
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -246,6 +282,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  playAllContainer: { alignItems: 'center', marginBottom: 16 },
+  playAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  playAllText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
   content: { flex: 1 },
   trackItem: {
     flexDirection: 'row',
@@ -278,4 +328,19 @@ const styles = StyleSheet.create({
   },
   likeButton: { padding: 8 },
   playButton: { padding: 8 },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
 });
