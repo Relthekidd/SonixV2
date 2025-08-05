@@ -13,7 +13,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track, TrackRow } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, MoreVertical, Users } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Play,
+  Pause,
+  MoreVertical,
+  Users,
+} from 'lucide-react-native';
+import TrackMenu from '@/components/TrackMenu';
 
 interface Artist {
   id: string;
@@ -216,6 +223,7 @@ export default function ArtistDetailScreen() {
                 {item.album}
               </Text>
             </View>
+            <TrackMenu track={item} />
             <TouchableOpacity>
               {currentTrack?.id === item.id && isPlaying ? (
                 <Pause color="#8b5cf6" size={20} />

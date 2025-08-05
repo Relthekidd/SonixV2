@@ -19,6 +19,7 @@ import {
   Heart,
   MoveVertical as MoreVertical,
 } from 'lucide-react-native';
+import TrackMenu from '@/components/TrackMenu';
 
 function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -219,6 +220,7 @@ function AlbumDetailScreen() {
                 fill={item.isLiked ? '#ef4444' : 'transparent'}
               />
             </TouchableOpacity>
+            <TrackMenu track={item} />
             <TouchableOpacity style={styles.playButton}>
               {currentTrack?.id === item.id && isPlaying ? (
                 <Pause size={20} color="#8b5cf6" />
