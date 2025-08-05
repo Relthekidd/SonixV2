@@ -126,8 +126,14 @@ function SearchScreen() {
 
       if (error) throw error;
 
-      const tracks = (data || []).map(
-        (t: TrackRow): Track => ({
+      const tracks = (data || []).map((t: TrackRow): Track => {
+        const genresArray = Array.isArray(t.genres)
+          ? (t.genres as string[])
+          : typeof t.genres === 'string'
+            ? [t.genres]
+            : [];
+
+        return {
           id: t.id,
           title: t.title,
           artist: t.artist?.name || 'Unknown Artist',
@@ -141,21 +147,15 @@ function SearchScreen() {
           ),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
           isLiked: likedSongs.some((l) => l.id === t.id),
-          genre: Array.isArray(t.genres)
-            ? t.genres[0]
-            : (t.genres as string) || '',
-          genres: Array.isArray(t.genres)
-            ? (t.genres as string[])
-            : typeof t.genres === 'string'
-              ? [t.genres]
-              : [],
+          genre: genresArray[0] || '',
+          genres: genresArray,
           releaseDate: t.release_date || t.created_at || '',
           year: t.release_date
             ? new Date(t.release_date).getFullYear().toString()
             : undefined,
           description: '',
-        }),
-      );
+        };
+      });
 
       setResults({ tracks, albums: [], singles: [], artists: [], users: [] });
     } catch (err) {
@@ -271,6 +271,11 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
+  const noResults =
+    results.tracks.length === 0 &&
+    results.artists.length === 0 &&
+    results.users.length === 0;
+
   return (
     <LinearGradient
       colors={['#1a1a2e', '#16213e', '#0f3460']}
@@ -341,10 +346,10 @@ function SearchScreen() {
               {results.tracks.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Songs</Text>
-                  <FlatList
+                  <FlatList<Track>
                     data={results.tracks}
                     renderItem={renderTrackItem}
-                    keyExtractor={(i) => i.id}
+                    keyExtractor={(item) => item.id}
                     scrollEnabled={false}
                   />
                 </View>
@@ -353,10 +358,10 @@ function SearchScreen() {
               {results.artists.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Artists</Text>
-                  <FlatList
+                  <FlatList<ArtistResult>
                     data={results.artists}
                     renderItem={renderArtistItem}
-                    keyExtractor={(i) => i.id}
+                    keyExtractor={(item) => item.id}
                     horizontal
                     showsHorizontalScrollIndicator={false}
                   />
@@ -366,22 +371,20 @@ function SearchScreen() {
               {results.users.length > 0 && (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>Users</Text>
-                  <FlatList
+                  <FlatList<UserResult>
                     data={results.users}
                     renderItem={renderUserItem}
-                    keyExtractor={(i) => i.id}
+                    keyExtractor={(item) => item.id}
                     scrollEnabled={false}
                   />
                 </View>
               )}
 
-              {results.tracks.length === 0 &&
-                results.artists.length === 0 &&
-                results.users.length === 0 && (
-                  <View style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No results found</Text>
-                  </View>
-                )}
+              {noResults ? (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No results found</Text>
+                </View>
+              ) : null}
             </>
           )}
         </ScrollView>
