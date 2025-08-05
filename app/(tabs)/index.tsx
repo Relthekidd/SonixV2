@@ -10,7 +10,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
-import { Play, TrendingUp, Clock, Star } from 'lucide-react-native';
+import { useUserStats } from '@/hooks/useUserStats';
+import { Play, TrendingUp, Clock, Star, User, Music } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 
 const featuredPlaylists = [
@@ -65,6 +66,7 @@ const mockTrending: Track[] = [
 
 function HomeScreen() {
   const { playTrack, trendingTracks } = useMusic();
+  const { stats } = useUserStats();
 
   const tracks = trendingTracks.length > 0 ? trendingTracks : mockTrending;
 
