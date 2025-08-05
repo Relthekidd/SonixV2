@@ -165,6 +165,20 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [albums] = useState<Track[]>([]);
 
+  const logPlay = useCallback(
+    (duration: number) => {
+      if (user && currentTrack) {
+        apiService.recordPlay(
+          currentTrack.id,
+          currentTrack.artistId,
+          user.id,
+          Math.floor(duration),
+        );
+      }
+    },
+    [user, currentTrack],
+  );
+
   const mapTrack = (t: TrackRow, liked = false): Track => ({
     id: t.id,
     title: t.title,
@@ -277,26 +291,54 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   };
 
   const addToQueue = (track: Track) => {
-    setQueue((prev) => [...prev, track]);
+    setQueue((prev) => {
+      const updated = [...prev, track];
+      originalQueueRef.current = updated;
+      return updated;
+    });
   };
 
   const removeFromQueue = (trackId: string) => {
-    setQueue((prev) => prev.filter((t) => t.id !== trackId));
+    setQueue((prev) => {
+      const index = prev.findIndex((t) => t.id === trackId);
+      const updated = prev.filter((t) => t.id !== trackId);
+      originalQueueRef.current = updated;
+      if (index !== -1) {
+        setCurrentIndex((prevIdx) => {
+          if (index < prevIdx) return prevIdx - 1;
+          if (index === prevIdx) return Math.min(prevIdx, updated.length - 1);
+          return prevIdx;
+        });
+      }
+      return updated;
+    });
   };
 
-  const clearQueue = () => setQueue([]);
+  const clearQueue = () => {
+    setQueue([]);
+    originalQueueRef.current = [];
+    setCurrentIndex(-1);
+  };
 
   const reorderQueue = (from: number, to: number) => {
     setQueue((prev) => {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
       updated.splice(to, 0, moved);
+      originalQueueRef.current = updated;
       return updated;
+    });
+    setCurrentIndex((prevIdx) => {
+      if (prevIdx === from) return to;
+      if (from < prevIdx && to >= prevIdx) return prevIdx - 1;
+      if (from > prevIdx && to <= prevIdx) return prevIdx + 1;
+      return prevIdx;
     });
   };
 
   const handleTrackEnd = async () => {
     if (!queue.length) return;
+    logPlay(duration);
     if (repeatMode === 'one') {
       try {
         await soundRef.current?.setPositionAsync(0);
@@ -312,10 +354,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         nextIdx = 0;
       } else {
         setIsPlaying(false);
+        setCurrentTrack(null);
+        setCurrentTime(0);
         return;
       }
     }
     const next = queue[nextIdx];
+    setCurrentTrack(null);
+    setCurrentTime(0);
     await playTrack(next);
   };
 
@@ -334,6 +380,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current.setOnPlaybackStatusUpdate(null);
+      }
+
+      if (currentTrack) {
+        logPlay(currentTime);
       }
 
       if (queueParam.length) {
@@ -367,9 +417,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       sound.setOnPlaybackStatusUpdate(handlePlaybackStatusUpdate);
       statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
       setCurrentTrack(track);
-      if (user && track.artistId) {
-        apiService.recordPlay(track.id, track.artistId);
-      }
       setRecentlyPlayed((prev) => {
         const filtered = prev.filter((t) => t.id !== track.id);
         return [track, ...filtered].slice(0, 20);

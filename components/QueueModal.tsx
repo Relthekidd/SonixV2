@@ -34,7 +34,7 @@ export default function QueueModal({ visible, onClose }: Props) {
       const index = queue.findIndex((t) => t.id === currentTrack?.id);
       if (index >= 0) {
         setTimeout(() => {
-          listRef.current?.scrollToIndex({ index, animated: true });
+          listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
         }, 100);
       }
     }
