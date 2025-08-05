@@ -43,7 +43,8 @@
     "react-native-web": "^0.20.0",
     "react-native-webview": "13.13.5",
     "rimraf": "^4.4.1",
-    "uuid": "^9.0.1"
+    "uuid": "^9.0.1",
+    "react-native-gesture-handler": "~2.24.0"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
