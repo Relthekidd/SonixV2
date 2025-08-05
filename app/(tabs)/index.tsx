@@ -97,35 +97,46 @@ function HomeScreen() {
           </Text>
         </Animated.View>
 
-        {/* Quick Stats */}
+        {/* User Stats */}
         <View style={styles.statsGrid}>
-          {[
-            { Icon: TrendingUp, label: 'Trending', value: '2.4K', color: '#22c55e' },
-            {
-              Icon: Clock,
-              label: 'Hours Played',
-              value: '152',
-              color: '#fb923c',
-            },
-            { Icon: Star, label: 'Top Rated', value: '4.9', color: '#3b82f6' },
-            { Icon: Play, label: 'Playlists', value: '89', color: '#8b5cf6' },
-          ].map((stat, index) => (
-            <Animated.View
-              entering={FadeIn.delay(index * 100)}
-              key={stat.label}
-              style={[
-                styles.statCard,
-                styles.glassCard,
-                styles.brutalBorder,
-                styles.brutalShadow,
-              ]}
-            >
-              <stat.Icon color={stat.color} size={32} />
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </Animated.View>
-          ))}
-        </View>
+  {[
+    {
+      Icon: Play,
+      label: 'Tracks Played',
+      value: stats.playsCount.toString(),
+      color: '#22c55e',
+    },
+    {
+      Icon: Clock,
+      label: 'Hours Listened',
+      value: (stats.totalTime / 3600).toFixed(1),
+      color: '#fb923c',
+    },
+    {
+      Icon: User,
+      label: 'Top Artist',
+      value: stats.topArtist,
+      color: '#3b82f6',
+    },
+    {
+      Icon: Music,
+      label: 'Top Song',
+      value: stats.topSong,
+      color: '#8b5cf6',
+    },
+  ].map((stat, i) => (
+    <Animated.View 
+      entering={FadeIn.delay(i * 100)} 
+      key={stat.label}
+      style={[styles.statCard, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+    >
+      <stat.Icon color={stat.color} size={32} />
+      <Text style={styles.statValue}>{stat.value}</Text>
+      <Text style={styles.statLabel}>{stat.label}</Text>
+    </Animated.View>
+  ))}
+</View>
+
 
         {/* Featured Playlists */}
         <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
