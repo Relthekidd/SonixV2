@@ -6,6 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
+  Modal,
+  Share,
+  Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -18,6 +22,10 @@ import {
   Pause,
   Heart,
   MoveVertical as MoreVertical,
+  Plus,
+  Share as ShareIcon,
+  Music,
+  X,
 } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
 
@@ -27,6 +35,7 @@ function AlbumDetailScreen() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
 
   const {
     currentTrack,
@@ -35,6 +44,7 @@ function AlbumDetailScreen() {
     pauseTrack,
     toggleLike,
     likedSongs,
+    addToQueue,
   } = useMusic();
 
   useEffect(() => {
@@ -110,6 +120,90 @@ function AlbumDetailScreen() {
     }
   };
 
+  const handleMoreMenuAction = (action: string) => {
+    setShowMoreMenu(false);
+    
+    switch (action) {
+      case 'like':
+        if (tracks.length > 0) {
+          tracks.forEach(track => toggleLike(track.id));
+        }
+        break;
+      case 'addToQueue':
+        if (tracks.length > 0) {
+          tracks.forEach(track => addToQueue(track));
+          Alert.alert('Added to Queue', `All tracks from "${album?.title}" added to queue`);
+        }
+        break;
+      case 'share':
+        if (album) {
+          Share.share({
+            message: `Check out "${album.title}" by ${album.artist}`,
+            url: `https://sonix.app/album/${id}`,
+          });
+        }
+        break;
+      case 'addToLibrary':
+        Alert.alert('Add to Library', 'Album library functionality coming soon!');
+        break;
+    }
+  };
+
+  const MoreMenu = () => (
+    <Modal
+      visible={showMoreMenu}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowMoreMenu(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalContent, styles.glassCard, styles.brutalBorder]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>More Options</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowMoreMenu(false)}
+            >
+              <X size={24} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleMoreMenuAction('addToLibrary')}
+          >
+            <Plus size={20} color="#8b5cf6" />
+            <Text style={styles.menuItemText}>Add to Library</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleMoreMenuAction('like')}
+          >
+            <Heart size={20} color="#ef4444" />
+            <Text style={styles.menuItemText}>Like Album</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleMoreMenuAction('addToQueue')}
+          >
+            <Music size={20} color="#10b981" />
+            <Text style={styles.menuItemText}>Add to Queue</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => handleMoreMenuAction('share')}
+          >
+            <ShareIcon size={20} color="#f59e0b" />
+            <Text style={styles.menuItemText}>Share Album</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
   if (isLoading) {
     return (
       <LinearGradient
@@ -156,14 +250,13 @@ function AlbumDetailScreen() {
           <ArrowLeft size={24} color="#fff" />
         </TouchableOpacity>
         <TouchableOpacity
-          onPress={() => {
-            /* more options */
-          }}
+          onPress={() => setShowMoreMenu(true)}
           style={styles.headerButton}
         >
           <MoreVertical size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+
       <View style={styles.playAllContainer}>
         <TouchableOpacity
           style={[
@@ -186,6 +279,7 @@ function AlbumDetailScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {tracks.map((item) => (
           <TouchableOpacity
@@ -210,17 +304,6 @@ function AlbumDetailScreen() {
                 )}
               </View>
             </View>
-            <TouchableOpacity
-              style={styles.likeButton}
-              onPress={() => toggleLike(item.id)}
-            >
-              <Heart
-                color={item.isLiked ? '#ef4444' : '#94a3b8'}
-                size={20}
-                fill={item.isLiked ? '#ef4444' : 'transparent'}
-              />
-            </TouchableOpacity>
-            <TrackMenu track={item} />
             <TouchableOpacity style={styles.playButton}>
               {currentTrack?.id === item.id && isPlaying ? (
                 <Pause size={20} color="#8b5cf6" />
@@ -231,6 +314,8 @@ function AlbumDetailScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      <MoreMenu />
     </LinearGradient>
   );
 }
@@ -328,7 +413,6 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     marginLeft: 4,
   },
-  likeButton: { padding: 8 },
   playButton: { padding: 8 },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -344,5 +428,41 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '80%',
+    maxWidth: 300,
+    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  closeButton: {
+    padding: 4,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuItemText: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#ffffff',
   },
 });
