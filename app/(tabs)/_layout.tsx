@@ -1,19 +1,17 @@
+// app/(tabs)/_layout.tsx
+
 import React, { useEffect } from 'react';
-import { Tabs } from 'expo-router';
+import { View, StyleSheet, Platform } from 'react-native';
+import { Slot, useRouter } from 'expo-router';
 import { useAuth } from '@/providers/AuthProvider';
-import { router } from 'expo-router';
-import {
-  Chrome as Home,
-  Search,
-  Library,
-  User,
-} from 'lucide-react-native';
+import { Navigation } from '@/components/Navigation';
 import { MiniPlayer } from '@/components/MiniPlayer';
-import { View, StyleSheet } from 'react-native';
 
-export default function TabLayout() {
+export default function RootLayout() {
   const { user, isLoading } = useAuth();
+  const router = useRouter();
 
+  // Redirect to login if not authenticated
   useEffect(() => {
     if (!isLoading && !user) {
       router.replace('/(auth)/login');
@@ -21,50 +19,20 @@ export default function TabLayout() {
   }, [user, isLoading]);
 
   if (isLoading || !user) {
-    return null; // Or <LoadingScreen />
+    return null; // or a <LoadingScreen />  
   }
-
-  const screens = [
-    { name: 'index', title: 'Home', icon: Home },
-    { name: 'search', title: 'Search', icon: Search },
-    { name: 'library', title: 'Library', icon: Library },
-    { name: 'profile', title: 'Profile', icon: User },
-  ];
 
   return (
     <View style={styles.container}>
-      <Tabs
-        screenOptions={{
-          headerShown: false,
-          tabBarStyle: {
-            backgroundColor: '#0f172a',
-            borderTopWidth: 1,
-            borderTopColor: 'rgba(139, 92, 246, 0.2)',
-            height: 80,
-            paddingBottom: 20,
-            paddingTop: 10,
-          },
-          tabBarActiveTintColor: '#8b5cf6',
-          tabBarInactiveTintColor: '#64748b',
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontFamily: 'Inter-Medium',
-          },
-        }}
-      >
-        {screens.map(({ name, title, icon: Icon }) => (
-          <Tabs.Screen
-            key={name}
-            name={name}
-            options={{
-              title,
-              tabBarIcon: ({ size, color }) => (
-                <Icon size={size} color={color} />
-              ),
-            }}
-          />
-        ))}
-      </Tabs>
+      {/* Responsive Navigation (mobile bottom / desktop sidebar) */}
+      <Navigation />
+
+      {/* Main content area */}
+      <View style={styles.content}>
+        <Slot />
+      </View>
+
+      {/* Persistent MiniPlayer */}
       <MiniPlayer />
     </View>
   );
@@ -73,6 +41,11 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    flexDirection: 'row',              // nav + content side by side
+    backgroundColor: '#0f172a',        // match your theme
+  },
+  content: {
+    flex: 1,
+    paddingBottom: Platform.OS === 'web' ? 0 : 80, // give room for MiniPlayer on native
   },
 });

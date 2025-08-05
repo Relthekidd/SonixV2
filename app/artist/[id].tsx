@@ -8,19 +8,17 @@ import {
   ScrollView,
   FlatList,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, router } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import {
   ArrowLeft,
   Play,
   Pause,
-  Users,
-  Music,
-  Heart,
-  MoveVertical as MoreVertical,
+  MoreVertical,
 } from 'lucide-react-native';
 
 interface Artist {
@@ -35,6 +33,7 @@ interface Artist {
 
 export default function ArtistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -43,114 +42,72 @@ export default function ArtistDetailScreen() {
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
 
   useEffect(() => {
-    if (id) {
-      loadArtistDetails();
-    }
+    if (id) loadArtistDetails();
   }, [id]);
 
   const loadArtistDetails = async () => {
     setIsLoading(true);
-    setError(null);
-
     try {
       const [artistData, tracksData] = await Promise.all([
         apiService.getArtistById(id!),
         apiService.getArtistTracks(id!),
       ]);
 
-      setArtist(artistData);
-      setTracks(tracksData.map(transformTrack));
+      setArtist({
+        id: String((artistData as any).id),
+        stage_name:
+          (artistData as any).stage_name || (artistData as any).name || 'Unknown Artist',
+        avatar_url: (artistData as any).avatar_url || undefined,
+        bio: (artistData as any).bio || undefined,
+        monthly_listeners: Number((artistData as any).monthly_listeners) || 0,
+        total_plays: Number((artistData as any).total_plays) || 0,
+        genres: Array.isArray((artistData as any).genres)
+          ? (artistData as any).genres.map(String)
+          : [],
+      });
+
+      setTracks((tracksData as any[]).map(transformTrack));
     } catch (err) {
-      console.error('Error loading artist details:', err);
-      setError('Failed to load artist details');
+      console.error(err);
+      setError('Failed to load artist data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const transformTrack = (apiTrack: unknown): Track => {
-    const t = apiTrack as Record<string, unknown>;
-    return {
-      id: t.id,
-      title: t.title,
-      artist:
-        t.artist?.name ||
-        t.artist_name ||
-        t.artist ||
-        t.artist_id ||
-        'Unknown Artist',
-      album: t.album || 'Unknown Album',
-      duration: t.duration,
-      coverUrl:
-        t.cover_url ||
-        'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-      audioUrl: t.audio_url,
-      isLiked: t.is_liked || false,
-      genre: Array.isArray(t.genres) ? t.genres[0] : t.genre || 'Unknown',
-      releaseDate:
-        t.created_at || t.release_date || new Date().toISOString(),
-      playCount: t.play_count,
-      likeCount: t.like_count,
-    };
-  };
+  const transformTrack = (t: any): Track => ({
+    id: String(t.id),
+    title: String(t.title),
+    artist: String(t.artist?.name || t.artist_name || 'Unknown'),
+    album: String(t.album || 'Unknown Album'),
+    duration: Number(t.duration) || 0,
+    coverUrl: String(
+      t.cover_url ||
+        'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400'
+    ),
+    audioUrl: String(t.audio_url || ''),
+    isLiked: Boolean(t.is_liked),
+    genre: Array.isArray(t.genres) ? String(t.genres[0]) : String(t.genre || ''),
+    releaseDate: String(t.release_date || ''),
+    playCount: typeof t.play_count === 'number' ? t.play_count : 0,
+    likeCount: typeof t.like_count === 'number' ? t.like_count : 0,
+  });
 
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      if (isPlaying) {
-        pauseTrack();
-      } else {
-        playTrack(track, tracks);
-      }
+      isPlaying ? pauseTrack() : playTrack(track, tracks);
     } else {
       playTrack(track, tracks);
     }
   };
 
-  const handlePlayAll = () => {
-    if (tracks.length > 0) {
-      playTrack(tracks[0], tracks);
-    }
-  };
-
-  const renderTrackItem = ({ item }: { item: Track }) => (
-    <TouchableOpacity
-      style={styles.trackItem}
-      onPress={() => handleTrackPress(item)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackAlbum} numberOfLines={1}>
-          {item.album}
-        </Text>
-        {item.playCount && (
-          <Text style={styles.trackStats}>
-            {item.playCount.toLocaleString()} plays
-          </Text>
-        )}
-      </View>
-      <TouchableOpacity style={styles.playButton}>
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
   if (isLoading) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={["#1a1a2e", "#16213e", "#0f3460"]}
         style={styles.container}
       >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading artist...</Text>
-        </View>
+        <ActivityIndicator size="large" color="#8b5cf6" />
       </LinearGradient>
     );
   }
@@ -158,126 +115,69 @@ export default function ArtistDetailScreen() {
   if (error || !artist) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={["#1a1a2e", "#16213e", "#0f3460"]}
         style={styles.container}
       >
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error || 'Artist not found'}</Text>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.errorText}>{error || 'Artist not found'}</Text>
       </LinearGradient>
     );
   }
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={["#1a1a2e", "#16213e", "#0f3460"]}
       style={styles.container}
     >
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.headerButton}
-          onPress={() => router.back()}
-        >
-          <ArrowLeft color="#ffffff" size={24} />
+        <TouchableOpacity onPress={() => router.back()}>
+          <ArrowLeft color="#fff" size={24} />
         </TouchableOpacity>
-
-        <TouchableOpacity style={styles.headerButton}>
-          <MoreVertical color="#ffffff" size={24} />
+        <TouchableOpacity>
+          <MoreVertical color="#fff" size={24} />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.artistHeader}>
-          <Image
-            source={{
-              uri:
-                artist.avatar_url ||
-                'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=400',
-            }}
-            style={styles.artistImage}
-          />
+      <View style={styles.artistInfo}>
+        {artist.avatar_url ? (
+          <Image source={{ uri: artist.avatar_url }} style={styles.avatar} />
+        ) : (
+          <Users color="#fff" size={80} />
+        )}
+        <Text style={styles.artistName}>{artist.stage_name}</Text>
+        <Text style={styles.artistStats}>
+          {artist.monthly_listeners?.toLocaleString()} listeners •{' '}
+          {artist.total_plays?.toLocaleString()} plays
+        </Text>
+      </View>
 
-          <Text style={styles.artistName}>{artist.stage_name}</Text>
-
-          {artist.bio && <Text style={styles.artistBio}>{artist.bio}</Text>}
-
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Users color="#8b5cf6" size={20} />
-              <Text style={styles.statValue}>
-                {artist.monthly_listeners
-                  ? artist.monthly_listeners.toLocaleString()
-                  : '0'}
+      <FlatList
+        data={tracks}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.trackItem}
+            onPress={() => handleTrackPress(item)}
+          >
+            <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
+            <View style={styles.trackDetails}>
+              <Text style={styles.trackTitle} numberOfLines={1}>
+                {item.title}
               </Text>
-              <Text style={styles.statLabel}>Monthly Listeners</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Music color="#8b5cf6" size={20} />
-              <Text style={styles.statValue}>{tracks.length}</Text>
-              <Text style={styles.statLabel}>Tracks</Text>
-            </View>
-
-            <View style={styles.statItem}>
-              <Heart color="#8b5cf6" size={20} />
-              <Text style={styles.statValue}>
-                {artist.total_plays ? artist.total_plays.toLocaleString() : '0'}
-              </Text>
-              <Text style={styles.statLabel}>Total Plays</Text>
-            </View>
-          </View>
-
-          {artist.genres && artist.genres.length > 0 && (
-            <View style={styles.genresContainer}>
-              {artist.genres.map((genre: string, index: number) => (
-                <View key={index} style={styles.genreTag}>
-                  <Text style={styles.genreText}>{genre}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-
-        <View style={styles.tracksSection}>
-          <View style={styles.tracksSectionHeader}>
-            <Text style={styles.sectionTitle}>Popular Tracks</Text>
-            {tracks.length > 0 && (
-              <TouchableOpacity
-                style={styles.playAllButton}
-                onPress={handlePlayAll}
-              >
-                <Play color="#ffffff" size={16} />
-                <Text style={styles.playAllText}>Play All</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {tracks.length > 0 ? (
-            <FlatList
-              data={tracks}
-              renderItem={renderTrackItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Music color="#64748b" size={48} />
-              <Text style={styles.emptyText}>No tracks available</Text>
-              <Text style={styles.emptySubtext}>
-                This artist hasn&apos;t uploaded any tracks yet
+              <Text style={styles.trackAlbum} numberOfLines={1}>
+                {item.album}
               </Text>
             </View>
-          )}
-        </View>
-
-        <View style={styles.bottomPadding} />
-      </ScrollView>
+            <TouchableOpacity>
+              {currentTrack?.id === item.id && isPlaying ? (
+                <Pause color="#8b5cf6" size={20} />
+              ) : (
+                <Play color="#8b5cf6" size={20} />
+              )}
+            </TouchableOpacity>
+          </TouchableOpacity>
+        )}
+        contentContainerStyle={styles.trackList}
+      />
     </LinearGradient>
   );
 }
@@ -285,222 +185,66 @@ export default function ArtistDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginTop: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  errorText: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ef4444',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  backButton: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  backButtonText: {
-    color: '#8b5cf6',
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-  },
-  headerButton: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  content: {
-    flex: 1,
-  },
-  artistHeader: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 32,
-  },
-  artistImage: {
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    marginBottom: 24,
-    borderWidth: 4,
-    borderColor: '#8b5cf6',
-  },
-  artistName: {
-    fontSize: 32,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  artistBio: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#cbd5e1',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginBottom: 24,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 20,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    textAlign: 'center',
-  },
-  genresContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  genreTag: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  genreText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: '#8b5cf6',
-  },
-  tracksSection: {
-    paddingHorizontal: 24,
-  },
-  tracksSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-  },
-  playAllButton: {
-    flexDirection: 'row',
+  artistInfo: {
     alignItems: 'center',
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+    marginBottom: 24,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
-  playAllText: {
-    color: '#8b5cf6',
+  avatar: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
+  },
+  artistName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 8,
+  },
+  artistStats: {
     fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    marginLeft: 6,
+    color: '#ccc',
+  },
+  trackList: {
+    paddingHorizontal: 16,
+    paddingBottom: 80,
   },
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    marginBottom: 8,
-    borderRadius: 12,
-    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   trackCover: {
     width: 50,
     height: 50,
     borderRadius: 8,
+    marginRight: 12,
   },
-  trackInfo: {
+  trackDetails: {
     flex: 1,
-    marginLeft: 12,
   },
   trackTitle: {
     fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginBottom: 4,
+    fontWeight: '600',
+    color: '#fff',
   },
   trackAlbum: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginBottom: 2,
-  },
-  trackStats: {
     fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: '#64748b',
+    color: '#aaa',
   },
-  playButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: '#64748b',
+  errorText: {
+    color: '#fff',
     textAlign: 'center',
-  },
-  bottomPadding: {
-    height: 120,
+    marginTop: 50,
+    fontSize: 18,
   },
 });
