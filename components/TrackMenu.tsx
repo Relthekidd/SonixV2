@@ -13,11 +13,17 @@ import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 interface Props {
   track: Track;
   playlistId?: string;
+  onShare?: () => void;
 }
 
-export default function TrackMenu({ track, playlistId }: Props) {
-  const { toggleLike, addToQueue, playlists, addToPlaylist, removeFromPlaylist } =
-    useMusic();
+export default function TrackMenu({ track, playlistId, onShare }: Props) {
+  const {
+    toggleLike,
+    addToQueue,
+    playlists,
+    addToPlaylist,
+    removeFromPlaylist,
+  } = useMusic();
   const [visible, setVisible] = useState(false);
   const [selectPlaylist, setSelectPlaylist] = useState(false);
 
@@ -85,6 +91,17 @@ export default function TrackMenu({ track, playlistId }: Props) {
             >
               <Text style={styles.menuText}>Add to Queue</Text>
             </TouchableOpacity>
+            {onShare && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  onShare();
+                  setVisible(false);
+                }}
+              >
+                <Text style={styles.menuText}>Share</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </Modal>

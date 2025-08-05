@@ -6,6 +6,7 @@ import { useFrameworkReady } from '@/hooks/useFrameworkReady';
 import { FontProvider } from '@/providers/FontProvider';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { MusicProvider } from '@/providers/MusicProvider';
+import { UserStatsProvider } from '@/providers/UserStatsProvider';
 
 export default function RootLayout() {
   useFrameworkReady();
@@ -14,8 +15,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <FontProvider>
         <AuthProvider>
-          <MusicProvider>
-            <Stack screenOptions={{ headerShown: false }}>
+          <UserStatsProvider>
+            <MusicProvider>
+              <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="(auth)" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
               <Stack.Screen name="(detail)" options={{ headerShown: false }} />
@@ -28,9 +30,10 @@ export default function RootLayout() {
                 }}
               />
               <Stack.Screen name="+not-found" />
-            </Stack>
-            <StatusBar style="light" />
-          </MusicProvider>
+              </Stack>
+              <StatusBar style="light" />
+            </MusicProvider>
+          </UserStatsProvider>
         </AuthProvider>
       </FontProvider>
     </GestureHandlerRootView>

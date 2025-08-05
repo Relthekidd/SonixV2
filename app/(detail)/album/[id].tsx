@@ -16,7 +16,6 @@ import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService, AlbumDetails, TrackData } from '@/services/api';
 import {
-  ArrowLeft,
   Play,
   Pause,
   Heart,
@@ -26,6 +25,7 @@ import {
   Music,
   X,
 } from 'lucide-react-native';
+import DetailHeader from '@/components/DetailHeader';
 
 function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -120,17 +120,20 @@ function AlbumDetailScreen() {
 
   const handleMoreMenuAction = (action: string) => {
     setShowMoreMenu(false);
-    
+
     switch (action) {
       case 'like':
         if (tracks.length > 0) {
-          tracks.forEach(track => toggleLike(track.id));
+          tracks.forEach((track) => toggleLike(track.id));
         }
         break;
       case 'addToQueue':
         if (tracks.length > 0) {
-          tracks.forEach(track => addToQueue(track));
-          Alert.alert('Added to Queue', `All tracks from "${album?.title}" added to queue`);
+          tracks.forEach((track) => addToQueue(track));
+          Alert.alert(
+            'Added to Queue',
+            `All tracks from "${album?.title}" added to queue`,
+          );
         }
         break;
       case 'share':
@@ -142,7 +145,10 @@ function AlbumDetailScreen() {
         }
         break;
       case 'addToLibrary':
-        Alert.alert('Add to Library', 'Album library functionality coming soon!');
+        Alert.alert(
+          'Add to Library',
+          'Album library functionality coming soon!',
+        );
         break;
     }
   };
@@ -155,7 +161,9 @@ function AlbumDetailScreen() {
       onRequestClose={() => setShowMoreMenu(false)}
     >
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, styles.glassCard, styles.brutalBorder]}>
+        <View
+          style={[styles.modalContent, styles.glassCard, styles.brutalBorder]}
+        >
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>More Options</Text>
             <TouchableOpacity
@@ -165,7 +173,7 @@ function AlbumDetailScreen() {
               <X size={24} color="#fff" />
             </TouchableOpacity>
           </View>
-          
+
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => handleMoreMenuAction('addToLibrary')}
@@ -240,20 +248,19 @@ function AlbumDetailScreen() {
       colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.headerButton}
-        >
-          <ArrowLeft size={24} color="#fff" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setShowMoreMenu(true)}
-          style={styles.headerButton}
-        >
-          <MoreVertical size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      <DetailHeader
+        title={album.title}
+        onBack={() => router.back()}
+        right=
+          {(
+            <TouchableOpacity
+              onPress={() => setShowMoreMenu(true)}
+              style={styles.headerButton}
+            >
+              <MoreVertical size={24} color="#fff" />
+            </TouchableOpacity>
+          )}
+      />
 
       <View style={styles.playAllContainer}>
         <TouchableOpacity
@@ -302,7 +309,22 @@ function AlbumDetailScreen() {
                 )}
               </View>
             </View>
-            <TouchableOpacity style={styles.playButton}>
+            <TouchableOpacity
+              style={styles.queueButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                addToQueue(item);
+              }}
+            >
+              <Plus size={20} color="#8b5cf6" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.playButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleTrackPress(item);
+              }}
+            >
               {currentTrack?.id === item.id && isPlaying ? (
                 <Pause size={20} color="#8b5cf6" />
               ) : (
@@ -353,13 +375,6 @@ const styles = StyleSheet.create({
     color: '#8b5cf6',
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    paddingTop: 60,
   },
   headerButton: {
     width: 44,
@@ -412,6 +427,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   playButton: { padding: 8 },
+  queueButton: { padding: 8, marginRight: 8 },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,

@@ -24,7 +24,15 @@ function LibraryScreen() {
   const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
   const [playlistName, setPlaylistName] = useState('');
 
-  const { likedSongIds, playlists, currentTrack, isPlaying, playTrack, pauseTrack, createPlaylist } = useMusic();
+  const {
+    likedSongIds,
+    playlists,
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    createPlaylist,
+  } = useMusic();
 
   const [likedTracks, setLikedTracks] = useState<Track[]>([]);
 
@@ -50,10 +58,15 @@ function LibraryScreen() {
           album: t.album?.title || t.album_title || 'Single',
           albumId: t.album_id || undefined,
           duration: t.duration || 0,
-          coverUrl: apiService.getPublicUrl('images', t.cover_url || t.album?.cover_url || ''),
+          coverUrl: apiService.getPublicUrl(
+            'images',
+            t.cover_url || t.album?.cover_url || '',
+          ),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
           isLiked: true,
-          genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
+          genre: Array.isArray(t.genres)
+            ? t.genres[0]
+            : (t.genres as string) || '',
           releaseDate: t.release_date || t.created_at || '',
         }));
         const ordered = likedSongIds
@@ -84,7 +97,12 @@ function LibraryScreen() {
 
   const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
-      style={[styles.trackItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+      style={[
+        styles.trackItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
@@ -115,7 +133,12 @@ function LibraryScreen() {
 
   const renderPlaylistItem = ({ item }: { item: Playlist }) => (
     <TouchableOpacity
-      style={[styles.playlistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+      style={[
+        styles.playlistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/playlist/${item.id}`)}
     >
       <View style={styles.playlistInfo}>
@@ -130,28 +153,66 @@ function LibraryScreen() {
   );
 
   return (
-    <LinearGradient colors={['#0f172a', '#1e293b', '#0f172a']} style={styles.container}>
+    <LinearGradient
+      colors={['#0f172a', '#1e293b', '#0f172a']}
+      style={styles.container}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Your Library</Text>
-        <TouchableOpacity style={styles.addButton} onPress={() => setShowCreatePlaylist(true)}>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowCreatePlaylist(true)}
+        >
           <Plus color="#8b5cf6" size={24} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.tabBar}>
         <TouchableOpacity
-          style={[styles.tabCard, styles.glassCard, styles.brutalBorder, styles.brutalShadow, activeTab === 'liked' && styles.activeTabCard]}
+          style={[
+            styles.tabCard,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+            activeTab === 'liked' && styles.activeTabCard,
+          ]}
           onPress={() => setActiveTab('liked')}
         >
-          <Heart color={activeTab === 'liked' ? '#8b5cf6' : '#64748b'} size={20} />
-          <Text style={[styles.tabText, activeTab === 'liked' && styles.activeTabText]}>Liked Songs</Text>
+          <Heart
+            color={activeTab === 'liked' ? '#8b5cf6' : '#64748b'}
+            size={20}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'liked' && styles.activeTabText,
+            ]}
+          >
+            Liked Songs
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.tabCard, styles.glassCard, styles.brutalBorder, styles.brutalShadow, activeTab === 'playlists' && styles.activeTabCard]}
+          style={[
+            styles.tabCard,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+            activeTab === 'playlists' && styles.activeTabCard,
+          ]}
           onPress={() => setActiveTab('playlists')}
         >
-          <Music color={activeTab === 'playlists' ? '#8b5cf6' : '#64748b'} size={20} />
-          <Text style={[styles.tabText, activeTab === 'playlists' && styles.activeTabText]}>Playlists</Text>
+          <Music
+            color={activeTab === 'playlists' ? '#8b5cf6' : '#64748b'}
+            size={20}
+          />
+          <Text
+            style={[
+              styles.tabText,
+              activeTab === 'playlists' && styles.activeTabText,
+            ]}
+          >
+            Playlists
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -199,7 +260,10 @@ function LibraryScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Create Playlist</Text>
-              <TouchableOpacity onPress={() => setShowCreatePlaylist(false)} style={styles.closeButton}>
+              <TouchableOpacity
+                onPress={() => setShowCreatePlaylist(false)}
+                style={styles.closeButton}
+              >
                 <X color="#ffffff" size={24} />
               </TouchableOpacity>
             </View>
@@ -212,7 +276,10 @@ function LibraryScreen() {
               onChangeText={setPlaylistName}
             />
 
-            <TouchableOpacity style={styles.modalButton} onPress={handleCreatePlaylist}>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleCreatePlaylist}
+            >
               <Text style={styles.modalButtonText}>Create</Text>
             </TouchableOpacity>
           </View>
@@ -237,7 +304,9 @@ const styles = StyleSheet.create({
   addButton: { padding: 8 },
   tabBar: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginBottom: 16,
     gap: 12,
   },
   tabCard: {
@@ -255,8 +324,9 @@ const styles = StyleSheet.create({
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 16,
     borderRadius: 16,
   },
   trackCover: { width: 48, height: 48, borderRadius: 8, marginRight: 12 },
@@ -267,20 +337,30 @@ const styles = StyleSheet.create({
   playlistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
-    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
     borderRadius: 16,
   },
   playlistInfo: { flex: 1 },
   playlistTitle: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-  playlistDescription: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 14 },
+  playlistDescription: {
+    color: '#94a3b8',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+  },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 80,
     gap: 8,
   },
   emptyText: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-  emptySubtext: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 14, textAlign: 'center' },
+  emptySubtext: {
+    color: '#94a3b8',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    textAlign: 'center',
+  },
   bottomPadding: { height: 120 },
   modal: {
     position: 'absolute',
