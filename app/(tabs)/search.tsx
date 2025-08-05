@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
@@ -49,27 +50,17 @@ interface TrackRow {
 
 interface SearchResults {
   tracks: Track[];
-  albums: Track[];
-  singles: Track[];
   artists: ArtistResult[];
   users: UserResult[];
 }
 
 function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResults>({
-    tracks: [],
-    albums: [],
-    singles: [],
-    artists: [],
-    users: [],
-  });
+  const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], users: [] });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>(
-    'relevance',
-  );
+  const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>('relevance');
 
   const {
     currentTrack,
@@ -81,30 +72,21 @@ function SearchScreen() {
   } = useMusic();
 
   useEffect(() => {
-    const load = async () => {
-      setTrendingSearches([
-        'Electronic Music',
-        'Chill Vibes',
-        'Hip Hop',
-        'Indie Rock',
-        'Jazz',
-        'Classical',
-        'Pop Hits',
-        'R&B',
-      ]);
-    };
-    load();
+    setTrendingSearches([
+      'Electronic Music',
+      'Chill Vibes',
+      'Hip Hop',
+      'Indie Rock',
+      'Jazz',
+      'Classical',
+      'Pop Hits',
+      'R&B',
+    ]);
   }, []);
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults({
-        tracks: [],
-        albums: [],
-        singles: [],
-        artists: [],
-        users: [],
-      });
+      setResults({ tracks: [], artists: [], users: [] });
       return;
     }
     const timer = setTimeout(() => handleSearch(query), 300);
@@ -120,44 +102,26 @@ function SearchScreen() {
         .select(`*, artist:artist_id(name), album:album_id(*)`)
         .ilike('title', `%${searchQuery}%`)
         .eq('is_published', true)
-        .order(sort === 'popular' ? 'play_count' : 'created_at', {
-          ascending: false,
-        });
+        .order(sort === 'popular' ? 'play_count' : 'created_at', { ascending: false });
 
       if (error) throw error;
 
-      const tracks = (data || []).map((t: TrackRow): Track => {
-        const genresArray = Array.isArray(t.genres)
-          ? (t.genres as string[])
-          : typeof t.genres === 'string'
-            ? [t.genres]
-            : [];
+      const tracks = (data || []).map((t: TrackRow): Track => ({
+        id: t.id,
+        title: t.title,
+        artist: t.artist?.name || 'Unknown Artist',
+        artistId: t.artist_id || undefined,
+        album: t.album?.title || 'Single',
+        albumId: t.album_id || undefined,
+        duration: t.duration || 0,
+        coverUrl: apiService.getPublicUrl('images', t.cover_url || t.album?.cover_url || ''),
+        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+        isLiked: likedSongs.some((l) => l.id === t.id),
+        genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
+        releaseDate: t.release_date || t.created_at || '',
+      }));
 
-        return {
-          id: t.id,
-          title: t.title,
-          artist: t.artist?.name || 'Unknown Artist',
-          artistId: t.artist_id || undefined,
-          album: t.album?.title || 'Single',
-          albumId: t.album_id || undefined,
-          duration: t.duration || 0,
-          coverUrl: apiService.getPublicUrl(
-            'images',
-            t.cover_url || t.album?.cover_url || '',
-          ),
-          audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-          isLiked: likedSongs.some((l) => l.id === t.id),
-          genre: genresArray[0] || '',
-          genres: genresArray,
-          releaseDate: t.release_date || t.created_at || '',
-          year: t.release_date
-            ? new Date(t.release_date).getFullYear().toString()
-            : undefined,
-          description: '',
-        };
-      });
-
-      setResults({ tracks, albums: [], singles: [], artists: [], users: [] });
+      setResults({ tracks, artists: [], users: [] });
     } catch (err) {
       console.error('search error', err);
       setErrorMessage('Something went wrong');
@@ -166,54 +130,36 @@ function SearchScreen() {
     }
   };
 
-  const handleTrendingPress = (trending: string) => {
-    setQuery(trending);
-  };
+  const handleTrendingPress = (term: string) => setQuery(term);
 
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      if (isPlaying) {
-        pauseTrack();
-      } else {
-        playTrack(track, results.tracks);
-      }
+      isPlaying ? pauseTrack() : playTrack(track, results.tracks);
     } else {
       playTrack(track, results.tracks);
     }
   };
 
-  const handleToggleLike = (trackId: string) => {
-    toggleLike(trackId);
-  };
+  const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
   const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
-      style={styles.resultItem}
+      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
       onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
       <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>
-          {item.artist} • Song
-        </Text>
+        <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>{item.artist} • Song</Text>
       </View>
-      <TouchableOpacity
-        style={styles.likeButton}
-        onPress={() => handleToggleLike(item.id)}
-      >
+      <TouchableOpacity style={styles.likeButton} onPress={() => handleToggleLike(item.id)}>
         <Heart
           color={item.isLiked ? '#ef4444' : '#94a3b8'}
-          size={18}
           fill={item.isLiked ? '#ef4444' : 'transparent'}
+          size={18}
         />
       </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.playButton}
-        onPress={() => handleTrackPress(item)}
-      >
+      <TouchableOpacity style={styles.playButton} onPress={() => handleTrackPress(item)}>
         {currentTrack?.id === item.id && isPlaying ? (
           <Pause color="#8b5cf6" size={20} />
         ) : (
@@ -223,27 +169,32 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
+  const renderArtistItem = ({ item }: { item: ArtistResult }) => (
+    <TouchableOpacity
+      style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+      onPress={() => router.push(`/artist/${item.id}`)}
+    >
+      <Image
+        source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
+        style={styles.artistImage}
+      />
+      <Text style={styles.artistName} numberOfLines={1}>{item.name}</Text>
+    </TouchableOpacity>
+  );
+
   const renderUserItem = ({ item }: { item: UserResult }) => (
     <TouchableOpacity
-      style={styles.resultItem}
+      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
       onPress={() => router.push(`/user/${item.id}`)}
     >
       <Image
-        source={{
-          uri:
-            item.profile_picture_url ||
-            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg',
-        }}
+        source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
         style={[styles.resultImage, styles.userImage]}
       />
       <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>
-          {item.display_name}
-        </Text>
+        <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
         <View style={styles.userMeta}>
-          <Text style={styles.resultSubtitle}>
-            {item.follower_count} followers
-          </Text>
+          <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
           <View style={styles.privacyIndicator}>
             {item.is_private ? <Lock size={12} /> : <Globe size={12} />}
           </View>
@@ -252,217 +203,174 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderArtistItem = ({ item }: { item: ArtistResult }) => (
-    <TouchableOpacity
-      style={styles.artistItem}
-      onPress={() => router.push(`/artist/${item.id}`)}
-    >
-      <Image
-        source={{
-          uri:
-            item.avatar_url ||
-            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg',
-        }}
-        style={styles.artistImage}
-      />
-      <Text style={styles.artistName} numberOfLines={1}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const noResults =
-    results.tracks.length === 0 &&
-    results.artists.length === 0 &&
-    results.users.length === 0;
-
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={[ '#0f172a', '#1e293b', '#0f172a' ]}
       style={styles.container}
     >
-      <View style={styles.header}>
-        <Text style={styles.title}>Search</Text>
-        <View style={styles.searchContainer}>
-          <Search size={20} color="#94a3b8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for songs, people, albums..."
-            placeholderTextColor="#64748b"
-            value={query}
-            onChangeText={setQuery}
-          />
-        </View>
-        <View style={styles.filterRow}>
-          {['relevance', 'recent', 'popular'].map((f) => (
-            <TouchableOpacity
-              key={f}
-              style={[
-                styles.filterOption,
-                sort === f && styles.filterOptionActive,
-              ]}
-            onPress={() => setSort(f as 'relevance' | 'recent' | 'popular')}
-            >
-              <Text style={styles.filterText}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <Animated.View entering={FadeInDown.delay(100)} style={styles.header}>
+          <Text style={styles.title}>Search</Text>
+          <View style={[styles.searchContainer, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>  
+            <Search size={20} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search for songs, people, albums..."
+              placeholderTextColor="#64748b"
+              value={query}
+              onChangeText={setQuery}
+            />
+          </View>
+          <View style={styles.filterRow}>
+            {['relevance','recent','popular'].map((f) => (
+              <TouchableOpacity
+                key={f}
+                style={[styles.filterOption, sort===f && styles.filterOptionActive]}
+                onPress={() => setSort(f as any)}
+              >
+                <Text style={styles.filterText}>{f.charAt(0).toUpperCase()+f.slice(1)}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
 
-      {isSearching && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Searching...</Text>
-        </View>
-      )}
+        {isSearching && (
+          <Animated.View entering={FadeIn.delay(200)} style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#8b5cf6" />
+            <Text style={styles.loadingText}>Searching...</Text>
+          </Animated.View>
+        )}
 
-      {errorMessage && !isSearching && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{errorMessage}</Text>
-        </View>
-      )}
+        {errorMessage && !isSearching && (
+          <Animated.View entering={FadeIn.delay(200)} style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </Animated.View>
+        )}
 
-      {!isSearching && (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-          {query.trim() === '' ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Trending Searches</Text>
-              <View style={styles.trendingContainer}>
-                {trendingSearches.map((t) => (
-                  <TouchableOpacity
-                    key={t}
-                    style={styles.trendingItem}
-                    onPress={() => handleTrendingPress(t)}
-                  >
-                    <Text style={styles.trendingText}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-          ) : (
-            <>
-              {results.tracks.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Songs</Text>
-                  <FlatList<Track>
-                    data={results.tracks}
-                    renderItem={renderTrackItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                  />
+        {!isSearching && !errorMessage && (
+          <>
+            {query.trim() === '' ? (
+              <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+                <Text style={styles.sectionTitle}>Trending Searches</Text>
+                <View style={styles.trendingContainer}>
+                  {trendingSearches.map((t, i) => (
+                    <Animated.View key={t} entering={FadeInDown.delay(300 + i*50)}>
+                      <TouchableOpacity
+                        style={[styles.trendingItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+                        onPress={() => handleTrendingPress(t)}
+                      >
+                        <Text style={styles.trendingText}>{t}</Text>
+                      </TouchableOpacity>
+                    </Animated.View>
+                  ))}
                 </View>
-              )}
-
-              {results.artists.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Artists</Text>
-                  <FlatList<ArtistResult>
-                    data={results.artists}
-                    renderItem={renderArtistItem}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                  />
-                </View>
-              )}
-
-              {results.users.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Users</Text>
-                  <FlatList<UserResult>
-                    data={results.users}
-                    renderItem={renderUserItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                  />
-                </View>
-              )}
-
-              {noResults ? (
-                <View style={styles.emptyState}>
-                  <Text style={styles.emptyText}>No results found</Text>
-                </View>
-              ) : null}
-            </>
-          )}
-        </ScrollView>
-      )}
-
-      <View style={styles.bottomPadding} />
+              </Animated.View>
+            ) : (
+              <>  
+                {results.tracks.length > 0 && (
+                  <Animated.View entering={FadeInDown.delay(300)} style={styles.section}>
+                    <Text style={styles.sectionTitle}>Songs</Text>
+                    <FlatList
+                      data={results.tracks}
+                      renderItem={renderTrackItem}
+                      keyExtractor={(i) => i.id}
+                      scrollEnabled={false}
+                    />
+                  </Animated.View>
+                )}
+                {results.artists.length > 0 && (
+                  <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
+                    <Text style={styles.sectionTitle}>Artists</Text>
+                    <FlatList
+                      data={results.artists}
+                      renderItem={renderArtistItem}
+                      keyExtractor={(i) => i.id}
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                    />
+                  </Animated.View>
+                )}
+                {results.users.length > 0 && (
+                  <Animated.View entering={FadeInDown.delay(500)} style={styles.section}>
+                    <Text style={styles.sectionTitle}>Users</Text>
+                    <FlatList
+                      data={results.users}
+                      renderItem={renderUserItem}
+                      keyExtractor={(i) => i.id}
+                      scrollEnabled={false}
+                    />
+                  </Animated.View>
+                )}
+                {results.tracks.length===0 && results.artists.length===0 && results.users.length===0 && (
+                  <Animated.View entering={FadeIn.delay(600)} style={styles.emptyState}>
+                    <Text style={styles.emptyText}>No results found</Text>
+                  </Animated.View>
+                )}
+              </>
+            )}
+            <View style={{ height: 120 }} />
+          </>
+        )}
+      </ScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 24, paddingTop: 60, paddingBottom: 16 },
-  title: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#fff' },
+  content: { padding: 24, paddingBottom: 110 },
+  header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
+  title: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#fff', marginBottom: 12 },
   searchContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 12,
-    padding: 12,
     alignItems: 'center',
+    padding: 12,
+    marginBottom: 12,
   },
-  searchInput: { flex: 1, marginLeft: 8, color: '#fff' },
+  searchInput: { flex: 1, marginLeft: 8, color: '#fff', fontFamily: 'Inter-Regular' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#94a3b8', marginTop: 12 },
+  loadingText: { color: '#94a3b8', marginTop: 12, fontFamily: 'Inter-Regular' },
   errorContainer: { padding: 24, alignItems: 'center' },
-  errorText: { color: '#ef4444' },
-  content: { flex: 1 },
-  section: { marginBottom: 32, paddingHorizontal: 24 },
-  sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16 },
-  trendingContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  trendingItem: {
-    backgroundColor: 'rgba(139,92,246,0.2)',
-    padding: 8,
-    borderRadius: 20,
-    margin: 4,
-  },
-  trendingText: { color: '#8b5cf6' },
-  filterRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  filterOption: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
+  errorText: { color: '#ef4444', fontFamily: 'Inter-Regular' },
+  section: { marginBottom: 32 },
+  sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16, fontFamily: 'Poppins-SemiBold' },
+  trendingContainer: { flexDirection: 'row', flexWrap: 'wrap' },
+  trendingItem: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, margin: 4 },
+  trendingText: { color: '#fff', fontFamily: 'Inter-SemiBold' },
+  filterRow: { flexDirection: 'row', marginBottom: 16 },
+  filterOption: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 8 },
   filterOptionActive: { backgroundColor: 'rgba(139,92,246,0.3)' },
-  filterText: { color: '#fff', fontSize: 12 },
-  resultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 24,
-    marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-  },
+  filterText: { color: '#fff', fontSize: 12, fontFamily: 'Inter-Regular' },
+  resultItem: { flexDirection: 'row', alignItems: 'center', padding: 12, marginHorizontal: 24, marginBottom: 8, borderRadius: 12 },
   resultImage: { width: 50, height: 50, borderRadius: 8 },
   userImage: { borderRadius: 25 },
   resultInfo: { flex: 1, marginLeft: 12 },
-  resultTitle: { color: '#fff' },
-  resultSubtitle: { color: '#94a3b8' },
+  resultTitle: { color: '#fff', fontFamily: 'Inter-SemiBold' },
+  resultSubtitle: { color: '#94a3b8', fontFamily: 'Inter-Regular' },
   likeButton: { padding: 8 },
-  playButton: { padding: 8 },
-  userMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  privacyIndicator: { marginLeft: 8 },
-  emptyState: { alignItems: 'center', marginTop: 40 },
-  emptyText: { color: '#94a3b8' },
-  artistItem: { alignItems: 'center', marginRight: 16 },
+  playButton: { padding: 8, marginLeft: 8 },
+  artistItem: { alignItems: 'center', marginRight: 16, padding: 12, borderRadius: 12 },
   artistImage: { width: 80, height: 80, borderRadius: 40, marginBottom: 8 },
-  artistName: { color: '#fff', maxWidth: 80, textAlign: 'center' },
+  artistName: { color: '#fff', maxWidth: 80, textAlign: 'center', fontFamily: 'Inter-Regular' },
+  emptyState: { alignItems: 'center', marginTop: 40 },
+  emptyText: { color: '#94a3b8', fontFamily: 'Inter-Regular' },
   bottomPadding: { height: 120 },
+  /* Neobrutalist styles */
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
 });
 
 export default withAuthGuard(SearchScreen);
