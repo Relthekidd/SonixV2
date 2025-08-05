@@ -1,6 +1,14 @@
-import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+} from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import Animated, { SlideInUp, FadeOut } from 'react-native-reanimated';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { X, Trash2 } from 'lucide-react-native';
 
@@ -18,6 +26,19 @@ export default function QueueModal({ visible, onClose }: Props) {
     clearQueue,
     reorderQueue,
   } = useMusic();
+
+  const listRef = useRef<DraggableFlatList<Track>>(null);
+
+  useEffect(() => {
+    if (visible) {
+      const index = queue.findIndex((t) => t.id === currentTrack?.id);
+      if (index >= 0) {
+        setTimeout(() => {
+          listRef.current?.scrollToIndex({ index, animated: true });
+        }, 100);
+      }
+    }
+  }, [visible, queue, currentTrack]);
 
   const renderItem = ({ item, drag }: RenderItemParams<Track>) => (
     <TouchableOpacity
@@ -41,9 +62,13 @@ export default function QueueModal({ visible, onClose }: Props) {
   );
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.modal}>
-        <View style={[styles.content, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
+        <Animated.View
+          entering={SlideInUp.springify()}
+          exiting={FadeOut}
+          style={[styles.content, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+        >
           <View style={styles.header}>
             <Text style={styles.heading}>Queue</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
@@ -58,12 +83,13 @@ export default function QueueModal({ visible, onClose }: Props) {
           )}
 
           <DraggableFlatList
+            ref={listRef}
             data={queue}
             keyExtractor={(item) => item.id}
             onDragEnd={({ from, to }) => reorderQueue(from, to)}
             renderItem={renderItem}
           />
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

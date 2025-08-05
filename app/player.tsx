@@ -8,7 +8,6 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
-  Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +23,7 @@ import {
   Heart,
   Shuffle,
   Repeat,
-  MoveHorizontal as MoreHorizontal,
+  ListMusic,
   Volume1,
   Volume2,
 } from 'lucide-react-native';
@@ -59,7 +58,7 @@ export default function PlayerScreen() {
     repeatMode,
   } = useMusic();
 
-const [queueVisible, setQueueVisible] = useState(false);
+  const [queueVisible, setQueueVisible] = useState(false);
 
 
   const [seekTime, setSeekTime] = useState<number | null>(null);
@@ -133,11 +132,11 @@ const [queueVisible, setQueueVisible] = useState(false);
         <Text style={styles.headerTitle}>Now Playing</Text>
 
         <TouchableOpacity
-  style={styles.headerButton}
-  onPress={() => setQueueVisible(true)}
->
-  <MoreHorizontal color="#ffffff" size={24} />
-</TouchableOpacity>
+          style={styles.headerButton}
+          onPress={() => setQueueVisible(true)}
+        >
+          <ListMusic color="#ffffff" size={24} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>

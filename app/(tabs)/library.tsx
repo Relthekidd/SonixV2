@@ -479,14 +479,14 @@ const styles = StyleSheet.create({
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   trackCover: {
-    width: 50,
-    height: 50,
+    width: 56,
+    height: 56,
     borderRadius: 8,
   },
   trackInfo: {
@@ -515,14 +515,14 @@ const styles = StyleSheet.create({
   playlistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   playlistCover: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     borderRadius: 8,
   },
   playlistInfo: {
@@ -549,14 +549,14 @@ const styles = StyleSheet.create({
   albumItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   albumCover: {
-    width: 60,
-    height: 60,
+    width: 64,
+    height: 64,
     borderRadius: 8,
   },
   albumInfo: {
@@ -577,15 +577,15 @@ const styles = StyleSheet.create({
   artistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    marginHorizontal: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   artistAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
   },
   artistName: {
     marginLeft: 12,
