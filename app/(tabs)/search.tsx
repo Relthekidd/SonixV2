@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -149,17 +150,368 @@ function SearchScreen() {
   );
 
   const renderArtistItem = ({ item }: { item: ArtistResult }) => (
-    <TouchableOpacity style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} onPress={() => router.push(`/artist/${item.id}`)}>
-      <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} style={styles.artistImage} />
+    <TouchableOpacity 
+      style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} 
+      onPress={() => router.push(`/artist/${item.id}`)}
+    >
+      <Image 
+        source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} 
+        style={styles.artistImage} 
+      />
       <Text style={styles.artistName} numberOfLines={1}>{item.name}</Text>
     </TouchableOpacity>
   );
 
   const renderUserItem = ({ item }: { item: UserResult }) => (
-    <TouchableOpacity style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} onPress={() => router.push(`/user/${item.id}`)}>
-      <Image source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} style={[styles.resultImage, styles.userImage]} />
+    <TouchableOpacity 
+      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} 
+      onPress={() => router.push(`/user/${item.id}`)}
+    >
+      <Image 
+        source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} 
+        style={[styles.resultImage, styles.userImage]} 
+      />
       <View style={styles.resultInfo}>
         <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
         <View style={styles.userMeta}>
           <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
-          <View style={styles.privacyIndicator}>{item.is_private ? <Lock size={12} /> : <Globe size={12} />}</n
+          <View style={styles.privacyIndicator}>
+            {item.is_private ? <Lock size={12} color="#94a3b8" /> : <Globe size={12} color="#94a3b8" />}
+          </View>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  return (
+    <LinearGradient colors={['#0f0f23', '#1a1a2e', '#16213e']} style={styles.container}>
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {/* Search Header */}
+        <Animated.View entering={FadeIn} style={styles.searchHeader}>
+          <Text style={styles.title}>Search</Text>
+          <View style={styles.searchContainer}>
+            <Search color="#8b5cf6" size={20} style={styles.searchIcon} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search for songs, artists, or users..."
+              placeholderTextColor="#64748b"
+              value={query}
+              onChangeText={setQuery}
+            />
+          </View>
+        </Animated.View>
+
+        {/* Sort Options */}
+        {query.length > 0 && (
+          <Animated.View entering={FadeInDown.delay(100)} style={styles.sortContainer}>
+            {(['relevance', 'recent', 'popular'] as const).map((option) => (
+              <TouchableOpacity
+                key={option}
+                style={[styles.sortButton, sort === option && styles.sortButtonActive]}
+                onPress={() => setSort(option)}
+              >
+                <Text style={[styles.sortButtonText, sort === option && styles.sortButtonTextActive]}>
+                  {option.charAt(0).toUpperCase() + option.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </Animated.View>
+        )}
+
+        {/* Loading */}
+        {isSearching && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#8b5cf6" />
+          </View>
+        )}
+
+        {/* Error Message */}
+        {errorMessage && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{errorMessage}</Text>
+          </View>
+        )}
+
+        {/* Search Results */}
+        {query.length > 0 && !isSearching && (
+          <Animated.View entering={FadeInDown.delay(200)} style={styles.resultsContainer}>
+            {/* Tracks Section */}
+            {results.tracks.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Songs</Text>
+                <FlatList
+                  data={results.tracks}
+                  renderItem={renderTrackItem}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
+
+            {/* Artists Section */}
+            {results.artists.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Artists</Text>
+                <FlatList
+                  data={results.artists}
+                  renderItem={renderArtistItem}
+                  keyExtractor={(item) => item.id}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                />
+              </View>
+            )}
+
+            {/* Users Section */}
+            {results.users.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Users</Text>
+                <FlatList
+                  data={results.users}
+                  renderItem={renderUserItem}
+                  keyExtractor={(item) => item.id}
+                  scrollEnabled={false}
+                />
+              </View>
+            )}
+
+            {/* No Results */}
+            {results.tracks.length === 0 && results.artists.length === 0 && results.users.length === 0 && (
+              <View style={styles.noResultsContainer}>
+                <Text style={styles.noResultsText}>No results found for "{query}"</Text>
+                <Text style={styles.noResultsSubtext}>Try different keywords or check your spelling</Text>
+              </View>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Trending Searches */}
+        {query.length === 0 && (
+          <Animated.View entering={FadeInDown.delay(300)} style={styles.trendingContainer}>
+            <Text style={styles.sectionTitle}>Trending Searches</Text>
+            <View style={styles.trendingGrid}>
+              {trendingSearches.map((term, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[styles.trendingItem, styles.glassCard]}
+                  onPress={() => handleTrendingPress(term)}
+                >
+                  <Text style={styles.trendingText}>{term}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+      </ScrollView>
+    </LinearGradient>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+    paddingTop: 60,
+  },
+  searchHeader: {
+    padding: 20,
+    paddingBottom: 10,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#ffffff',
+    marginBottom: 20,
+    textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  sortContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 10,
+  },
+  sortButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  sortButtonActive: {
+    backgroundColor: '#8b5cf6',
+    borderColor: '#8b5cf6',
+  },
+  sortButtonText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  sortButtonTextActive: {
+    color: '#ffffff',
+  },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  errorContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  errorText: {
+    color: '#ef4444',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  resultsContainer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  section: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 15,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 15,
+  },
+  resultImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 15,
+  },
+  userImage: {
+    borderRadius: 25,
+  },
+  resultInfo: {
+    flex: 1,
+  },
+  resultTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  resultSubtitle: {
+    color: '#94a3b8',
+    fontSize: 14,
+  },
+  userMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  privacyIndicator: {
+    padding: 2,
+  },
+  likeButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  playButton: {
+    padding: 8,
+  },
+  artistItem: {
+    alignItems: 'center',
+    padding: 15,
+    marginRight: 15,
+    borderRadius: 15,
+    width: 100,
+  },
+  artistImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 10,
+  },
+  artistName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  noResultsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noResultsSubtext: {
+    color: '#94a3b8',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  trendingContainer: {
+    padding: 20,
+  },
+  trendingGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  trendingItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  trendingText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    backdropFilter: 'blur(10px)',
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  brutalShadow: {
+    shadowColor: '#8b5cf6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});
+
+export default withAuthGuard(SearchScreen);
