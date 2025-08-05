@@ -242,7 +242,14 @@ function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 24, paddingBottom: 110 },
-  hero: { padding: 24, marginTop: 32, marginBottom: 32 },
+  hero: {
+  padding: 24,
+  marginTop: 32,
+  marginBottom: 32,
+  alignItems: 'center',         // centers children horizontally
+  justifyContent: 'center',     // centers children vertically
+  minHeight: 180,               // 👈 add this for vertical centering
+},
   heroTitle: {
     fontSize: 40,
     fontFamily: 'Poppins-Bold',

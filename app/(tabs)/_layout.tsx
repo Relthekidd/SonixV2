@@ -47,6 +47,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingBottom: Platform.OS === 'web' ? 0 : 96,
+    paddingBottom: Platform.OS === 'web' ? 0 : 0,
   },
 });

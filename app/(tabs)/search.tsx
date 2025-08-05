@@ -184,8 +184,9 @@ function SearchScreen() {
   );
 
   return (
-    <LinearGradient colors={['#0f0f23', '#1a1a2e', '#16213e']} style={styles.container}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
+      <LinearGradient colors={['#0f0f23', '#1a1a2e', '#16213e']} style={styles.gradient}>
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Search Header */}
         <Animated.View entering={FadeIn} style={styles.searchHeader}>
           <Text style={styles.title}>Search</Text>
@@ -278,7 +279,7 @@ function SearchScreen() {
             {/* No Results */}
             {results.tracks.length === 0 && results.artists.length === 0 && results.users.length === 0 && (
               <View style={styles.noResultsContainer}>
-                <Text style={styles.noResultsText}>No results found for "{query}"</Text>
+                <Text style={styles.noResultsText}>No results found for &quot;{query}&quot;</Text>
                 <Text style={styles.noResultsSubtext}>Try different keywords or check your spelling</Text>
               </View>
             )}
@@ -303,7 +304,8 @@ function SearchScreen() {
           </Animated.View>
         )}
       </ScrollView>
-    </LinearGradient>
+      </LinearGradient>
+    </View>
   );
 }
 
@@ -311,9 +313,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  gradient: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingTop: 60,
+    paddingBottom: 100, // Extra padding at bottom
   },
   searchHeader: {
     padding: 20,
@@ -321,10 +330,10 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 32,
-    fontWeight: '900',
+    fontWeight: '900' as const,
     color: '#ffffff',
     marginBottom: 20,
-    textShadow: '2px 2px 4px rgba(0,0,0,0.5)',
+    // Removed textShadow as it's not supported in React Native
   },
   searchContainer: {
     flexDirection: 'row',
@@ -348,7 +357,7 @@ const styles = StyleSheet.create({
   sortContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingBottom: 10,
+    paddingBottom: 20,
     gap: 10,
   },
   sortButton: {
