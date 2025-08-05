@@ -9,7 +9,6 @@ import {
   Modal,
   Share,
   Alert,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -27,7 +26,6 @@ import {
   Music,
   X,
 } from 'lucide-react-native';
-import TrackMenu from '@/components/TrackMenu';
 
 function AlbumDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,7 +41,7 @@ function AlbumDetailScreen() {
     playTrack,
     pauseTrack,
     toggleLike,
-    likedSongs,
+    likedSongIds,
     addToQueue,
   } = useMusic();
 
@@ -69,7 +67,7 @@ function AlbumDetailScreen() {
           duration: t.duration,
           coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-          isLiked: likedSongs.some((l) => l.id === t.id),
+          isLiked: likedSongIds.includes(t.id),
           trackNumber: t.track_number ?? idx + 1,
           playCount: t.play_count ?? undefined,
           likeCount: t.like_count ?? undefined,

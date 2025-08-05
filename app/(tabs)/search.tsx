@@ -75,7 +75,7 @@ function SearchScreen() {
     playTrack,
     pauseTrack,
     toggleLike,
-    likedSongs,
+    likedSongIds,
   } = useMusic();
 
   useEffect(() => {
@@ -131,7 +131,7 @@ function SearchScreen() {
             t.cover_url || t.album?.cover_url || '',
           ),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-          isLiked: likedSongs.some((l) => l.id === t.id),
+          isLiked: likedSongIds.includes(t.id),
           genre: Array.isArray(t.genres)
             ? t.genres[0]
             : (t.genres as string) || '',
