@@ -1,16 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
+} from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic, Track, TrackRow } from '@/providers/MusicProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { ArrowLeft, Play, Pause, Music } from 'lucide-react-native';
+import { Play, Pause, Music } from 'lucide-react-native';
+import DetailHeader from '@/components/DetailHeader';
 import TrackMenu from '@/components/TrackMenu';
 
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { playlists, playTrack, pauseTrack, currentTrack, isPlaying } = useMusic();
+  const { playlists, playTrack, pauseTrack, currentTrack, isPlaying } =
+    useMusic();
   const playlist = playlists.find((p) => p.id === id);
   const [tracks, setTracks] = useState<Track[]>([]);
 
@@ -37,10 +46,15 @@ export default function PlaylistDetailScreen() {
           album: t.album?.title || t.album_title || 'Single',
           albumId: t.album_id || undefined,
           duration: t.duration || 0,
-          coverUrl: apiService.getPublicUrl('images', t.cover_url || t.album?.cover_url || ''),
+          coverUrl: apiService.getPublicUrl(
+            'images',
+            t.cover_url || t.album?.cover_url || '',
+          ),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
           isLiked: false,
-          genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
+          genre: Array.isArray(t.genres)
+            ? t.genres[0]
+            : (t.genres as string) || '',
           releaseDate: t.release_date || t.created_at || '',
         }));
         const ordered = playlist.trackIds
@@ -61,13 +75,22 @@ export default function PlaylistDetailScreen() {
 
   const renderItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
-      style={[styles.trackItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+      style={[
+        styles.trackItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
       <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>{item.artist}</Text>
+        <Text style={styles.trackTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.trackArtist} numberOfLines={1}>
+          {item.artist}
+        </Text>
       </View>
       <TrackMenu track={item} playlistId={playlist?.id} />
       <TouchableOpacity
@@ -88,13 +111,11 @@ export default function PlaylistDetailScreen() {
 
   if (!playlist) {
     return (
-      <LinearGradient colors={['#0f172a', '#1e293b', '#0f172a']} style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ArrowLeft color="#fff" size={24} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Playlist</Text>
-        </View>
+      <LinearGradient
+        colors={['#0f172a', '#1e293b', '#0f172a']}
+        style={styles.container}
+      >
+        <DetailHeader title="Playlist" onBack={() => router.back()} />
         <View style={styles.emptyState}>
           <Music color="#64748b" size={48} />
           <Text style={styles.emptyText}>Playlist not found</Text>
@@ -104,13 +125,11 @@ export default function PlaylistDetailScreen() {
   }
 
   return (
-    <LinearGradient colors={['#0f172a', '#1e293b', '#0f172a']} style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ArrowLeft color="#fff" size={24} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{playlist.title}</Text>
-      </View>
+    <LinearGradient
+      colors={['#0f172a', '#1e293b', '#0f172a']}
+      style={styles.container}
+    >
+      <DetailHeader title={playlist.title} onBack={() => router.back()} />
       <FlatList
         data={tracks}
         renderItem={renderItem}
@@ -128,14 +147,6 @@ export default function PlaylistDetailScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 48 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  backButton: { marginRight: 16 },
-  headerTitle: { color: '#fff', fontSize: 20, fontFamily: 'Poppins-Bold' },
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',

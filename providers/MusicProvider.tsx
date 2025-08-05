@@ -11,6 +11,7 @@ import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
 import { useAuth } from './AuthProvider';
+import { useUserStats } from './UserStatsProvider';
 
 export interface Track {
   id: string;
@@ -74,6 +75,13 @@ interface UserProfile {
   profile_picture_url?: string | null;
 }
 
+export interface AlbumResult {
+  id: string;
+  title: string;
+  artist?: string;
+  coverUrl: string;
+}
+
 interface MusicContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -102,7 +110,7 @@ interface MusicContextType {
     sort?: 'recent' | 'popular',
   ) => Promise<{
     tracks: Track[];
-    albums: Track[];
+    albums: AlbumResult[];
     singles: Track[];
     artists: Artist[];
     users: UserProfile[];
@@ -125,6 +133,7 @@ const MusicContext = createContext<MusicContextType | null>(null);
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { refreshStats } = useUserStats();
   const soundRef = useRef<Audio.Sound | null>(null);
   const statusSubRef = useRef<(() => void) | null>(null);
   const originalQueueRef = useRef<Track[]>([]);
@@ -151,15 +160,17 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const logPlay = useCallback(
     (duration: number) => {
       if (user && currentTrack) {
-        apiService.recordPlay(
-          currentTrack.id,
-          currentTrack.artistId,
-          user.id,
-          Math.floor(duration),
-        );
+        apiService
+          .recordPlay(
+            currentTrack.id,
+            currentTrack.artistId,
+            user.id,
+            Math.floor(duration),
+          )
+          .then(() => refreshStats());
       }
     },
-    [user, currentTrack],
+    [user, currentTrack, refreshStats],
   );
 
   const mapTrack = (
@@ -542,9 +553,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         user ? apiService.getUserLibrary(user.id) : Promise.resolve(null),
       ]);
 
-      const libraryData =
-        (library as { likedSongIds: string[]; playlists: Playlist[] }) ||
-        { likedSongIds: [], playlists: [] };
+      const libraryData = (library as {
+        likedSongIds: string[];
+        playlists: Playlist[];
+      }) || { likedSongIds: [], playlists: [] };
       setLikedSongIds(libraryData.likedSongIds);
       setPlaylists(libraryData.playlists);
 
@@ -575,7 +587,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const [trackRes, artistRes, userRes] = await Promise.all([
+      const [trackRes, artistRes, albumRes, userRes] = await Promise.all([
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
@@ -592,14 +604,31 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .select('id,name,avatar_url')
           .ilike('name', `%${term}%`)
           .limit(10),
-        supabase.rpc('search_users', { search_query: term, limit_count: 10 }),
+        supabase
+          .from('albums')
+          .select('id,title,cover_url,artist:artist_id(name)')
+          .ilike('title', `%${term}%`)
+          .limit(10),
+        supabase
+          .from('users')
+          .select('id,display_name,profile_picture_url')
+          .ilike('display_name', `%${term}%`)
+          .limit(10),
       ]);
 
       const tracks = (trackRes.data || []).map((t: TrackRow) => mapTrack(t));
+      const albums = (albumRes.data || []).map(
+        (a: { id: string; title: string; cover_url?: string | null; artist?: { name?: string } | null }) => ({
+          id: a.id,
+          title: a.title,
+          artist: a.artist?.name || 'Unknown Artist',
+          coverUrl: apiService.getPublicUrl('images', a.cover_url || ''),
+        }),
+      );
 
       return {
         tracks,
-        albums: [],
+        albums,
         singles: [],
         artists: (artistRes.data || []) as Artist[],
         users: (userRes.data || []) as UserProfile[],

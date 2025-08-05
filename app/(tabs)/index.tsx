@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,15 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { useUserStats } from '@/hooks/useUserStats';
-import { Play, TrendingUp, Clock, Star, User, Music } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import {
+  Play,
+  TrendingUp,
+  Clock,
+  Star,
+  User,
+  Music,
+} from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
@@ -26,7 +34,8 @@ interface FeaturedPlaylist {
 
 function HomeScreen() {
   const { playTrack, trendingTracks } = useMusic();
-  const { stats } = useUserStats();
+  const { listeningTime, topSong, topArtist, playsCount, refreshStats } =
+    useUserStats();
   const [featuredPlaylists, setFeaturedPlaylists] = useState<
     FeaturedPlaylist[]
   >([]);
@@ -52,6 +61,12 @@ function HomeScreen() {
     };
     fetchFeatured();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshStats();
+    }, [refreshStats]),
+  );
 
   const tracks = trendingTracks;
 
@@ -86,44 +101,48 @@ function HomeScreen() {
 
         {/* User Stats */}
         <View style={styles.statsGrid}>
-  {[
-    {
-      Icon: Play,
-      label: 'Tracks Played',
-      value: stats.playsCount.toString(),
-      color: '#22c55e',
-    },
-    {
-      Icon: Clock,
-      label: 'Hours Listened',
-      value: (stats.totalTime / 3600).toFixed(1),
-      color: '#fb923c',
-    },
-    {
-      Icon: User,
-      label: 'Top Artist',
-      value: stats.topArtist,
-      color: '#3b82f6',
-    },
-    {
-      Icon: Music,
-      label: 'Top Song',
-      value: stats.topSong,
-      color: '#8b5cf6',
-    },
-  ].map((stat, i) => (
-    <Animated.View 
-      entering={FadeIn.delay(i * 100)} 
-      key={stat.label}
-      style={[styles.statCard, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-    >
-      <stat.Icon color={stat.color} size={32} />
-      <Text style={styles.statValue}>{stat.value}</Text>
-      <Text style={styles.statLabel}>{stat.label}</Text>
-    </Animated.View>
-  ))}
-</View>
-
+          {[
+            {
+              Icon: Play,
+              label: 'Tracks Played',
+              value: playsCount.toString(),
+              color: '#22c55e',
+            },
+            {
+              Icon: Clock,
+              label: 'Hours Listened',
+              value: (listeningTime / 3600).toFixed(1),
+              color: '#fb923c',
+            },
+            {
+              Icon: User,
+              label: 'Top Artist',
+              value: topArtist,
+              color: '#3b82f6',
+            },
+            {
+              Icon: Music,
+              label: 'Top Song',
+              value: topSong,
+              color: '#8b5cf6',
+            },
+          ].map((stat, i) => (
+            <Animated.View
+              entering={FadeIn.delay(i * 100)}
+              key={stat.label}
+              style={[
+                styles.statCard,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+            >
+              <stat.Icon color={stat.color} size={32} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </Animated.View>
+          ))}
+        </View>
 
         {/* Featured Playlists */}
         <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
@@ -228,13 +247,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 24, paddingBottom: 110 },
   hero: {
-  padding: 24,
-  marginTop: 32,
-  marginBottom: 32,
-  alignItems: 'center',         // centers children horizontally
-  justifyContent: 'center',     // centers children vertically
-  minHeight: 180,               // 👈 add this for vertical centering
-},
+    padding: 24,
+    marginTop: 32,
+    marginBottom: 32,
+    alignItems: 'center', // centers children horizontally
+    justifyContent: 'center', // centers children vertically
+    minHeight: 180, // 👈 add this for vertical centering
+  },
   heroTitle: {
     fontSize: 40,
     fontFamily: 'Poppins-Bold',
@@ -385,4 +404,3 @@ const styles = StyleSheet.create({
 });
 
 export default withAuthGuard(HomeScreen);
-

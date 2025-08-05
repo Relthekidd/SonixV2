@@ -8,34 +8,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Share,
-  Alert,
-  Modal,
-  FlatList,
-  TextInput,
-  ActionSheetIOS,
-  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import { supabase } from '@/services/supabase';
-import {
-  ArrowLeft,
-  Play,
-  Pause,
-  Heart,
-  Share as ShareIcon,
-  Plus,
-  Calendar,
-  Music,
-  Clock,
-  MoveVertical as MoreVertical,
-  X,
-  Check,
-  ListPlus,
-  PlayCircle,
-} from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Calendar, Music, Clock } from 'lucide-react-native';
+import TrackMenu from '@/components/TrackMenu';
 
 export default function TrackDetailScreen() {
   const router = useRouter();
@@ -51,23 +31,9 @@ export default function TrackDetailScreen() {
   const [track, setTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showLibraryModal, setShowLibraryModal] = useState(false);
-  const [showMoreModal, setShowMoreModal] = useState(false);
-  const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
-  const [newPlaylistName, setNewPlaylistName] = useState('');
 
-  const {
-    currentTrack,
-    isPlaying,
-    playTrack,
-    pauseTrack,
-    toggleLike,
-    likedSongIds,
-    playlists,
-    addToPlaylist,
-    removeFromPlaylist,
-    createPlaylist,
-  } = useMusic();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
+    useMusic();
 
   useEffect(() => {
     if (id) loadTrackDetails();
@@ -158,18 +124,6 @@ export default function TrackDetailScreen() {
       playTrack(track, [track]);
     }
   };
-
-  const handleLike = () => {
-    if (!track) return;
-    toggleLike(track.id);
-    setTrack((prev) => (prev ? { ...prev, isLiked: !prev.isLiked } : prev));
-  };
-
-  const handleAddToQueue = () => {
-    if (!track) return;
-    Alert.alert('Added to Queue', `"${track.title}" added to your queue`);
-  };
-
   const handleShare = async () => {
     if (!track) return;
     try {
@@ -180,79 +134,6 @@ export default function TrackDetailScreen() {
     } catch (err) {
       console.error('Error sharing track:', err);
     }
-  };
-
-  const openLibraryModal = () => {
-    if (track) {
-      const current = playlists
-        .filter((pl) => pl.trackIds.includes(track.id))
-        .map((pl) => pl.id);
-      setSelectedPlaylists(current);
-    }
-    setShowLibraryModal(true);
-  };
-
-  const handleMorePress = () => {
-    if (!track) return;
-
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [
-            'Cancel',
-            'Add to Library',
-            track.isLiked ? 'Unlike' : 'Like',
-            'Add to Playlist',
-            'Add to Queue',
-            'Share',
-          ],
-          cancelButtonIndex: 0,
-        },
-        (buttonIndex) => {
-          switch (buttonIndex) {
-            case 1:
-              openLibraryModal();
-              break;
-            case 2:
-              handleLike();
-              break;
-            case 3:
-              openLibraryModal();
-              break;
-            case 4:
-              handleAddToQueue();
-              break;
-            case 5:
-              handleShare();
-              break;
-          }
-        }
-      );
-    } else {
-      setShowMoreModal(true);
-    }
-  };
-
-  const togglePlaylistSelection = (playlistId: string) => {
-    if (!track) return;
-    const exists = selectedPlaylists.includes(playlistId);
-    if (exists) {
-      removeFromPlaylist(playlistId, track.id);
-      setSelectedPlaylists((prev) => prev.filter((id) => id !== playlistId));
-    } else {
-      addToPlaylist(playlistId, track);
-      setSelectedPlaylists((prev) => [...prev, playlistId]);
-    }
-  };
-
-  const handleCreatePlaylist = async () => {
-    if (!newPlaylistName.trim() || !track) return;
-    const pl = await createPlaylist(newPlaylistName);
-    if (pl) {
-      addToPlaylist(pl.id, track);
-      setSelectedPlaylists((prev) => [...prev, pl.id]);
-    }
-    setNewPlaylistName('');
   };
 
   const formatDuration = (seconds: number) => {
@@ -312,9 +193,6 @@ export default function TrackDetailScreen() {
           onPress={() => router.back()}
         >
           <ArrowLeft color="#ffffff" size={24} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton} onPress={handleMorePress}>
-          <MoreVertical color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
 
@@ -386,6 +264,7 @@ export default function TrackDetailScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
+          <TrackMenu track={track} onShare={handleShare} />
         </View>
 
         {track.lyrics && (
@@ -398,169 +277,6 @@ export default function TrackDetailScreen() {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
-      {/* More Actions Modal for Android */}
-      {showMoreModal && Platform.OS === 'android' && (
-        <Modal transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.moreModalContent,
-                styles.glassCard,
-                styles.brutalBorder,
-                styles.brutalShadow,
-              ]}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>More Actions</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setShowMoreModal(false)}
-                >
-                  <X color="#ffffff" size={24} />
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.moreActionRow}
-                onPress={() => {
-                  setShowMoreModal(false);
-                  openLibraryModal();
-                }}
-              >
-                <Plus color="#8b5cf6" size={20} />
-                <Text style={styles.moreActionText}>Add to Library</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.moreActionRow}
-                onPress={() => {
-                  setShowMoreModal(false);
-                  handleLike();
-                }}
-              >
-                <Heart
-                  color={track.isLiked ? '#ef4444' : '#8b5cf6'}
-                  fill={track.isLiked ? '#ef4444' : 'transparent'}
-                  size={20}
-                />
-                <Text style={styles.moreActionText}>
-                  {track.isLiked ? 'Unlike' : 'Like'}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.moreActionRow}
-                onPress={() => {
-                  setShowMoreModal(false);
-                  openLibraryModal();
-                }}
-              >
-                <ListPlus color="#8b5cf6" size={20} />
-                <Text style={styles.moreActionText}>Add to Playlist</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.moreActionRow}
-                onPress={() => {
-                  setShowMoreModal(false);
-                  handleAddToQueue();
-                }}
-              >
-                <PlayCircle color="#8b5cf6" size={20} />
-                <Text style={styles.moreActionText}>Add to Queue</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.moreActionRow}
-                onPress={() => {
-                  setShowMoreModal(false);
-                  handleShare();
-                }}
-              >
-                <ShareIcon color="#8b5cf6" size={20} />
-                <Text style={styles.moreActionText}>Share</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* Library Modal */}
-      {showLibraryModal && (
-        <Modal transparent animationType="fade">
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.modalContent,
-                styles.glassCard,
-                styles.brutalBorder,
-                styles.brutalShadow,
-              ]}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add to Library</Text>
-                <TouchableOpacity
-                  style={styles.closeButton}
-                  onPress={() => setShowLibraryModal(false)}
-                >
-                  <X color="#ffffff" size={24} />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={styles.modalLikeRow} onPress={handleLike}>
-                <Heart
-                  color={track.isLiked ? '#ef4444' : '#94a3b8'}
-                  fill={track.isLiked ? '#ef4444' : 'transparent'}
-                  size={20}
-                />
-                <Text style={styles.modalLikeText}>
-                  {track.isLiked ? 'Unlike' : 'Like'} Song
-                </Text>
-              </TouchableOpacity>
-              <FlatList
-                data={playlists}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => {
-                  const selected = selectedPlaylists.includes(item.id);
-                  return (
-                    <TouchableOpacity
-                      style={styles.playlistRow}
-                      onPress={() => togglePlaylistSelection(item.id)}
-                    >
-                      <View
-                        style={[
-                          styles.checkbox,
-                          selected && styles.checkboxSelected,
-                        ]}
-                      >
-                        {selected && <Check color="#0f172a" size={16} />}
-                      </View>
-                      <Text style={styles.playlistName}>{item.title}</Text>
-                    </TouchableOpacity>
-                  );
-                }}
-                ListEmptyComponent={(
-                  <Text style={styles.emptyPlaylists}>No playlists yet</Text>
-                )}
-              />
-              <View style={styles.newPlaylistRow}>
-                <TextInput
-                  style={styles.newPlaylistInput}
-                  placeholder="New playlist"
-                  placeholderTextColor="#64748b"
-                  value={newPlaylistName}
-                  onChangeText={setNewPlaylistName}
-                />
-                <TouchableOpacity
-                  style={styles.createButton}
-                  onPress={handleCreatePlaylist}
-                >
-                  <Plus color="#8b5cf6" size={20} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </LinearGradient>
   );
 }
@@ -678,7 +394,7 @@ const styles = StyleSheet.create({
   genreText: { fontSize: 12, fontFamily: 'Inter-Medium', color: '#8b5cf6' },
   controlsSection: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 36,
@@ -729,99 +445,4 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    padding: 24,
-  },
-  moreModalContent: {
-    width: '80%',
-    maxWidth: 300,
-    padding: 24,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-  },
-  closeButton: { padding: 4 },
-  moreActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  moreActionText: {
-    marginLeft: 12,
-    color: '#ffffff',
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-  },
-  modalLikeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  modalLikeText: {
-    marginLeft: 8,
-    color: '#ffffff',
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-  },
-  playlistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#8b5cf6',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  checkboxSelected: { backgroundColor: '#8b5cf6' },
-  playlistName: {
-    color: '#ffffff',
-    fontFamily: 'Inter-Regular',
-    fontSize: 16,
-  },
-  emptyPlaylists: {
-    color: '#94a3b8',
-    textAlign: 'center',
-    marginVertical: 12,
-  },
-  newPlaylistRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  newPlaylistInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    color: '#ffffff',
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  createButton: { padding: 8 },
 });
