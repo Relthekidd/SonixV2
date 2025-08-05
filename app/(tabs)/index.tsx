@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -6,379 +6,384 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  FlatList,
-  ActivityIndicator,
-  RefreshControl,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '@/providers/AuthProvider';
-import { useMusic, Track } from '@/providers/MusicProvider';
-import { Play, Pause, RefreshCw } from 'lucide-react-native';
-import { router } from 'expo-router';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
+import { useMusic, Track } from '@/providers/MusicProvider';
+import { Play, TrendingUp, Clock, Star } from 'lucide-react-native';
+import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+
+const featuredPlaylists = [
+  {
+    id: '1',
+    title: "Today's Hits",
+    description: 'The hottest tracks right now',
+    cover: '',
+  },
+  { id: '2', title: 'Chill Vibes', description: 'Relax and unwind', cover: '' },
+  { id: '3', title: 'Workout Mix', description: 'High energy beats', cover: '' },
+];
+
+const mockTrending: Track[] = [
+  {
+    id: '1',
+    title: 'Midnight Drive',
+    artist: 'Neon Dreams',
+    album: '',
+    duration: 185,
+    coverUrl: '',
+    audioUrl: '',
+    isLiked: false,
+    genre: '',
+    releaseDate: '',
+  },
+  {
+    id: '2',
+    title: 'Electric Soul',
+    artist: 'Cyber Punk',
+    album: '',
+    duration: 203,
+    coverUrl: '',
+    audioUrl: '',
+    isLiked: false,
+    genre: '',
+    releaseDate: '',
+  },
+  {
+    id: '3',
+    title: 'Digital Love',
+    artist: 'Synth Wave',
+    album: '',
+    duration: 176,
+    coverUrl: '',
+    audioUrl: '',
+    isLiked: false,
+    genre: '',
+    releaseDate: '',
+  },
+];
 
 function HomeScreen() {
-  const { user, isLoading: authLoading } = useAuth();
-  const {
-    trendingTracks,
-    newReleases,
-    recentlyPlayed,
-    currentTrack,
-    isPlaying,
-    playTrack,
-    pauseTrack,
-    isLoading: musicLoading,
-    error,
-    refreshData,
-  } = useMusic();
+  const { playTrack, trendingTracks } = useMusic();
 
-  const [refreshing, setRefreshing] = useState(false);
+  const tracks = trendingTracks.length > 0 ? trendingTracks : mockTrending;
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace('/(auth)/login');
-    }
-  }, [authLoading, user]);
-
-  // Pull-to-refresh
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    try {
-      await refreshData();
-    } finally {
-      setRefreshing(false);
-    }
-  }, [refreshData]);
-
-  // Play/pause logic
-  const handleTrackPress = (track: Track) => {
-    if (currentTrack?.id === track.id) {
-      if (isPlaying) {
-        pauseTrack();
-      } else {
-        playTrack(track, trendingTracks);
-      }
-    } else {
-      playTrack(track, trendingTracks);
-    }
+  const handlePlay = (track: Track, list: Track[] = tracks) => {
+    playTrack(track, list);
   };
-
-  // Loading state
-  if (authLoading || musicLoading) {
-    return (
-      <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
-        style={styles.container}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading your music...</Text>
-        </View>
-      </LinearGradient>
-    );
-  }
-
-  const nothingToShow =
-    recentlyPlayed.length === 0 &&
-    trendingTracks.length === 0 &&
-    newReleases.length === 0;
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
       <ScrollView
-        style={styles.scrollView}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8b5cf6"
-            colors={['#8b5cf6']}
-          />
-        }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.greeting}>
-              Good {new Date().getHours() < 12 ? 'morning' : 'evening'}
-            </Text>
-            <Text style={styles.username}>
-              {user?.displayName || 'Music Lover'}
-            </Text>
-          </View>
-          {error && (
-            <TouchableOpacity style={styles.errorButton} onPress={refreshData}>
-              <RefreshCw color="#ef4444" size={20} />
-            </TouchableOpacity>
-          )}
+        {/* Hero Section */}
+        <Animated.View
+          entering={FadeInDown.delay(100)}
+          style={[
+            styles.hero,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
+          <Text style={styles.heroTitle}>Discover Your Sound</Text>
+          <Text style={styles.heroSubtitle}>
+            Stream millions of songs with stunning audio quality and cutting-edge
+            design.
+          </Text>
+          <TouchableOpacity
+            style={[styles.button, styles.brutalBorder, styles.brutalShadow]}
+          >
+            <Text style={styles.buttonText}>Start Listening</Text>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Quick Stats */}
+        <View style={styles.statsGrid}>
+          {[
+            { Icon: TrendingUp, label: 'Trending', value: '2.4K', color: '#22c55e' },
+            {
+              Icon: Clock,
+              label: 'Hours Played',
+              value: '152',
+              color: '#fb923c',
+            },
+            { Icon: Star, label: 'Top Rated', value: '4.9', color: '#3b82f6' },
+            { Icon: Play, label: 'Playlists', value: '89', color: '#8b5cf6' },
+          ].map((stat, index) => (
+            <Animated.View
+              entering={FadeIn.delay(index * 100)}
+              key={stat.label}
+              style={[
+                styles.statCard,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+            >
+              <stat.Icon color={stat.color} size={32} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </Animated.View>
+          ))}
         </View>
 
-        {/* Display error */}
-        {error && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
-            <TouchableOpacity style={styles.retryButton} onPress={refreshData}>
-              <Text style={styles.retryButtonText}>Retry</Text>
-            </TouchableOpacity>
+        {/* Featured Playlists */}
+        <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Star color="#a78bfa" size={20} />
+            <Text style={styles.sectionTitle}>Featured Playlists</Text>
           </View>
-        )}
-
-        {/* If no content and no error */}
-        {nothingToShow && !error && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>
-              No music found. Try refreshing.
-            </Text>
-            <TouchableOpacity
-              style={styles.refreshButton}
-              onPress={refreshData}
-            >
-              <RefreshCw color="#8b5cf6" size={20} />
-              <Text style={styles.refreshButtonText}>Refresh</Text>
-            </TouchableOpacity>
+          <View style={styles.playlistGrid}>
+            {featuredPlaylists.map((pl, index) => (
+              <Animated.View
+                entering={FadeInDown.delay(200 + index * 100)}
+                key={pl.id}
+                style={{ width: '32%' }}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.playlistCard,
+                    styles.glassCard,
+                    styles.brutalBorder,
+                    styles.brutalShadow,
+                  ]}
+                >
+                  <View style={[styles.playlistCover, styles.brutalBorder]} />
+                  <Text style={styles.playlistTitle}>{pl.title}</Text>
+                  <Text style={styles.playlistDesc}>{pl.description}</Text>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
           </View>
-        )}
+        </Animated.View>
 
-        {/* Recently Played */}
-        {recentlyPlayed.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Recently Played</Text>
-            <FlatList
-              data={recentlyPlayed.slice(0, 5)}
-              renderItem={({ item }) => (
-                <TrackItem
-                  item={item}
-                  onPress={handleTrackPress}
-                  isPlaying={isPlaying}
-                  currentTrack={currentTrack}
-                />
-              )}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          </View>
-        )}
-
-        {/* Trending Now */}
-        {trendingTracks.length > 0 && (
-          <View style={styles.section}>
+        {/* Trending Tracks */}
+        <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <TrendingUp color="#a78bfa" size={20} />
             <Text style={styles.sectionTitle}>Trending Now</Text>
-            <FlatList
-              data={trendingTracks}
-              renderItem={({ item }) => (
-                <TrackItem
-                  item={item}
-                  onPress={handleTrackPress}
-                  isPlaying={isPlaying}
-                  currentTrack={currentTrack}
-                />
-              )}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
           </View>
-        )}
+          <View
+            style={[
+              styles.trackList,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
+            {tracks.map((track, index) => (
+              <Animated.View
+                entering={FadeInDown.delay(400 + index * 50)}
+                key={track.id}
+              >
+                <TouchableOpacity
+                  style={[
+                    styles.trackRow,
+                    index !== tracks.length - 1 && styles.trackRowBorder,
+                  ]}
+                  onPress={() => handlePlay(track, tracks)}
+                >
+                  <View style={[styles.trackCover, styles.brutalBorder]}>
+                    {track.coverUrl ? (
+                      <Image
+                        source={{ uri: track.coverUrl }}
+                        style={styles.trackImage}
+                      />
+                    ) : (
+                      <Play color="#8b5cf6" size={20} />
+                    )}
+                  </View>
+                  <View style={styles.trackInfo}>
+                    <Text style={styles.trackTitle} numberOfLines={1}>
+                      {track.title}
+                    </Text>
+                    <Text style={styles.trackArtist} numberOfLines={1}>
+                      {track.artist}
+                    </Text>
+                  </View>
+                  <Text style={styles.trackDuration}>
+                    {Math.floor(track.duration / 60)}:
+                    {(track.duration % 60).toString().padStart(2, '0')}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.trackAction, styles.brutalBorder]}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      handlePlay(track, tracks);
+                    }}
+                  >
+                    <Play color="#8b5cf6" size={16} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
+              </Animated.View>
+            ))}
+          </View>
+        </Animated.View>
 
-        {/* New Releases */}
-        {newReleases.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>New Releases</Text>
-            <FlatList
-              data={newReleases}
-              horizontal
-              renderItem={({ item }) => <AlbumItem item={item} />}
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-            />
-          </View>
-        )}
+        <View style={{ height: 120 }} />
       </ScrollView>
-
-      <View style={styles.bottomPadding} />
     </LinearGradient>
-  );
-}
-
-interface TrackItemProps {
-  item: Track;
-  onPress: (track: Track) => void;
-  isPlaying: boolean;
-  currentTrack: Track | null;
-}
-
-function TrackItem({ item, onPress, isPlaying, currentTrack }: TrackItemProps) {
-  return (
-    <TouchableOpacity style={styles.trackItem} onPress={() => onPress(item)}>
-      <Image
-        source={{
-          uri:
-            item.coverUrl ||
-            'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg',
-        }}
-        style={styles.trackCover}
-      />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {item.artist}
-        </Text>
-      </View>
-      <TouchableOpacity style={styles.playButton}>
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-}
-
-interface AlbumItemProps {
-  item: Track;
-}
-
-function AlbumItem({ item }: AlbumItemProps) {
-  return (
-    <TouchableOpacity style={styles.albumItem}>
-      <Image
-        source={{
-          uri:
-            item.coverUrl ||
-            'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg',
-        }}
-        style={styles.albumCover}
-      />
-      <Text style={styles.albumTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      <Text style={styles.albumArtist} numberOfLines={1}>
-        {item.artist} • {item.year || new Date().getFullYear()}
-      </Text>
-    </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollView: { flex: 1 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: {
+  content: { padding: 24, paddingBottom: 140 },
+  hero: { padding: 24, marginBottom: 32 },
+  heroTitle: {
+    fontSize: 40,
+    fontFamily: 'Poppins-Bold',
+    color: '#fff',
+    marginBottom: 16,
+  },
+  heroSubtitle: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginTop: 16,
+    color: 'rgba(255,255,255,0.8)',
+    marginBottom: 24,
   },
-  header: {
+  button: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#1e1e1e',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
+  buttonText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
+  statsGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 24,
-    paddingTop: 60,
+    marginBottom: 32,
   },
-  greeting: {
-    fontSize: 18,
+  statCard: {
+    width: '48%',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 16,
+  },
+  statValue: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: '#fff',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
     fontFamily: 'Inter-Regular',
-    color: '#94a3b8',
-    marginBottom: 4,
+    color: 'rgba(255,255,255,0.7)',
+    marginTop: 4,
   },
-  username: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#fff' },
   section: { marginBottom: 32 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 22,
     fontFamily: 'Poppins-SemiBold',
     color: '#fff',
-    marginBottom: 16,
-  },
-  trackItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginHorizontal: 24,
-    marginBottom: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 12,
-  },
-  trackCover: { width: 50, height: 50, borderRadius: 8 },
-  trackInfo: { flex: 1, marginLeft: 12 },
-  trackTitle: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#fff' },
-  trackArtist: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#94a3b8' },
-  playButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(139,92,246,0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  albumItem: { width: 140, marginRight: 16 },
-  albumCover: { width: 140, height: 140, borderRadius: 12, marginBottom: 8 },
-  albumTitle: { fontSize: 14, fontFamily: 'Inter-SemiBold', color: '#fff' },
-  albumArtist: { fontSize: 12, fontFamily: 'Inter-Regular', color: '#94a3b8' },
-  emptyState: { alignItems: 'center', justifyContent: 'center', padding: 40 },
-  emptyText: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#64748b',
-    marginBottom: 16,
-  },
-  refreshButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(139,92,246,0.2)',
-    borderWidth: 1,
-    borderColor: 'rgba(139,92,246,0.3)',
-  },
-  refreshButtonText: {
-    color: '#8b5cf6',
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
     marginLeft: 8,
   },
-  errorButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(239,68,68,0.2)',
+  playlistGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  playlistCard: {
+    padding: 16,
+  },
+  playlistCover: {
+    width: '100%',
+    height: 80,
+    borderRadius: 12,
+    marginBottom: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  playlistTitle: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  playlistDesc: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  trackList: {
+    borderRadius: 16,
+  },
+  trackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  trackRowBorder: {
+    borderBottomWidth: 2,
+    borderColor: 'rgba(255,255,255,0.1)',
+  },
+  trackCover: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  errorContainer: {
-    backgroundColor: 'rgba(239,68,68,0.1)',
-    borderRadius: 12,
-    padding: 16,
-    margin: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(239,68,68,0.3)',
-  },
-  errorText: {
-    color: '#ef4444',
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryButton: {
-    alignSelf: 'center',
-    backgroundColor: 'rgba(239,68,68,0.2)',
-    padding: 8,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#ef4444',
-    fontSize: 14,
+  trackImage: { width: 48, height: 48, borderRadius: 12 },
+  trackInfo: { flex: 1 },
+  trackTitle: {
+    fontSize: 16,
     fontFamily: 'Inter-SemiBold',
+    color: '#fff',
   },
-  bottomPadding: { height: 120 },
+  trackArtist: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: 'rgba(255,255,255,0.7)',
+  },
+  trackDuration: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: 'rgba(255,255,255,0.7)',
+    marginRight: 8,
+  },
+  trackAction: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(139,92,246,0.1)',
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
 });
 
 export default withAuthGuard(HomeScreen);
+
