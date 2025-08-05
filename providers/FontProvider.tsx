@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 import { useFonts } from 'expo-font';
 import {
   Inter_400Regular,
@@ -51,4 +51,4 @@ export function FontProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-const useFontContext = () => useContext(FontContext);
+export const useFontContext = () => useContext(FontContext);
