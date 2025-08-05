@@ -56,25 +56,40 @@ interface SearchResults {
 
 function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], users: [] });
+  const [results, setResults] = useState<SearchResults>({
+    tracks: [],
+    artists: [],
+    users: [],
+  });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>('relevance');
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack, toggleLike, likedSongs } = useMusic();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    toggleLike,
+    likedSongs,
+  } = useMusic();
 
   useEffect(() => {
-    setTrendingSearches([
-      'Electronic Music',
-      'Chill Vibes',
-      'Hip Hop',
-      'Indie Rock',
-      'Jazz',
-      'Classical',
-      'Pop Hits',
-      'R&B',
-    ]);
+    const fetchTrending = async () => {
+      const { data, error } = await supabase
+        .from('tracks')
+        .select('title')
+        .eq('is_published', true)
+        .order('play_count', { ascending: false })
+        .limit(8);
+      if (error) {
+        console.error('fetch trending searches', error);
+        return;
+      }
+      setTrendingSearches((data || []).map((t) => t.title));
+    };
+    fetchTrending();
   }, []);
 
   useEffect(() => {
@@ -123,7 +138,11 @@ function SearchScreen() {
   const handleTrendingPress = (term: string) => setQuery(term);
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, results.tracks);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, results.tracks);
+      }
     } else {
       playTrack(track, results.tracks);
     }
@@ -185,7 +204,10 @@ function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      <LinearGradient colors={['#0f0f23', '#1a1a2e', '#16213e']} style={styles.gradient}>
+      <LinearGradient
+        colors={['#0f172a', '#1e293b', '#0f172a']}
+        style={styles.gradient}
+      >
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Search Header */}
         <Animated.View entering={FadeIn} style={styles.searchHeader}>
@@ -294,7 +316,12 @@ function SearchScreen() {
               {trendingSearches.map((term, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={[styles.trendingItem, styles.glassCard]}
+                  style={[
+                    styles.trendingItem,
+                    styles.glassCard,
+                    styles.brutalBorder,
+                    styles.brutalShadow,
+                  ]}
                   onPress={() => handleTrendingPress(term)}
                 >
                   <Text style={styles.trendingText}>{term}</Text>
@@ -497,9 +524,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   trendingText: {
     color: '#ffffff',
@@ -507,18 +531,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   glassCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    backdropFilter: 'blur(10px)',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
   },
   brutalBorder: {
     borderWidth: 2,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   brutalShadow: {
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
     elevation: 8,
   },
 });

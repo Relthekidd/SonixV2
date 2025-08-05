@@ -162,7 +162,7 @@ function ProfileScreen() {
   if (loading) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.centered}>
@@ -175,7 +175,7 @@ function ProfileScreen() {
   if (!profile) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.centered}>
@@ -187,14 +187,21 @@ function ProfileScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
+        <View
+          style={[
+            styles.header,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <Image
             source={{
               uri:
@@ -269,7 +276,14 @@ function ProfileScreen() {
         </View>
 
         {topSongs.length > 0 && (
-          <View style={styles.section}>
+          <View
+            style={[
+              styles.section,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
             <Text style={styles.sectionTitle}>Top Songs</Text>
             {topSongs.map((s) => (
               <Text key={s.id} style={{ color: '#fff' }}>
@@ -280,7 +294,14 @@ function ProfileScreen() {
         )}
 
         {publicPlaylists.length > 0 && (
-          <View style={styles.section}>
+          <View
+            style={[
+              styles.section,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
             <Text style={styles.sectionTitle}>Public Playlists</Text>
             {publicPlaylists.map((p) => (
               <TouchableOpacity
@@ -293,7 +314,14 @@ function ProfileScreen() {
           </View>
         )}
 
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.section,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <Text style={styles.sectionTitle}>Settings</Text>
           <View style={styles.settingRow}>
             <Text style={styles.settingLabel}>Private Account</Text>
@@ -317,7 +345,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { color: '#fff' },
-  content: { paddingBottom: 80 },
+  content: { padding: 24, paddingBottom: 80 },
   header: { alignItems: 'center', padding: 24, paddingTop: 60 },
   avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 12 },
   name: { fontSize: 24, fontFamily: 'Poppins-Bold', color: '#fff' },
@@ -344,7 +372,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   editText: { color: '#fff', fontFamily: 'Inter-Medium', marginLeft: 6 },
-  section: { marginBottom: 32, paddingHorizontal: 24 },
+  section: { marginBottom: 32, padding: 24 },
   sectionTitle: {
     fontSize: 20,
     fontFamily: 'Poppins-SemiBold',
@@ -364,6 +392,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     color: '#fff',
     width: '100%',
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
 

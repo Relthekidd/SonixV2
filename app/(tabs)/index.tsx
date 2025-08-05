@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,62 +13,46 @@ import { useMusic, Track } from '@/providers/MusicProvider';
 import { useUserStats } from '@/hooks/useUserStats';
 import { Play, TrendingUp, Clock, Star, User, Music } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
+import { supabase } from '@/services/supabase';
+import { apiService } from '@/services/api';
 
-const featuredPlaylists = [
-  {
-    id: '1',
-    title: "Today's Hits",
-    description: 'The hottest tracks right now',
-    cover: '',
-  },
-  { id: '2', title: 'Chill Vibes', description: 'Relax and unwind', cover: '' },
-  { id: '3', title: 'Workout Mix', description: 'High energy beats', cover: '' },
-];
-
-const mockTrending: Track[] = [
-  {
-    id: '1',
-    title: 'Midnight Drive',
-    artist: 'Neon Dreams',
-    album: '',
-    duration: 185,
-    coverUrl: '',
-    audioUrl: '',
-    isLiked: false,
-    genre: '',
-    releaseDate: '',
-  },
-  {
-    id: '2',
-    title: 'Electric Soul',
-    artist: 'Cyber Punk',
-    album: '',
-    duration: 203,
-    coverUrl: '',
-    audioUrl: '',
-    isLiked: false,
-    genre: '',
-    releaseDate: '',
-  },
-  {
-    id: '3',
-    title: 'Digital Love',
-    artist: 'Synth Wave',
-    album: '',
-    duration: 176,
-    coverUrl: '',
-    audioUrl: '',
-    isLiked: false,
-    genre: '',
-    releaseDate: '',
-  },
-];
+interface FeaturedPlaylist {
+  id: string;
+  title: string;
+  description: string;
+  cover: string;
+}
 
 function HomeScreen() {
   const { playTrack, trendingTracks } = useMusic();
   const { stats } = useUserStats();
+  const [featuredPlaylists, setFeaturedPlaylists] = useState<
+    FeaturedPlaylist[]
+  >([]);
 
-  const tracks = trendingTracks.length > 0 ? trendingTracks : mockTrending;
+  useEffect(() => {
+    const fetchFeatured = async () => {
+      const { data, error } = await supabase
+        .from('playlists')
+        .select('id,title,description,cover_url')
+        .eq('is_featured', true)
+        .eq('is_public', true);
+      if (error) {
+        console.error('fetch featured playlists', error);
+        return;
+      }
+      const mapped = (data || []).map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.description || '',
+        cover: apiService.getPublicUrl('images', p.cover_url || ''),
+      }));
+      setFeaturedPlaylists(mapped);
+    };
+    fetchFeatured();
+  }, []);
+
+  const tracks = trendingTracks;
 
   const handlePlay = (track: Track, list: Track[] = tracks) => {
     playTrack(track, list);
