@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         position: 'fixed',
-        bottom: 16,
+        bottom: 18,
         left: 16,
         width: 256,
         zIndex: 1000,
       },
       default: {
         position: 'absolute',
-        bottom: 16,
+        bottom: 18,
         left: 16,
         right: 16,
         zIndex: 1000,
