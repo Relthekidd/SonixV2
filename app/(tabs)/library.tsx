@@ -24,7 +24,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, router } from 'expo-router';
 import TrackMenu from '@/components/TrackMenu';
 
 function LibraryScreen() {
@@ -158,7 +158,7 @@ function LibraryScreen() {
         styles.brutalBorder,
         styles.brutalShadow,
       ]}
-      onPress={() => handleTrackPress(item)}
+      onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
       <View style={styles.trackInfo}>
@@ -170,7 +170,13 @@ function LibraryScreen() {
         </Text>
       </View>
       <TrackMenu track={item} />
-      <TouchableOpacity style={styles.playButton}>
+      <TouchableOpacity
+        style={styles.playButton}
+        onPress={(e) => {
+          e.stopPropagation();
+          handleTrackPress(item);
+        }}
+      >
         {currentTrack?.id === item.id && isPlaying ? (
           <Pause color="#8b5cf6" size={20} />
         ) : (
@@ -212,6 +218,7 @@ function LibraryScreen() {
         styles.brutalBorder,
         styles.brutalShadow,
       ]}
+      onPress={() => router.push(`/album/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
       <View style={styles.albumInfo}>
@@ -233,6 +240,7 @@ function LibraryScreen() {
         styles.brutalBorder,
         styles.brutalShadow,
       ]}
+      onPress={() => router.push(`/artist/${item.id}`)}
     >
       <Image source={{ uri: item.avatarUrl }} style={styles.artistAvatar} />
       <Text style={styles.artistName} numberOfLines={1}>

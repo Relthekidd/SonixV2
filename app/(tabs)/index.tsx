@@ -15,6 +15,7 @@ import { Play, TrendingUp, Clock, Star, User, Music } from 'lucide-react-native'
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
+import { router } from 'expo-router';
 
 interface FeaturedPlaylist {
   id: string;
@@ -178,7 +179,7 @@ function HomeScreen() {
                     styles.trackRow,
                     index !== tracks.length - 1 && styles.trackRowBorder,
                   ]}
-                  onPress={() => handlePlay(track, tracks)}
+                  onPress={() => router.push(`/track/${track.id}`)}
                 >
                   <View style={[styles.trackCover, styles.brutalBorder]}>
                     {track.coverUrl ? (

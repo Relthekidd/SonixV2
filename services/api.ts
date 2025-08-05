@@ -70,11 +70,19 @@ class ApiService {
     return data.publicUrl;
   }
 
-  async recordPlay(trackId: string, artistId: string) {
+  async recordPlay(
+    trackId: string,
+    artistId?: string,
+    userId?: string,
+    durationPlayed = 0,
+  ) {
     try {
-      await supabase
-        .from('song_plays')
-        .insert({ track_id: trackId, artist_id: artistId });
+      await supabase.from('song_plays').insert({
+        track_id: trackId,
+        artist_id: artistId,
+        user_id: userId,
+        duration_played: durationPlayed,
+      });
     } catch (err) {
       console.error('[ApiService] recordPlay error', err);
     }
