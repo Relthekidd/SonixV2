@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
   sortContainer: {
     flexDirection: 'row',
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 10,
     gap: 10,
   },
   sortButton: {
