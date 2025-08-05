@@ -4,6 +4,7 @@ import React, {
   useState,
   useEffect,
   useRef,
+  useCallback,
 } from 'react';
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Alert } from 'react-native';
@@ -96,15 +97,20 @@ interface MusicContextType {
   duration: number;
   queue: Track[];
   volume: number;
+  isShuffled: boolean;
+  repeatMode: 'off' | 'all' | 'one';
   recentlyPlayed: Track[];
   trendingTracks: Track[];
   newReleases: Track[];
   isLoading: boolean;
   error: string | null;
   playTrack: (track: Track, queue?: Track[]) => Promise<void>;
+  resumeTrack: () => Promise<void>;
   pauseTrack: () => Promise<void>;
   nextTrack: () => Promise<void>;
   previousTrack: () => Promise<void>;
+  toggleShuffle: () => void;
+  toggleRepeat: () => void;
   seekTo: (seconds: number) => Promise<void>;
   refreshData: () => Promise<void>;
   searchMusic: (
@@ -133,14 +139,18 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const soundRef = useRef<Audio.Sound | null>(null);
   const statusSubRef = useRef<(() => void) | null>(null);
+  const originalQueueRef = useRef<Track[]>([]);
 
   const [currentTrack, setCurrentTrack] = useState<Track | null>(null);
   const [queue, setQueue] = useState<Track[]>([]);
+  const [currentIndex, setCurrentIndex] = useState<number>(-1);
   const [recentlyPlayed, setRecentlyPlayed] = useState<Track[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
+  const [isShuffled, setIsShuffled] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [trendingTracks, setTrendingTracks] = useState<Track[]>([]);
   const [newReleases, setNewReleases] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -182,6 +192,15 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     likeCount: t.like_count || undefined,
   });
 
+  const shuffleArray = (arr: Track[]) => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+
   const createPlaylist = async (title: string, description = '') => {
     if (!user) return;
     const { data, error } = await supabase
@@ -203,20 +222,41 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const toggleLike = async (trackId: string) => {
     if (!user) return;
     const already = likedSongs.some((t) => t.id === trackId);
-    if (already) {
-      await supabase
-        .from('liked_songs')
-        .delete()
-        .match({ user_id: user.id, track_id: trackId });
-      setLikedSongs((prev) => prev.filter((t) => t.id !== trackId));
-    } else {
-      const track = queue.find((t) => t.id === trackId) || currentTrack;
-      if (track) {
+    try {
+      if (already) {
         await supabase
           .from('liked_songs')
-          .upsert({ user_id: user.id, track_id: trackId });
-        setLikedSongs((prev) => [...prev, track]);
+          .delete()
+          .match({ user_id: user.id, track_id: trackId });
+        setLikedSongs((prev) => prev.filter((t) => t.id !== trackId));
+      } else {
+        const track = queue.find((t) => t.id === trackId) || currentTrack;
+        if (track) {
+          await supabase
+            .from('liked_songs')
+            .upsert({ user_id: user.id, track_id: trackId });
+          setLikedSongs((prev) => [...prev, { ...track, isLiked: true }]);
+        }
       }
+
+      const updateTrack = (t: Track) =>
+        t.id === trackId ? { ...t, isLiked: !already } : t;
+
+      setQueue((prev) => prev.map(updateTrack));
+      setTrendingTracks((prev) => prev.map(updateTrack));
+      setNewReleases((prev) => prev.map(updateTrack));
+      setRecentlyPlayed((prev) => prev.map(updateTrack));
+      setPlaylists((prev) =>
+        prev.map((pl) => ({
+          ...pl,
+          tracks: pl.tracks.map(updateTrack),
+        })),
+      );
+      setCurrentTrack((ct) =>
+        ct && ct.id === trackId ? { ...ct, isLiked: !already } : ct,
+      );
+    } catch (err) {
+      console.error('toggleLike error', err);
     }
   };
 
@@ -232,39 +272,81 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
-  useEffect(() => {
-    return () => {
-      if (statusSubRef.current) statusSubRef.current();
-      if (soundRef.current) soundRef.current.unloadAsync();
-    };
-  }, []);
+  const handleTrackEnd = async () => {
+    if (!queue.length) return;
+    if (repeatMode === 'one') {
+      try {
+        await soundRef.current?.setPositionAsync(0);
+        await soundRef.current?.playAsync();
+      } catch (err) {
+        console.error('repeat one error', err);
+      }
+      return;
+    }
+    let nextIdx = currentIndex + 1;
+    if (nextIdx >= queue.length) {
+      if (repeatMode === 'all') {
+        nextIdx = 0;
+      } else {
+        setIsPlaying(false);
+        return;
+      }
+    }
+    const next = queue[nextIdx];
+    await playTrack(next);
+  };
 
-  useEffect(() => {
-    refreshData();
-  }, [user]);
+  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
+    if (!status.isLoaded) return;
+    setIsPlaying(status.isPlaying);
+    setCurrentTime(status.positionMillis / 1000);
+    setDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
+    if (status.didJustFinish && !status.isLooping) {
+      handleTrackEnd();
+    }
+  };
 
   const playTrack = async (track: Track, queueParam: Track[] = []) => {
     try {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
+        soundRef.current.setOnPlaybackStatusUpdate(null);
       }
+
+      if (queueParam.length) {
+        originalQueueRef.current = queueParam;
+        let workingQueue = queueParam;
+        if (isShuffled) {
+          const rest = queueParam.filter((t) => t.id !== track.id);
+          workingQueue = [track, ...shuffleArray(rest)];
+          setCurrentIndex(0);
+        } else {
+          const idx = queueParam.findIndex((t) => t.id === track.id);
+          setCurrentIndex(idx);
+        }
+        setQueue(workingQueue);
+      } else {
+        if (queue.length === 0) {
+          originalQueueRef.current = [track];
+          setQueue([track]);
+          setCurrentIndex(0);
+        } else {
+          const idx = queue.findIndex((t) => t.id === track.id);
+          if (idx !== -1) setCurrentIndex(idx);
+        }
+      }
+
       const { sound } = await Audio.Sound.createAsync(
         { uri: track.audioUrl },
         { shouldPlay: true, volume },
       );
       soundRef.current = sound;
-      sound.setOnPlaybackStatusUpdate((status: AVPlaybackStatus) => {
-        if (!status.isLoaded) return;
-        setIsPlaying(status.isPlaying);
-        setCurrentTime(status.positionMillis / 1000);
-        setDuration(status.durationMillis ? status.durationMillis / 1000 : 0);
-      });
+      sound.setOnPlaybackStatusUpdate(handlePlaybackStatusUpdate);
       statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
       setCurrentTrack(track);
       if (user && track.artistId) {
         apiService.recordPlay(track.id, track.artistId);
       }
-      setQueue(queueParam.length ? queueParam : [track]);
       setRecentlyPlayed((prev) => {
         const filtered = prev.filter((t) => t.id !== track.id);
         return [track, ...filtered].slice(0, 20);
@@ -276,39 +358,108 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const resumeTrack = async () => {
+    try {
+      await soundRef.current?.playAsync();
+    } catch (err) {
+      console.error('resumeTrack error', err);
+    }
+  };
+
   const pauseTrack = async () => {
     try {
       await soundRef.current?.pauseAsync();
-    } catch {}
+    } catch (err) {
+      console.error('pauseTrack error', err);
+    }
     setIsPlaying(false);
   };
 
   const nextTrack = async () => {
-    const idx = queue.findIndex((t) => t.id === currentTrack?.id);
-    const nxt = queue[idx + 1] || queue[0];
-    await playTrack(nxt, queue);
+    if (!queue.length) return;
+    let nextIdx = currentIndex + 1;
+    if (nextIdx >= queue.length) {
+      if (repeatMode === 'all') nextIdx = 0; else return;
+    }
+    await playTrack(queue[nextIdx]);
   };
 
   const previousTrack = async () => {
-    const idx = queue.findIndex((t) => t.id === currentTrack?.id);
-    const prev = queue[idx - 1] || queue[queue.length - 1];
-    await playTrack(prev, queue);
+    if (!queue.length) return;
+    let prevIdx = currentIndex - 1;
+    if (prevIdx < 0) {
+      if (repeatMode === 'all') prevIdx = queue.length - 1; else prevIdx = 0;
+    }
+    await playTrack(queue[prevIdx]);
   };
+
+  const toggleShuffle = useCallback(() => {
+    setIsShuffled((prev) => {
+      const newVal = !prev;
+      if (newVal) {
+        if (currentTrack) {
+          const shuffled = [
+            currentTrack,
+            ...shuffleArray(
+              originalQueueRef.current.filter((t) => t.id !== currentTrack.id),
+            ),
+          ];
+          setQueue(shuffled);
+          setCurrentIndex(0);
+        }
+      } else {
+        const idx = originalQueueRef.current.findIndex(
+          (t) => t.id === currentTrack?.id,
+        );
+        setQueue(originalQueueRef.current);
+        if (idx !== -1) setCurrentIndex(idx);
+      }
+      return newVal;
+    });
+  }, [currentTrack]);
+
+  const toggleRepeat = useCallback(() => {
+    setRepeatMode((prev) =>
+      prev === 'off' ? 'all' : prev === 'all' ? 'one' : 'off',
+    );
+  }, []);
 
   const setVolume = (value: number) => {
     const vol = Math.min(1, Math.max(0, value));
     setVolumeState(vol);
     try {
       soundRef.current?.setVolumeAsync(vol);
-    } catch {}
+    } catch (err) {
+      console.error('setVolume error', err);
+    }
   };
 
   const seekTo = async (seconds: number) => {
     try {
       await soundRef.current?.setPositionAsync(seconds * 1000);
       setCurrentTime(seconds);
-    } catch {}
+    } catch (err) {
+      console.error('seekTo error', err);
+    }
   };
+
+  useEffect(() => {
+    Audio.setAudioModeAsync({
+      staysActiveInBackground: true,
+      playsInSilentModeIOS: true,
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (statusSubRef.current) statusSubRef.current();
+      if (soundRef.current) soundRef.current.unloadAsync();
+    };
+  }, []);
+
+  useEffect(() => {
+    refreshData();
+  }, [user]);
 
   const refreshData = async () => {
     setIsLoading(true);
@@ -344,7 +495,9 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const [trendingRes, newRes, likedRes, playlistRes] =
         await Promise.all(promises);
 
-      setTrendingTracks((trendingRes.data || []).map((t: TrackRow) => mapTrack(t)));
+      setTrendingTracks(
+        (trendingRes.data || []).map((t: TrackRow) => mapTrack(t)),
+      );
       setNewReleases((newRes.data || []).map((t: TrackRow) => mapTrack(t)));
 
       if (user && likedRes && playlistRes) {
@@ -423,15 +576,20 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         duration,
         queue,
         volume,
+        isShuffled,
+        repeatMode,
         recentlyPlayed,
         trendingTracks,
         newReleases,
         isLoading,
         error,
         playTrack,
+        resumeTrack,
         pauseTrack,
         nextTrack,
         previousTrack,
+        toggleShuffle,
+        toggleRepeat,
         seekTo,
         refreshData,
         searchMusic,
