@@ -52,20 +52,23 @@ const styles = StyleSheet.create({
   container: {
     ...Platform.select({
       web: {
+        position: 'fixed',
+        bottom: 16,
+        left: 16,
         width: 256,
-        paddingTop: 24,
-        flexDirection: 'column',
+        zIndex: 1000,
       },
       default: {
         position: 'absolute',
         bottom: 16,
         left: 16,
         right: 16,
-        flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingVertical: 8,
+        zIndex: 1000,
       },
     }),
+    flexDirection: Platform.OS === 'web' ? 'column' : 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 8,
   },
 
   // Neobrutalist card styles
