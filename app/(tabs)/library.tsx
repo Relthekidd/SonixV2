@@ -121,7 +121,12 @@ function LibraryScreen() {
 
   const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
-      style={styles.trackItem}
+      style={[
+        styles.trackItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => handleTrackPress(item)}
       onLongPress={() => toggleLike(item.id)}
     >
@@ -145,7 +150,14 @@ function LibraryScreen() {
   );
 
   const renderPlaylistItem = ({ item }: { item: Playlist }) => (
-    <TouchableOpacity style={styles.playlistItem}>
+    <TouchableOpacity
+      style={[
+        styles.playlistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+    >
       <Image source={{ uri: item.coverUrl }} style={styles.playlistCover} />
       <View style={styles.playlistInfo}>
         <Text style={styles.playlistTitle} numberOfLines={1}>
@@ -162,7 +174,14 @@ function LibraryScreen() {
   );
 
   const renderAlbumItem = ({ item }: { item: SavedAlbum }) => (
-    <TouchableOpacity style={styles.albumItem}>
+    <TouchableOpacity
+      style={[
+        styles.albumItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+    >
       <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
       <View style={styles.albumInfo}>
         <Text style={styles.albumTitle} numberOfLines={1}>
@@ -183,7 +202,7 @@ function LibraryScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -386,10 +405,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginHorizontal: 24,
     marginBottom: 8,
-    borderRadius: 12,
   },
   trackCover: {
     width: 50,
@@ -424,10 +441,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginHorizontal: 24,
     marginBottom: 8,
-    borderRadius: 12,
   },
   playlistCover: {
     width: 60,
@@ -460,10 +475,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
     marginHorizontal: 24,
     marginBottom: 8,
-    borderRadius: 12,
   },
   albumCover: {
     width: 60,
@@ -570,6 +583,21 @@ const styles = StyleSheet.create({
   },
   bottomPadding: {
     height: 120,
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
 
