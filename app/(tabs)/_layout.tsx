@@ -41,11 +41,12 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    flexDirection: 'row',              // nav + content side by side
-    backgroundColor: '#0f172a',        // match your theme
+    position: 'relative',     // enable absolute children
+    overflow: 'visible',      // don't clip them
+    backgroundColor: '#0f172a',
   },
   content: {
     flex: 1,
-    paddingBottom: Platform.OS === 'web' ? 0 : 80, // give room for MiniPlayer on native
+    paddingBottom: Platform.OS === 'web' ? 0 : 96,
   },
 });
