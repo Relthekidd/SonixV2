@@ -53,16 +53,16 @@ function AlbumDetailScreen() {
           id: t.id,
           title: t.title,
           artist: albumData.artist || 'Unknown',
-          artistId: albumData.artist_id,
+          artistId: albumData.artist_id || undefined,
           album: albumData.title,
           duration: t.duration,
           coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
           isLiked: likedSongs.some((l) => l.id === t.id),
           trackNumber: t.track_number ?? idx + 1,
-          playCount: t.play_count,
-          likeCount: t.like_count,
-          lyrics: t.lyrics,
+          playCount: t.play_count ?? undefined,
+          likeCount: t.like_count ?? undefined,
+          lyrics: t.lyrics || undefined,
           genre: '',
           releaseDate: albumData.release_date || '',
           year: albumData.release_date
@@ -72,9 +72,7 @@ function AlbumDetailScreen() {
         }),
       );
 
-      transformed.sort(
-        (a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0),
-      );
+      transformed.sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
 
       setTracks(transformed);
     } catch (err) {

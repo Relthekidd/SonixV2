@@ -33,7 +33,14 @@ function LibraryScreen() {
   const [playlistName, setPlaylistName] = useState('');
   const [playlistDescription, setPlaylistDescription] = useState('');
 
-  const [savedAlbums, setSavedAlbums] = useState<Track[]>([]);
+  interface SavedAlbum {
+    id: string;
+    title: string;
+    artist: string;
+    year: string;
+    coverUrl: string;
+  }
+  const [savedAlbums, setSavedAlbums] = useState<SavedAlbum[]>([]);
 
   const {
     likedSongs,
@@ -77,7 +84,8 @@ function LibraryScreen() {
       };
     }
 
-    const mapped = (data || []).map((r: FavoriteAlbumRow) => ({
+    const rows = ((data ?? []) as unknown as FavoriteAlbumRow[]);
+    const mapped: SavedAlbum[] = rows.map((r) => ({
       id: r.album.id,
       title: r.album.title,
       artist: r.album.artist?.name || '',
@@ -153,7 +161,7 @@ function LibraryScreen() {
     </TouchableOpacity>
   );
 
-  const renderAlbumItem = ({ item }: { item: Track }) => (
+  const renderAlbumItem = ({ item }: { item: SavedAlbum }) => (
     <TouchableOpacity style={styles.albumItem}>
       <Image source={{ uri: item.coverUrl }} style={styles.albumCover} />
       <View style={styles.albumInfo}>

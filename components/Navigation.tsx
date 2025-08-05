@@ -1,10 +1,16 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { useRouter, useSegments } from 'expo-router';
-import { Home, Search, Library, User } from 'lucide-react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+} from 'react-native';
+import { useRouter, useSegments, Href } from 'expo-router';
+import { Home, Search, Library, User, type LucideIcon } from 'lucide-react-native';
 
 // Define navigation items
-const navItems = [
+const navItems: { icon: LucideIcon; label: string; id: string; path: Href }[] = [
   { icon: Home, label: 'Home', id: 'home', path: '/(tabs)/index' },
   { icon: Search, label: 'Search', id: 'search', path: '/(tabs)/search' },
   { icon: Library, label: 'Library', id: 'library', path: '/(tabs)/library' },
@@ -15,7 +21,8 @@ export function Navigation() {
   const router = useRouter();
   const segments = useSegments();
   // Determine active route by the last segment
-  const activeTab = segments.length > 0 ? segments[segments.length - 1] : 'index';
+  const activeTab =
+    segments.length > 0 ? segments[segments.length - 1] : 'index';
 
   return (
     <View style={styles.container}>
