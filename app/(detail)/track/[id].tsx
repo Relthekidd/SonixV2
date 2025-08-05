@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 36,
     gap: 16,
   },
   actionButton: {
@@ -636,6 +636,7 @@ const styles = StyleSheet.create({
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,
+    padding: 16,
   },
   brutalBorder: {
     borderWidth: 2,
