@@ -114,6 +114,20 @@ export default function ArtistDetailScreen() {
     }
   };
 
+  const handlePlayAll = () => {
+    if (!tracks.length) return;
+    const first = tracks[0];
+    if (currentTrack?.id === first.id) {
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(first, tracks);
+      }
+    } else {
+      playTrack(first, tracks);
+    }
+  };
+
   if (isLoading) {
     return (
       <LinearGradient
@@ -161,6 +175,28 @@ export default function ArtistDetailScreen() {
           {artist.monthly_listeners?.toLocaleString()} listeners •{' '}
           {artist.total_plays?.toLocaleString()} plays
         </Text>
+      </View>
+      <View style={styles.playAllContainer}>
+        <TouchableOpacity
+          style={[
+            styles.playAllButton,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+          onPress={handlePlayAll}
+        >
+          {currentTrack?.id === tracks[0]?.id && isPlaying ? (
+            <Pause size={24} color="#8b5cf6" />
+          ) : (
+            <Play size={24} color="#8b5cf6" />
+          )}
+          <Text style={styles.playAllText}>
+            {currentTrack?.id === tracks[0]?.id && isPlaying
+              ? 'Pause'
+              : 'Play All'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -227,6 +263,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#ccc',
   },
+  playAllContainer: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  playAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
+  },
+  playAllText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
   trackList: {
     paddingHorizontal: 16,
     paddingBottom: 80,
@@ -259,5 +312,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
     fontSize: 18,
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
