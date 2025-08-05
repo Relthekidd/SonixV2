@@ -315,6 +315,81 @@ class ApiService {
     };
   }
 
+  /** Fetch liked songs and playlists for a user */
+  async getUserLibrary(userId: string): Promise<{
+    likedSongIds: string[];
+    playlists: { id: string; title: string; trackIds: string[] }[];
+  }> {
+    const [likedRes, playlistRes] = await Promise.all([
+      supabase.from('liked_songs').select('track_id').eq('user_id', userId),
+      supabase
+        .from('playlists')
+        .select('id,title, playlist_tracks:playlist_tracks(track_id,position)')
+        .eq('user_id', userId),
+    ]);
+
+    const likedSongIds =
+      likedRes.data?.map((r: { track_id: string }) => r.track_id) || [];
+
+    const playlists =
+      playlistRes.data?.map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        trackIds:
+          (p.playlist_tracks || [])
+            .sort((a: any, b: any) => a.position - b.position)
+            .map((pt: any) => pt.track_id) || [],
+      })) || [];
+
+    return { likedSongIds, playlists };
+  }
+
+  /** Toggle like for a track */
+  async toggleLike(userId: string, trackId: string, liked: boolean) {
+    if (liked) {
+      await supabase
+        .from('liked_songs')
+        .delete()
+        .match({ user_id: userId, track_id: trackId });
+    } else {
+      await supabase
+        .from('liked_songs')
+        .upsert({ user_id: userId, track_id: trackId });
+    }
+  }
+
+  /** Create a new playlist */
+  async createPlaylist(userId: string, title: string) {
+    const { data, error } = await supabase
+      .from('playlists')
+      .insert({ user_id: userId, title })
+      .select()
+      .single();
+    if (error) throw error;
+    return { id: data.id, title: data.title };
+  }
+
+  /** Add track to playlist at the end */
+  async addTrackToPlaylist(
+    playlistId: string,
+    trackId: string,
+    position: number,
+  ) {
+    const { error } = await supabase
+      .from('playlist_tracks')
+      .insert({ playlist_id: playlistId, track_id: trackId, position });
+    if (error) throw error;
+  }
+
+  /** Remove track from playlist */
+  async removeTrackFromPlaylist(playlistId: string, trackId: string) {
+    const { error } = await supabase
+      .from('playlist_tracks')
+      .delete()
+      .match({ playlist_id: playlistId, track_id: trackId });
+    if (error) throw error;
+  }
+
   /** Publish a track */
   async publishTrack(id: string) {
     const { error } = await supabase

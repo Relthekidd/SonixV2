@@ -50,7 +50,7 @@ export default function SingleDetailScreen() {
     playTrack,
     pauseTrack,
     toggleLike,
-    likedSongs,
+    likedSongIds,
   } = useMusic();
 
   useEffect(() => {
@@ -93,7 +93,7 @@ export default function SingleDetailScreen() {
           data.cover_url || data.album?.cover_url || '',
         ),
         audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
-        isLiked: likedSongs.some((l) => l.id === data.id),
+        isLiked: likedSongIds.includes(data.id),
         genre: Array.isArray(data.genres) ? data.genres[0] : data.genre || '',
         releaseDate: data.release_date || data.created_at,
         playCount: data.play_count,
