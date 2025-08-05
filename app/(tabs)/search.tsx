@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  FlatList,
   ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -62,14 +61,7 @@ function SearchScreen() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>('relevance');
 
-  const {
-    currentTrack,
-    isPlaying,
-    playTrack,
-    pauseTrack,
-    toggleLike,
-    likedSongs,
-  } = useMusic();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, toggleLike, likedSongs } = useMusic();
 
   useEffect(() => {
     setTrendingSearches([
@@ -103,9 +95,7 @@ function SearchScreen() {
         .ilike('title', `%${searchQuery}%`)
         .eq('is_published', true)
         .order(sort === 'popular' ? 'play_count' : 'created_at', { ascending: false });
-
       if (error) throw error;
-
       const tracks = (data || []).map((t: TrackRow): Track => ({
         id: t.id,
         title: t.title,
@@ -120,7 +110,6 @@ function SearchScreen() {
         genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
         releaseDate: t.release_date || t.created_at || '',
       }));
-
       setResults({ tracks, artists: [], users: [] });
     } catch (err) {
       console.error('search error', err);
@@ -131,7 +120,6 @@ function SearchScreen() {
   };
 
   const handleTrendingPress = (term: string) => setQuery(term);
-
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
       isPlaying ? pauseTrack() : playTrack(track, results.tracks);
@@ -139,7 +127,6 @@ function SearchScreen() {
       playTrack(track, results.tracks);
     }
   };
-
   const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
   const renderTrackItem = ({ item }: { item: Track }) => (
@@ -153,224 +140,36 @@ function SearchScreen() {
         <Text style={styles.resultSubtitle} numberOfLines={1}>{item.artist} • Song</Text>
       </View>
       <TouchableOpacity style={styles.likeButton} onPress={() => handleToggleLike(item.id)}>
-        <Heart
-          color={item.isLiked ? '#ef4444' : '#94a3b8'}
-          fill={item.isLiked ? '#ef4444' : 'transparent'}
-          size={18}
-        />
+        <Heart color={item.isLiked ? '#ef4444' : '#94a3b8'} fill={item.isLiked ? '#ef4444' : 'transparent'} size={18} />
       </TouchableOpacity>
       <TouchableOpacity style={styles.playButton} onPress={() => handleTrackPress(item)}>
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
+        {currentTrack?.id === item.id && isPlaying ? <Pause color="#8b5cf6" size={20} /> : <Play color="#8b5cf6" size={20} />}
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const renderArtistItem = ({ item }: { item: ArtistResult }) => (
-    <TouchableOpacity
-      style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-      onPress={() => router.push(`/artist/${item.id}`)}
-    >
-      <Image
-        source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
-        style={styles.artistImage}
-      />
+    <TouchableOpacity style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} onPress={() => router.push(`/artist/${item.id}`)}>
+      <Image source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} style={styles.artistImage} />
       <Text style={styles.artistName} numberOfLines={1}>{item.name}</Text>
     </TouchableOpacity>
   );
 
   const renderUserItem = ({ item }: { item: UserResult }) => (
-    <TouchableOpacity
-      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-      onPress={() => router.push(`/user/${item.id}`)}
-    >
-      <Image
-        source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }}
-        style={[styles.resultImage, styles.userImage]}
-      />
+    <TouchableOpacity style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} onPress={() => router.push(`/user/${item.id}`)}>
+      <Image source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} style={[styles.resultImage, styles.userImage]} />
       <View style={styles.resultInfo}>
         <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
         <View style={styles.userMeta}>
           <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
-          <View style={styles.privacyIndicator}>
-            {item.is_private ? <Lock size={12} /> : <Globe size={12} />}
-          </View>
+          <View style={styles.privacyIndicator}>{item.is_private ? <Lock size={12} /> : <Globe size={12} />}</View>
         </View>
       </View>
     </TouchableOpacity>
   );
 
   return (
-    <LinearGradient
-      colors={[ '#0f172a', '#1e293b', '#0f172a' ]}
-      style={styles.container}
-    >
+    <LinearGradient colors={[ '#0f172a', '#1e293b', '#0f172a' ]} style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Animated.View entering={FadeInDown.delay(100)} style={styles.header}>
-          <Text style={styles.title}>Search</Text>
-          <View style={[styles.searchContainer, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>  
-            <Search size={20} color="#94a3b8" />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for songs, people, albums..."
-              placeholderTextColor="#64748b"
-              value={query}
-              onChangeText={setQuery}
-            />
-          </View>
-          <View style={styles.filterRow}>
-            {['relevance','recent','popular'].map((f) => (
-              <TouchableOpacity
-                key={f}
-                style={[styles.filterOption, sort===f && styles.filterOptionActive]}
-                onPress={() => setSort(f as any)}
-              >
-                <Text style={styles.filterText}>{f.charAt(0).toUpperCase()+f.slice(1)}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </Animated.View>
-
-        {isSearching && (
-          <Animated.View entering={FadeIn.delay(200)} style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8b5cf6" />
-            <Text style={styles.loadingText}>Searching...</Text>
-          </Animated.View>
-        )}
-
-        {errorMessage && !isSearching && (
-          <Animated.View entering={FadeIn.delay(200)} style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </Animated.View>
-        )}
-
-        {!isSearching && !errorMessage && (
-          <>
-            {query.trim() === '' ? (
-              <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
-                <Text style={styles.sectionTitle}>Trending Searches</Text>
-                <View style={styles.trendingContainer}>
-                  {trendingSearches.map((t, i) => (
-                    <Animated.View key={t} entering={FadeInDown.delay(300 + i*50)}>
-                      <TouchableOpacity
-                        style={[styles.trendingItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-                        onPress={() => handleTrendingPress(t)}
-                      >
-                        <Text style={styles.trendingText}>{t}</Text>
-                      </TouchableOpacity>
-                    </Animated.View>
-                  ))}
-                </View>
-              </Animated.View>
-            ) : (
-              <>  
-                {results.tracks.length > 0 && (
-                  <Animated.View entering={FadeInDown.delay(300)} style={styles.section}>
-                    <Text style={styles.sectionTitle}>Songs</Text>
-                    <FlatList
-                      data={results.tracks}
-                      renderItem={renderTrackItem}
-                      keyExtractor={(i) => i.id}
-                      scrollEnabled={false}
-                    />
-                  </Animated.View>
-                )}
-                {results.artists.length > 0 && (
-                  <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
-                    <Text style={styles.sectionTitle}>Artists</Text>
-                    <FlatList
-                      data={results.artists}
-                      renderItem={renderArtistItem}
-                      keyExtractor={(i) => i.id}
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                    />
-                  </Animated.View>
-                )}
-                {results.users.length > 0 && (
-                  <Animated.View entering={FadeInDown.delay(500)} style={styles.section}>
-                    <Text style={styles.sectionTitle}>Users</Text>
-                    <FlatList
-                      data={results.users}
-                      renderItem={renderUserItem}
-                      keyExtractor={(i) => i.id}
-                      scrollEnabled={false}
-                    />
-                  </Animated.View>
-                )}
-                {results.tracks.length===0 && results.artists.length===0 && results.users.length===0 && (
-                  <Animated.View entering={FadeIn.delay(600)} style={styles.emptyState}>
-                    <Text style={styles.emptyText}>No results found</Text>
-                  </Animated.View>
-                )}
-              </>
-            )}
-            <View style={{ height: 120 }} />
-          </>
-        )}
-      </ScrollView>
-    </LinearGradient>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  content: { padding: 24, paddingBottom: 110 },
-  header: { paddingHorizontal: 24, paddingTop: 60, paddingBottom: 16 },
-  title: { fontSize: 28, fontFamily: 'Poppins-Bold', color: '#fff', marginBottom: 12 },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 12,
-  },
-  searchInput: { flex: 1, marginLeft: 8, color: '#fff', fontFamily: 'Inter-Regular' },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loadingText: { color: '#94a3b8', marginTop: 12, fontFamily: 'Inter-Regular' },
-  errorContainer: { padding: 24, alignItems: 'center' },
-  errorText: { color: '#ef4444', fontFamily: 'Inter-Regular' },
-  section: { marginBottom: 32 },
-  sectionTitle: { fontSize: 20, color: '#fff', marginBottom: 16, fontFamily: 'Poppins-SemiBold' },
-  trendingContainer: { flexDirection: 'row', flexWrap: 'wrap' },
-  trendingItem: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12, margin: 4 },
-  trendingText: { color: '#fff', fontFamily: 'Inter-SemiBold' },
-  filterRow: { flexDirection: 'row', marginBottom: 16 },
-  filterOption: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.05)', marginRight: 8 },
-  filterOptionActive: { backgroundColor: 'rgba(139,92,246,0.3)' },
-  filterText: { color: '#fff', fontSize: 12, fontFamily: 'Inter-Regular' },
-  resultItem: { flexDirection: 'row', alignItems: 'center', padding: 12, marginHorizontal: 24, marginBottom: 8, borderRadius: 12 },
-  resultImage: { width: 50, height: 50, borderRadius: 8 },
-  userImage: { borderRadius: 25 },
-  resultInfo: { flex: 1, marginLeft: 12 },
-  resultTitle: { color: '#fff', fontFamily: 'Inter-SemiBold' },
-  resultSubtitle: { color: '#94a3b8', fontFamily: 'Inter-Regular' },
-  likeButton: { padding: 8 },
-  playButton: { padding: 8, marginLeft: 8 },
-  artistItem: { alignItems: 'center', marginRight: 16, padding: 12, borderRadius: 12 },
-  artistImage: { width: 80, height: 80, borderRadius: 40, marginBottom: 8 },
-  artistName: { color: '#fff', maxWidth: 80, textAlign: 'center', fontFamily: 'Inter-Regular' },
-  emptyState: { alignItems: 'center', marginTop: 40 },
-  emptyText: { color: '#94a3b8', fontFamily: 'Inter-Regular' },
-  bottomPadding: { height: 120 },
-  /* Neobrutalist styles */
-  glassCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-  },
-  brutalBorder: {
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  brutalShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
-  },
-});
-
-export default withAuthGuard(SearchScreen);
+          <Text style={styles.title}>Search</n
