@@ -12,15 +12,12 @@ import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 
 interface Props {
   track: Track;
+  playlistId?: string;
 }
 
-export default function TrackMenu({ track }: Props) {
-  const {
-    toggleLike,
-    addToQueue,
-    playlists,
-    addToPlaylist,
-  } = useMusic();
+export default function TrackMenu({ track, playlistId }: Props) {
+  const { toggleLike, addToQueue, playlists, addToPlaylist, removeFromPlaylist } =
+    useMusic();
   const [visible, setVisible] = useState(false);
   const [selectPlaylist, setSelectPlaylist] = useState(false);
 
@@ -37,8 +34,18 @@ export default function TrackMenu({ track }: Props) {
       </TouchableOpacity>
       <Modal transparent visible={visible} animationType="fade">
         <View style={styles.overlay}>
-          <View style={[styles.menu, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
-            <TouchableOpacity style={styles.close} onPress={() => setVisible(false)}>
+          <View
+            style={[
+              styles.menu,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.close}
+              onPress={() => setVisible(false)}
+            >
               <X color="#fff" size={20} />
             </TouchableOpacity>
             <TouchableOpacity
@@ -47,6 +54,17 @@ export default function TrackMenu({ track }: Props) {
             >
               <Text style={styles.menuText}>Add to Playlist</Text>
             </TouchableOpacity>
+            {playlistId && (
+              <TouchableOpacity
+                style={styles.menuItem}
+                onPress={() => {
+                  removeFromPlaylist(playlistId, track.id);
+                  setVisible(false);
+                }}
+              >
+                <Text style={styles.menuText}>Remove from Playlist</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.menuItem}
               onPress={() => {
@@ -72,7 +90,14 @@ export default function TrackMenu({ track }: Props) {
       </Modal>
       <Modal transparent visible={selectPlaylist} animationType="fade">
         <View style={styles.overlay}>
-          <View style={[styles.playlistSelect, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
+          <View
+            style={[
+              styles.playlistSelect,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
             <TouchableOpacity
               style={styles.close}
               onPress={() => setSelectPlaylist(false)}

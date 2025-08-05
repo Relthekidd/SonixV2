@@ -9,6 +9,9 @@ import {
   ActivityIndicator,
   Share,
   Alert,
+  Modal,
+  FlatList,
+  TextInput,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -26,6 +29,8 @@ import {
   Music,
   Clock,
   MoveVertical as MoreVertical,
+  X,
+  Check,
 } from 'lucide-react-native';
 
 export default function TrackDetailScreen() {
@@ -42,6 +47,9 @@ export default function TrackDetailScreen() {
   const [track, setTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
 
   const {
     currentTrack,
@@ -50,6 +58,10 @@ export default function TrackDetailScreen() {
     pauseTrack,
     toggleLike,
     likedSongs,
+    playlists,
+    addToPlaylist,
+    removeFromPlaylist,
+    createPlaylist,
   } = useMusic();
 
   useEffect(() => {
@@ -106,13 +118,16 @@ export default function TrackDetailScreen() {
           : data.genre || 'Unknown',
         releaseDate:
           data.release_date || singleExtra?.release_date || data.created_at,
-        year: (data.release_date || singleExtra?.release_date)
-          ? new Date(
-              data.release_date || singleExtra?.release_date || data.created_at,
-            )
-              .getFullYear()
-              .toString()
-          : undefined,
+        year:
+          data.release_date || singleExtra?.release_date
+            ? new Date(
+                data.release_date ||
+                  singleExtra?.release_date ||
+                  data.created_at,
+              )
+                .getFullYear()
+                .toString()
+            : undefined,
         playCount: data.play_count,
         likeCount: data.like_count,
         lyrics: data.lyrics || singleExtra?.lyrics || '',
@@ -162,6 +177,38 @@ export default function TrackDetailScreen() {
     }
   };
 
+  const openLibraryModal = () => {
+    if (track) {
+      const current = playlists
+        .filter((pl) => pl.tracks.some((t) => t.id === track.id))
+        .map((pl) => pl.id);
+      setSelectedPlaylists(current);
+    }
+    setShowLibraryModal(true);
+  };
+
+  const togglePlaylistSelection = (playlistId: string) => {
+    if (!track) return;
+    const exists = selectedPlaylists.includes(playlistId);
+    if (exists) {
+      removeFromPlaylist(playlistId, track.id);
+      setSelectedPlaylists((prev) => prev.filter((id) => id !== playlistId));
+    } else {
+      addToPlaylist(playlistId, track);
+      setSelectedPlaylists((prev) => [...prev, playlistId]);
+    }
+  };
+
+  const handleCreatePlaylist = async () => {
+    if (!newPlaylistName.trim() || !track) return;
+    const pl = await createPlaylist(newPlaylistName);
+    if (pl) {
+      addToPlaylist(pl.id, track);
+      setSelectedPlaylists((prev) => [...prev, pl.id]);
+    }
+    setNewPlaylistName('');
+  };
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -178,7 +225,7 @@ export default function TrackDetailScreen() {
   if (isLoading) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.loadingContainer}>
@@ -192,7 +239,7 @@ export default function TrackDetailScreen() {
   if (error || !track) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.errorContainer}>
@@ -210,7 +257,7 @@ export default function TrackDetailScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -226,7 +273,14 @@ export default function TrackDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.trackHeader}>
+        <View
+          style={[
+            styles.trackHeader,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <Image source={{ uri: track.coverUrl }} style={styles.trackCover} />
           <Text style={styles.trackTitle}>{track.title}</Text>
           <Text style={styles.trackArtist}>{track.artist}</Text>
@@ -266,7 +320,14 @@ export default function TrackDetailScreen() {
           )}
         </View>
 
-        <View style={styles.controlsSection}>
+        <View
+          style={[
+            styles.controlsSection,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
             <Heart
               color={track.isLiked ? '#ef4444' : '#ffffff'}
@@ -313,6 +374,93 @@ export default function TrackDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+      <TouchableOpacity
+        style={[
+          styles.fab,
+          styles.glassCard,
+          styles.brutalBorder,
+          styles.brutalShadow,
+        ]}
+        onPress={openLibraryModal}
+      >
+        <Plus color="#8b5cf6" size={20} />
+        <Text style={styles.fabText}>Add to Library</Text>
+      </TouchableOpacity>
+      {showLibraryModal && (
+        <Modal transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContent,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add to Library</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowLibraryModal(false)}
+                >
+                  <X color="#ffffff" size={24} />
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.modalLikeRow} onPress={handleLike}>
+                <Heart
+                  color={track.isLiked ? '#ef4444' : '#94a3b8'}
+                  fill={track.isLiked ? '#ef4444' : 'transparent'}
+                  size={20}
+                />
+                <Text style={styles.modalLikeText}>
+                  {track.isLiked ? 'Unlike' : 'Like'} Song
+                </Text>
+              </TouchableOpacity>
+              <FlatList
+                data={playlists}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const selected = selectedPlaylists.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      style={styles.playlistRow}
+                      onPress={() => togglePlaylistSelection(item.id)}
+                    >
+                      <View
+                        style={[
+                          styles.checkbox,
+                          selected && styles.checkboxSelected,
+                        ]}
+                      >
+                        {selected && <Check color="#0f172a" size={16} />}
+                      </View>
+                      <Text style={styles.playlistName}>{item.title}</Text>
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={(
+                  <Text style={styles.emptyPlaylists}>No playlists yet</Text>
+                )}
+              />
+              <View style={styles.newPlaylistRow}>
+                <TextInput
+                  style={styles.newPlaylistInput}
+                  placeholder="New playlist"
+                  placeholderTextColor="#64748b"
+                  value={newPlaylistName}
+                  onChangeText={setNewPlaylistName}
+                />
+                <TouchableOpacity
+                  style={styles.createButton}
+                  onPress={handleCreatePlaylist}
+                >
+                  <Plus color="#8b5cf6" size={20} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </LinearGradient>
   );
 }
@@ -485,4 +633,111 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   bottomPadding: { height: 120 },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+  fab: {
+    position: 'absolute',
+    right: 24,
+    bottom: 100,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  fabText: {
+    color: '#8b5cf6',
+    marginLeft: 8,
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
+  },
+  closeButton: { padding: 4 },
+  modalLikeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalLikeText: {
+    marginLeft: 8,
+    color: '#ffffff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+  },
+  playlistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#8b5cf6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  checkboxSelected: { backgroundColor: '#8b5cf6' },
+  playlistName: {
+    color: '#ffffff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+  },
+  emptyPlaylists: {
+    color: '#94a3b8',
+    textAlign: 'center',
+    marginVertical: 12,
+  },
+  newPlaylistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  newPlaylistInput: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: '#ffffff',
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
+  },
+  createButton: { padding: 8 },
 });

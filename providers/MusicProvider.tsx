@@ -127,9 +127,13 @@ interface MusicContextType {
   likedSongs: Track[];
   playlists: Playlist[];
   albums: Track[];
-  createPlaylist: (title: string, description?: string) => Promise<void>;
+  createPlaylist: (
+    title: string,
+    description?: string,
+  ) => Promise<Playlist | null>;
   toggleLike: (trackId: string) => void;
   addToPlaylist: (playlistId: string, track: Track) => void;
+  removeFromPlaylist: (playlistId: string, trackId: string) => void;
   setVolume: (value: number) => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
@@ -219,8 +223,11 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     return copy;
   };
 
-  const createPlaylist = async (title: string, description = '') => {
-    if (!user) return;
+  const createPlaylist = async (
+    title: string,
+    description = '',
+  ): Promise<Playlist | null> => {
+    if (!user) return null;
     const { data, error } = await supabase
       .from('playlists')
       .insert({ title, description, user_id: user.id })
@@ -234,7 +241,9 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         coverUrl: data.cover_url || '',
       };
       setPlaylists((prev) => [newPL, ...prev]);
+      return newPL;
     }
+    return null;
   };
 
   const toggleLike = async (trackId: string) => {
@@ -286,6 +295,21 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     setPlaylists((prev) =>
       prev.map((pl) =>
         pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl,
+      ),
+    );
+  };
+
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => {
+    if (!user) return;
+    await supabase
+      .from('playlist_tracks')
+      .delete()
+      .match({ playlist_id: playlistId, track_id: trackId });
+    setPlaylists((prev) =>
+      prev.map((pl) =>
+        pl.id === playlistId
+          ? { ...pl, tracks: pl.tracks.filter((t) => t.id !== trackId) }
+          : pl,
       ),
     );
   };
@@ -676,6 +700,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         createPlaylist,
         toggleLike,
         addToPlaylist,
+        removeFromPlaylist,
         setVolume,
         addToQueue,
         removeFromQueue,
