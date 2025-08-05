@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useLocalSearchParams } from 'expo-router';
+import TrackMenu from '@/components/TrackMenu';
 
 function LibraryScreen() {
   const { playlist } = useLocalSearchParams<{ playlist?: string }>();
@@ -41,6 +42,12 @@ function LibraryScreen() {
     coverUrl: string;
   }
   const [savedAlbums, setSavedAlbums] = useState<SavedAlbum[]>([]);
+  interface SavedArtist {
+    id: string;
+    name: string;
+    avatarUrl: string;
+  }
+  const [savedArtists, setSavedArtists] = useState<SavedArtist[]>([]);
 
   const {
     likedSongs,
@@ -50,7 +57,6 @@ function LibraryScreen() {
     playTrack,
     pauseTrack,
     createPlaylist,
-    toggleLike,
     refreshData,
   } = useMusic();
 
@@ -61,6 +67,7 @@ function LibraryScreen() {
   useEffect(() => {
     refreshData();
     fetchSavedAlbums();
+    fetchSavedArtists();
   }, []);
 
   async function fetchSavedAlbums() {
@@ -84,7 +91,7 @@ function LibraryScreen() {
       };
     }
 
-    const rows = ((data ?? []) as unknown as FavoriteAlbumRow[]);
+    const rows = (data ?? []) as unknown as FavoriteAlbumRow[];
     const mapped: SavedAlbum[] = rows.map((r) => ({
       id: r.album.id,
       title: r.album.title,
@@ -93,6 +100,30 @@ function LibraryScreen() {
       coverUrl: apiService.getPublicUrl('images', r.album.cover_url || ''),
     }));
     setSavedAlbums(mapped);
+  }
+
+  async function fetchSavedArtists() {
+    const { data: authData } = await supabase.auth.getUser();
+    const uid = authData.user?.id;
+    if (!uid) return;
+
+    const { data } = await supabase
+      .from('favorites')
+      .select('artist:artist_id(*)')
+      .eq('user_id', uid)
+      .not('artist_id', 'is', null);
+
+    interface FavoriteArtistRow {
+      artist: { id: string; name: string; avatar_url?: string | null };
+    }
+
+    const rows = (data ?? []) as unknown as FavoriteArtistRow[];
+    const mapped: SavedArtist[] = rows.map((r) => ({
+      id: r.artist.id,
+      name: r.artist.name,
+      avatarUrl: apiService.getPublicUrl('images', r.artist.avatar_url || ''),
+    }));
+    setSavedArtists(mapped);
   }
 
   const handleCreatePlaylist = () => {
@@ -128,7 +159,6 @@ function LibraryScreen() {
         styles.brutalShadow,
       ]}
       onPress={() => handleTrackPress(item)}
-      onLongPress={() => toggleLike(item.id)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
       <View style={styles.trackInfo}>
@@ -139,6 +169,7 @@ function LibraryScreen() {
           {item.artist}
         </Text>
       </View>
+      <TrackMenu track={item} />
       <TouchableOpacity style={styles.playButton}>
         {currentTrack?.id === item.id && isPlaying ? (
           <Pause color="#8b5cf6" size={20} />
@@ -194,10 +225,27 @@ function LibraryScreen() {
     </TouchableOpacity>
   );
 
+  const renderArtistItem = ({ item }: { item: SavedArtist }) => (
+    <TouchableOpacity
+      style={[
+        styles.artistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+    >
+      <Image source={{ uri: item.avatarUrl }} style={styles.artistAvatar} />
+      <Text style={styles.artistName} numberOfLines={1}>
+        {item.name}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const tabs = [
     { id: 'playlists', title: 'Playlists', icon: Music },
     { id: 'liked', title: 'Liked Songs', icon: Heart },
     { id: 'albums', title: 'Albums', icon: Music },
+    { id: 'artists', title: 'Artists', icon: Music },
   ];
 
   return (
@@ -215,11 +263,21 @@ function LibraryScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabBar}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabBar}
+      >
         {tabs.map((tab) => (
           <TouchableOpacity
             key={tab.id}
-            style={[styles.tab, activeTab === tab.id && styles.activeTab]}
+            style={[
+              styles.tabCard,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+              activeTab === tab.id && styles.activeTabCard,
+            ]}
             onPress={() => setActiveTab(tab.id)}
           >
             <tab.icon
@@ -236,7 +294,7 @@ function LibraryScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {activeTab === 'playlists' && (
@@ -287,6 +345,24 @@ function LibraryScreen() {
                 <Text style={styles.emptyText}>No albums saved</Text>
                 <Text style={styles.emptySubtext}>
                   Save albums to access them quickly
+                </Text>
+              </View>
+            }
+          />
+        )}
+
+        {activeTab === 'artists' && (
+          <FlatList
+            data={savedArtists}
+            renderItem={renderArtistItem}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Music color="#64748b" size={48} />
+                <Text style={styles.emptyText}>No artists saved</Text>
+                <Text style={styles.emptySubtext}>
+                  Follow artists to see them here
                 </Text>
               </View>
             }
@@ -376,17 +452,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 20,
   },
-  tab: {
+  tabCard: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     marginRight: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
   },
-  activeTab: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+  activeTabCard: {
+    borderColor: '#8b5cf6',
+    borderWidth: 2,
   },
   tabText: {
     fontSize: 14,
@@ -497,6 +573,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-Regular',
     color: '#94a3b8',
+  },
+  artistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    marginHorizontal: 24,
+    marginBottom: 8,
+  },
+  artistAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  artistName: {
+    marginLeft: 12,
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
   },
   emptyState: {
     alignItems: 'center',

@@ -1,15 +1,10 @@
-import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Image,
-} from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import { Play, Pause, SkipForward, Heart } from 'lucide-react-native';
+import { Play, Pause, SkipForward, Heart, ListMusic } from 'lucide-react-native';
+import QueueModal from './QueueModal';
 
 export function MiniPlayer() {
   const {
@@ -20,6 +15,7 @@ export function MiniPlayer() {
     nextTrack,
     toggleLike,
   } = useMusic();
+  const [showQueue, setShowQueue] = useState(false);
 
   if (!currentTrack) return null;
 
@@ -88,9 +84,16 @@ export function MiniPlayer() {
             <TouchableOpacity style={styles.controlButton} onPress={nextTrack}>
               <SkipForward color="#ffffff" size={20} />
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => setShowQueue(true)}
+            >
+              <ListMusic color="#ffffff" size={20} />
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </LinearGradient>
+      <QueueModal visible={showQueue} onClose={() => setShowQueue(false)} />
     </View>
   );
 }

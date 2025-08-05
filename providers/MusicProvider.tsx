@@ -131,6 +131,10 @@ interface MusicContextType {
   toggleLike: (trackId: string) => void;
   addToPlaylist: (playlistId: string, track: Track) => void;
   setVolume: (value: number) => void;
+  addToQueue: (track: Track) => void;
+  removeFromQueue: (trackId: string) => void;
+  clearQueue: () => void;
+  reorderQueue: (from: number, to: number) => void;
 }
 
 const MusicContext = createContext<MusicContextType | null>(null);
@@ -270,6 +274,25 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl,
       ),
     );
+  };
+
+  const addToQueue = (track: Track) => {
+    setQueue((prev) => [...prev, track]);
+  };
+
+  const removeFromQueue = (trackId: string) => {
+    setQueue((prev) => prev.filter((t) => t.id !== trackId));
+  };
+
+  const clearQueue = () => setQueue([]);
+
+  const reorderQueue = (from: number, to: number) => {
+    setQueue((prev) => {
+      const updated = [...prev];
+      const [moved] = updated.splice(from, 1);
+      updated.splice(to, 0, moved);
+      return updated;
+    });
   };
 
   const handleTrackEnd = async () => {
@@ -499,19 +522,19 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       ]);
 
       const trendingData =
-        ((trendingRes as { data?: TrackRow[] | null })?.data ?? []);
+        (trendingRes as { data?: TrackRow[] | null })?.data ?? [];
       setTrendingTracks(trendingData.map((t) => mapTrack(t)));
 
-      const newData = ((newRes as { data?: TrackRow[] | null })?.data ?? []);
+      const newData = (newRes as { data?: TrackRow[] | null })?.data ?? [];
       setNewReleases(newData.map((t) => mapTrack(t)));
 
       if (user && likedRes && playlistRes) {
         const likedData =
-          ((likedRes as { data?: LikedSongRow[] | null })?.data ?? []);
+          (likedRes as { data?: LikedSongRow[] | null })?.data ?? [];
         const liked = likedData.map((r) => mapTrack(r.track, true));
         setLikedSongs(liked);
         const plsData =
-          ((playlistRes as { data?: PlaylistRow[] | null })?.data ?? []);
+          (playlistRes as { data?: PlaylistRow[] | null })?.data ?? [];
         const pls = plsData.map((p) => ({
           id: p.id,
           title: p.title,
@@ -607,6 +630,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         toggleLike,
         addToPlaylist,
         setVolume,
+        addToQueue,
+        removeFromQueue,
+        clearQueue,
+        reorderQueue,
       }}
     >
       {children}

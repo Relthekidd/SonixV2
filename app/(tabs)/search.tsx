@@ -18,6 +18,7 @@ import { supabase } from '@/services/supabase';
 import { Search, Play, Pause, Lock, Globe, Heart } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { apiService } from '@/services/api';
+import TrackMenu from '@/components/TrackMenu';
 
 interface ArtistResult {
   id: string;
@@ -64,7 +65,9 @@ function SearchScreen() {
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>('relevance');
+  const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>(
+    'relevance',
+  );
 
   const {
     currentTrack,
@@ -110,22 +113,31 @@ function SearchScreen() {
         .select(`*, artist:artist_id(name), album:album_id(*)`)
         .ilike('title', `%${searchQuery}%`)
         .eq('is_published', true)
-        .order(sort === 'popular' ? 'play_count' : 'created_at', { ascending: false });
+        .order(sort === 'popular' ? 'play_count' : 'created_at', {
+          ascending: false,
+        });
       if (error) throw error;
-      const tracks = (data || []).map((t: TrackRow): Track => ({
-        id: t.id,
-        title: t.title,
-        artist: t.artist?.name || 'Unknown Artist',
-        artistId: t.artist_id || undefined,
-        album: t.album?.title || 'Single',
-        albumId: t.album_id || undefined,
-        duration: t.duration || 0,
-        coverUrl: apiService.getPublicUrl('images', t.cover_url || t.album?.cover_url || ''),
-        audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-        isLiked: likedSongs.some((l) => l.id === t.id),
-        genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
-        releaseDate: t.release_date || t.created_at || '',
-      }));
+      const tracks = (data || []).map(
+        (t: TrackRow): Track => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist?.name || 'Unknown Artist',
+          artistId: t.artist_id || undefined,
+          album: t.album?.title || 'Single',
+          albumId: t.album_id || undefined,
+          duration: t.duration || 0,
+          coverUrl: apiService.getPublicUrl(
+            'images',
+            t.cover_url || t.album?.cover_url || '',
+          ),
+          audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+          isLiked: likedSongs.some((l) => l.id === t.id),
+          genre: Array.isArray(t.genres)
+            ? t.genres[0]
+            : (t.genres as string) || '',
+          releaseDate: t.release_date || t.created_at || '',
+        }),
+      );
       setResults({ tracks, artists: [], users: [] });
     } catch (err) {
       console.error('search error', err);
@@ -151,51 +163,103 @@ function SearchScreen() {
 
   const renderTrackItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
-      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+      style={[
+        styles.resultItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/track/${item.id}`)}
     >
       <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
       <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>{item.artist} • Song</Text>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.resultSubtitle} numberOfLines={1}>
+          {item.artist} • Song
+        </Text>
       </View>
-      <TouchableOpacity style={styles.likeButton} onPress={() => handleToggleLike(item.id)}>
-        <Heart color={item.isLiked ? '#ef4444' : '#94a3b8'} fill={item.isLiked ? '#ef4444' : 'transparent'} size={18} />
+      <TouchableOpacity
+        style={styles.likeButton}
+        onPress={() => handleToggleLike(item.id)}
+      >
+        <Heart
+          color={item.isLiked ? '#ef4444' : '#94a3b8'}
+          fill={item.isLiked ? '#ef4444' : 'transparent'}
+          size={18}
+        />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.playButton} onPress={() => handleTrackPress(item)}>
-        {currentTrack?.id === item.id && isPlaying ? <Pause color="#8b5cf6" size={20} /> : <Play color="#8b5cf6" size={20} />}
+      <TrackMenu track={item} />
+      <TouchableOpacity
+        style={styles.playButton}
+        onPress={() => handleTrackPress(item)}
+      >
+        {currentTrack?.id === item.id && isPlaying ? (
+          <Pause color="#8b5cf6" size={20} />
+        ) : (
+          <Play color="#8b5cf6" size={20} />
+        )}
       </TouchableOpacity>
     </TouchableOpacity>
   );
 
   const renderArtistItem = ({ item }: { item: ArtistResult }) => (
-    <TouchableOpacity 
-      style={[styles.artistItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} 
+    <TouchableOpacity
+      style={[
+        styles.artistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/artist/${item.id}`)}
     >
-      <Image 
-        source={{ uri: item.avatar_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} 
-        style={styles.artistImage} 
+      <Image
+        source={{
+          uri:
+            item.avatar_url ||
+            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg',
+        }}
+        style={styles.artistImage}
       />
-      <Text style={styles.artistName} numberOfLines={1}>{item.name}</Text>
+      <Text style={styles.artistName} numberOfLines={1}>
+        {item.name}
+      </Text>
     </TouchableOpacity>
   );
 
   const renderUserItem = ({ item }: { item: UserResult }) => (
-    <TouchableOpacity 
-      style={[styles.resultItem, styles.glassCard, styles.brutalBorder, styles.brutalShadow]} 
+    <TouchableOpacity
+      style={[
+        styles.resultItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
       onPress={() => router.push(`/user/${item.id}`)}
     >
-      <Image 
-        source={{ uri: item.profile_picture_url || 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg' }} 
-        style={[styles.resultImage, styles.userImage]} 
+      <Image
+        source={{
+          uri:
+            item.profile_picture_url ||
+            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg',
+        }}
+        style={[styles.resultImage, styles.userImage]}
       />
       <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>{item.display_name}</Text>
+        <Text style={styles.resultTitle} numberOfLines={1}>
+          {item.display_name}
+        </Text>
         <View style={styles.userMeta}>
-          <Text style={styles.resultSubtitle}>{item.follower_count} followers</Text>
+          <Text style={styles.resultSubtitle}>
+            {item.follower_count} followers
+          </Text>
           <View style={styles.privacyIndicator}>
-            {item.is_private ? <Lock size={12} color="#94a3b8" /> : <Globe size={12} color="#94a3b8" />}
+            {item.is_private ? (
+              <Lock size={12} color="#94a3b8" />
+            ) : (
+              <Globe size={12} color="#94a3b8" />
+            )}
           </View>
         </View>
       </View>
@@ -208,129 +272,156 @@ function SearchScreen() {
         colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.gradient}
       >
-        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Search Header */}
-        <Animated.View entering={FadeIn} style={styles.searchHeader}>
-          <Text style={styles.title}>Search</Text>
-          <View style={styles.searchContainer}>
-            <Search color="#8b5cf6" size={20} style={styles.searchIcon} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search for songs, artists, or users..."
-              placeholderTextColor="#64748b"
-              value={query}
-              onChangeText={setQuery}
-            />
-          </View>
-        </Animated.View>
-
-        {/* Sort Options */}
-        {query.length > 0 && (
-          <Animated.View entering={FadeInDown.delay(100)} style={styles.sortContainer}>
-            {(['relevance', 'recent', 'popular'] as const).map((option) => (
-              <TouchableOpacity
-                key={option}
-                style={[styles.sortButton, sort === option && styles.sortButtonActive]}
-                onPress={() => setSort(option)}
-              >
-                <Text style={[styles.sortButtonText, sort === option && styles.sortButtonTextActive]}>
-                  {option.charAt(0).toUpperCase() + option.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </Animated.View>
-        )}
-
-        {/* Loading */}
-        {isSearching && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8b5cf6" />
-          </View>
-        )}
-
-        {/* Error Message */}
-        {errorMessage && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{errorMessage}</Text>
-          </View>
-        )}
-
-        {/* Search Results */}
-        {query.length > 0 && !isSearching && (
-          <Animated.View entering={FadeInDown.delay(200)} style={styles.resultsContainer}>
-            {/* Tracks Section */}
-            {results.tracks.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Songs</Text>
-                <FlatList
-                  data={results.tracks}
-                  renderItem={renderTrackItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
-
-            {/* Artists Section */}
-            {results.artists.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Artists</Text>
-                <FlatList
-                  data={results.artists}
-                  renderItem={renderArtistItem}
-                  keyExtractor={(item) => item.id}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                />
-              </View>
-            )}
-
-            {/* Users Section */}
-            {results.users.length > 0 && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Users</Text>
-                <FlatList
-                  data={results.users}
-                  renderItem={renderUserItem}
-                  keyExtractor={(item) => item.id}
-                  scrollEnabled={false}
-                />
-              </View>
-            )}
-
-            {/* No Results */}
-            {results.tracks.length === 0 && results.artists.length === 0 && results.users.length === 0 && (
-              <View style={styles.noResultsContainer}>
-                <Text style={styles.noResultsText}>No results found for &quot;{query}&quot;</Text>
-                <Text style={styles.noResultsSubtext}>Try different keywords or check your spelling</Text>
-              </View>
-            )}
-          </Animated.View>
-        )}
-
-        {/* Trending Searches */}
-        {query.length === 0 && (
-          <Animated.View entering={FadeInDown.delay(300)} style={styles.trendingContainer}>
-            <Text style={styles.sectionTitle}>Trending Searches</Text>
-            <View style={styles.trendingGrid}>
-              {trendingSearches.map((term, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[
-                    styles.trendingItem,
-                    styles.glassCard,
-                    styles.brutalBorder,
-                    styles.brutalShadow,
-                  ]}
-                  onPress={() => handleTrendingPress(term)}
-                >
-                  <Text style={styles.trendingText}>{term}</Text>
-                </TouchableOpacity>
-              ))}
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+        >
+          {/* Search Header */}
+          <Animated.View entering={FadeIn} style={styles.searchHeader}>
+            <Text style={styles.title}>Search</Text>
+            <View style={styles.searchContainer}>
+              <Search color="#8b5cf6" size={20} style={styles.searchIcon} />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search for songs, artists, or users..."
+                placeholderTextColor="#64748b"
+                value={query}
+                onChangeText={setQuery}
+              />
             </View>
           </Animated.View>
-        )}
-      </ScrollView>
+
+          {/* Sort Options */}
+          {query.length > 0 && (
+            <Animated.View
+              entering={FadeInDown.delay(100)}
+              style={styles.sortContainer}
+            >
+              {(['relevance', 'recent', 'popular'] as const).map((option) => (
+                <TouchableOpacity
+                  key={option}
+                  style={[
+                    styles.sortButton,
+                    sort === option && styles.sortButtonActive,
+                  ]}
+                  onPress={() => setSort(option)}
+                >
+                  <Text
+                    style={[
+                      styles.sortButtonText,
+                      sort === option && styles.sortButtonTextActive,
+                    ]}
+                  >
+                    {option.charAt(0).toUpperCase() + option.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </Animated.View>
+          )}
+
+          {/* Loading */}
+          {isSearching && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8b5cf6" />
+            </View>
+          )}
+
+          {/* Error Message */}
+          {errorMessage && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          )}
+
+          {/* Search Results */}
+          {query.length > 0 && !isSearching && (
+            <Animated.View
+              entering={FadeInDown.delay(200)}
+              style={styles.resultsContainer}
+            >
+              {/* Tracks Section */}
+              {results.tracks.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Songs</Text>
+                  <FlatList
+                    data={results.tracks}
+                    renderItem={renderTrackItem}
+                    keyExtractor={(item) => item.id}
+                    scrollEnabled={false}
+                  />
+                </View>
+              )}
+
+              {/* Artists Section */}
+              {results.artists.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Artists</Text>
+                  <FlatList
+                    data={results.artists}
+                    renderItem={renderArtistItem}
+                    keyExtractor={(item) => item.id}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                  />
+                </View>
+              )}
+
+              {/* Users Section */}
+              {results.users.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Users</Text>
+                  <FlatList
+                    data={results.users}
+                    renderItem={renderUserItem}
+                    keyExtractor={(item) => item.id}
+                    scrollEnabled={false}
+                  />
+                </View>
+              )}
+
+              {/* No Results */}
+              {results.tracks.length === 0 &&
+                results.artists.length === 0 &&
+                results.users.length === 0 && (
+                  <View style={styles.noResultsContainer}>
+                    <Text style={styles.noResultsText}>
+                      No results found for &quot;{query}&quot;
+                    </Text>
+                    <Text style={styles.noResultsSubtext}>
+                      Try different keywords or check your spelling
+                    </Text>
+                  </View>
+                )}
+            </Animated.View>
+          )}
+
+          {/* Trending Searches */}
+          {query.length === 0 && (
+            <Animated.View
+              entering={FadeInDown.delay(300)}
+              style={styles.trendingContainer}
+            >
+              <Text style={styles.sectionTitle}>Trending Searches</Text>
+              <View style={styles.trendingGrid}>
+                {trendingSearches.map((term, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.trendingItem,
+                      styles.glassCard,
+                      styles.brutalBorder,
+                      styles.brutalShadow,
+                    ]}
+                    onPress={() => handleTrendingPress(term)}
+                  >
+                    <Text style={styles.trendingText}>{term}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </Animated.View>
+          )}
+        </ScrollView>
       </LinearGradient>
     </View>
   );
