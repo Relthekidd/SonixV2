@@ -14,7 +14,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
-import { Track, Playlist } from '@/providers/MusicProvider';
+import { Track, Playlist, TrackRow } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
 import { CreditCard as Edit3, LogOut } from 'lucide-react-native';
@@ -67,7 +67,7 @@ function ProfileScreen() {
       setBio(data.bio ?? '');
       setIsPrivate(data.is_private ?? false);
 
-      const [songsRes, , playlistsRes] = await Promise.all([
+      const [songsRes, playlistsRes] = await Promise.all([
         supabase
           .from('user_top_songs')
           .select('play_count, track:track_id(*, artist:artist_id(*))')
@@ -80,16 +80,20 @@ function ProfileScreen() {
           .eq('user_id', uid)
           .eq('is_public', true),
       ]);
+
       interface SongRow {
-        track: Track & { artist?: { name?: string } | null };
+        play_count?: number | null;
+        track: TrackRow;
       }
 
+      const songsData =
+        ((songsRes as { data?: SongRow[] | null })?.data ?? []);
       setTopSongs(
-        (songsRes.data || []).map((r: SongRow) => ({
+        songsData.map((r) => ({
           id: r.track.id,
           title: r.track.title,
           artist: r.track.artist?.name || '',
-          artistId: r.track.artist_id,
+          artistId: r.track.artist_id || undefined,
           album: r.track.album_title || 'Single',
           duration: r.track.duration || 0,
           coverUrl: apiService.getPublicUrl('images', r.track.cover_url || ''),
@@ -99,14 +103,16 @@ function ProfileScreen() {
           releaseDate: r.track.release_date || '',
         })),
       );
-      const publicPls = (playlistsRes.data || []).map(
-        (p: { id: string; title: string; cover_url?: string | null }) => ({
-          id: p.id,
-          title: p.title,
-          tracks: [],
-          coverUrl: p.cover_url || '',
-        }),
-      );
+      const plData =
+        ((playlistsRes as {
+          data?: { id: string; title: string; cover_url?: string | null }[] | null;
+        })?.data ?? []);
+      const publicPls = plData.map((p) => ({
+        id: p.id,
+        title: p.title,
+        tracks: [],
+        coverUrl: p.cover_url || '',
+      }));
       setPublicPlaylists(publicPls);
     } catch (err) {
       console.error(err);

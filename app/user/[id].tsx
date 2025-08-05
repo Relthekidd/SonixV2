@@ -176,7 +176,7 @@ export default function UserProfileScreen() {
       onPress={() => handleTrackPress(item)}
     >
       <Text style={styles.topTrackRank}>{index + 1}</Text>
-      <Image source={{ uri: item.cover_url }} style={styles.topTrackCover} />
+      <Image source={{ uri: item.coverUrl }} style={styles.topTrackCover} />
       <View style={styles.topTrackInfo}>
         <Text style={styles.topTrackTitle} numberOfLines={1}>
           {item.title}
@@ -195,7 +195,11 @@ export default function UserProfileScreen() {
     </TouchableOpacity>
   );
 
-  const renderTopArtist = ({ item }: { item: { id: string; name: string; avatar_url: string } }) => (
+  const renderTopArtist = ({
+    item,
+  }: {
+    item: { id: string; name: string; avatar_url: string };
+  }) => (
     <TouchableOpacity style={styles.topArtistItem}>
       <Image source={{ uri: item.avatar_url }} style={styles.topArtistAvatar} />
       <Text style={styles.topArtistName} numberOfLines={1}>

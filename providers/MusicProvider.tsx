@@ -41,7 +41,7 @@ export interface Playlist {
   coverUrl?: string;
 }
 
-interface TrackRow {
+export interface TrackRow {
   id: string;
   title: string;
   artist_id?: string | null;
@@ -379,7 +379,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!queue.length) return;
     let nextIdx = currentIndex + 1;
     if (nextIdx >= queue.length) {
-      if (repeatMode === 'all') nextIdx = 0; else return;
+      if (repeatMode === 'all') nextIdx = 0;
+      else return;
     }
     await playTrack(queue[nextIdx]);
   };
@@ -388,7 +389,8 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     if (!queue.length) return;
     let prevIdx = currentIndex - 1;
     if (prevIdx < 0) {
-      if (repeatMode === 'all') prevIdx = queue.length - 1; else prevIdx = 0;
+      if (repeatMode === 'all') prevIdx = queue.length - 1;
+      else prevIdx = 0;
     }
     await playTrack(queue[prevIdx]);
   };
@@ -477,35 +479,40 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      const promises: PromiseLike<unknown>[] = [trendingQuery, newQuery];
-      if (user) {
-        promises.push(
-          supabase
-            .from('liked_songs')
-            .select('track:tracks!fk_liked_songs_track(*)')
-            .eq('user_id', user.id),
-          supabase
-            .from('playlists')
-            .select(
-              'id,title,cover_url,playlist_tracks:playlist_tracks!fk_playlist_tracks_playlist(track:tracks!fk_playlist_tracks_track(*))',
-            )
-            .eq('user_id', user.id),
-        );
-      }
-      const [trendingRes, newRes, likedRes, playlistRes] =
-        await Promise.all(promises);
+      const [trendingRes, newRes, likedRes, playlistRes] = await Promise.all([
+        trendingQuery,
+        newQuery,
+        user
+          ? supabase
+              .from('liked_songs')
+              .select('track:tracks!fk_liked_songs_track(*)')
+              .eq('user_id', user.id)
+          : Promise.resolve(null),
+        user
+          ? supabase
+              .from('playlists')
+              .select(
+                'id,title,cover_url,playlist_tracks:playlist_tracks!fk_playlist_tracks_playlist(track:tracks!fk_playlist_tracks_track(*))',
+              )
+              .eq('user_id', user.id)
+          : Promise.resolve(null),
+      ]);
 
-      setTrendingTracks(
-        (trendingRes.data || []).map((t: TrackRow) => mapTrack(t)),
-      );
-      setNewReleases((newRes.data || []).map((t: TrackRow) => mapTrack(t)));
+      const trendingData =
+        ((trendingRes as { data?: TrackRow[] | null })?.data ?? []);
+      setTrendingTracks(trendingData.map((t) => mapTrack(t)));
+
+      const newData = ((newRes as { data?: TrackRow[] | null })?.data ?? []);
+      setNewReleases(newData.map((t) => mapTrack(t)));
 
       if (user && likedRes && playlistRes) {
-        const liked = (likedRes.data || []).map((r: LikedSongRow) =>
-          mapTrack(r.track, true),
-        );
+        const likedData =
+          ((likedRes as { data?: LikedSongRow[] | null })?.data ?? []);
+        const liked = likedData.map((r) => mapTrack(r.track, true));
         setLikedSongs(liked);
-        const pls = (playlistRes.data || []).map((p: PlaylistRow) => ({
+        const plsData =
+          ((playlistRes as { data?: PlaylistRow[] | null })?.data ?? []);
+        const pls = plsData.map((p) => ({
           id: p.id,
           title: p.title,
           coverUrl: p.cover_url || '',

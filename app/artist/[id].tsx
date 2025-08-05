@@ -5,21 +5,15 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  ScrollView,
   FlatList,
   ActivityIndicator,
   Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMusic, Track } from '@/providers/MusicProvider';
+import { useMusic, Track, TrackRow } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import {
-  ArrowLeft,
-  Play,
-  Pause,
-  MoreVertical,
-} from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, MoreVertical, Users } from 'lucide-react-native';
 
 interface Artist {
   id: string;
@@ -53,20 +47,31 @@ export default function ArtistDetailScreen() {
         apiService.getArtistTracks(id!),
       ]);
 
+      type RawArtist = {
+        id?: string | number;
+        stage_name?: string | null;
+        name?: string | null;
+        avatar_url?: string | null;
+        bio?: string | null;
+        monthly_listeners?: number | null;
+        total_plays?: number | null;
+        genres?: unknown;
+      };
+
+      const artistRaw = artistData as RawArtist;
       setArtist({
-        id: String((artistData as any).id),
-        stage_name:
-          (artistData as any).stage_name || (artistData as any).name || 'Unknown Artist',
-        avatar_url: (artistData as any).avatar_url || undefined,
-        bio: (artistData as any).bio || undefined,
-        monthly_listeners: Number((artistData as any).monthly_listeners) || 0,
-        total_plays: Number((artistData as any).total_plays) || 0,
-        genres: Array.isArray((artistData as any).genres)
-          ? (artistData as any).genres.map(String)
+        id: String(artistRaw.id),
+        stage_name: artistRaw.stage_name || artistRaw.name || 'Unknown Artist',
+        avatar_url: artistRaw.avatar_url || undefined,
+        bio: artistRaw.bio || undefined,
+        monthly_listeners: artistRaw.monthly_listeners ?? 0,
+        total_plays: artistRaw.total_plays ?? 0,
+        genres: Array.isArray(artistRaw.genres)
+          ? artistRaw.genres.map(String)
           : [],
       });
 
-      setTracks((tracksData as any[]).map(transformTrack));
+      setTracks((tracksData as TrackRow[]).map(transformTrack));
     } catch (err) {
       console.error(err);
       setError('Failed to load artist data');
@@ -75,27 +80,35 @@ export default function ArtistDetailScreen() {
     }
   };
 
-  const transformTrack = (t: any): Track => ({
-    id: String(t.id),
-    title: String(t.title),
-    artist: String(t.artist?.name || t.artist_name || 'Unknown'),
-    album: String(t.album || 'Unknown Album'),
-    duration: Number(t.duration) || 0,
-    coverUrl: String(
+  const transformTrack = (t: TrackRow): Track => ({
+    id: t.id,
+    title: t.title,
+    artist: t.artist?.name || t.artist_name || 'Unknown',
+    album: t.album?.title || t.album_title || 'Unknown Album',
+    duration: t.duration ?? 0,
+    coverUrl:
       t.cover_url ||
-        'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400'
-    ),
-    audioUrl: String(t.audio_url || ''),
-    isLiked: Boolean(t.is_liked),
-    genre: Array.isArray(t.genres) ? String(t.genres[0]) : String(t.genre || ''),
-    releaseDate: String(t.release_date || ''),
-    playCount: typeof t.play_count === 'number' ? t.play_count : 0,
-    likeCount: typeof t.like_count === 'number' ? t.like_count : 0,
+      t.album?.cover_url ||
+      'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+    audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+    isLiked: false,
+    genre: Array.isArray(t.genres)
+      ? String(t.genres[0])
+      : typeof t.genres === 'string'
+        ? t.genres
+        : '',
+    releaseDate: t.release_date || '',
+    playCount: t.play_count ?? 0,
+    likeCount: t.like_count ?? 0,
   });
 
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
-      isPlaying ? pauseTrack() : playTrack(track, tracks);
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, tracks);
+      }
     } else {
       playTrack(track, tracks);
     }
@@ -104,7 +117,7 @@ export default function ArtistDetailScreen() {
   if (isLoading) {
     return (
       <LinearGradient
-        colors={["#1a1a2e", "#16213e", "#0f3460"]}
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
         style={styles.container}
       >
         <ActivityIndicator size="large" color="#8b5cf6" />
@@ -115,7 +128,7 @@ export default function ArtistDetailScreen() {
   if (error || !artist) {
     return (
       <LinearGradient
-        colors={["#1a1a2e", "#16213e", "#0f3460"]}
+        colors={['#1a1a2e', '#16213e', '#0f3460']}
         style={styles.container}
       >
         <Text style={styles.errorText}>{error || 'Artist not found'}</Text>
@@ -125,7 +138,7 @@ export default function ArtistDetailScreen() {
 
   return (
     <LinearGradient
-      colors={["#1a1a2e", "#16213e", "#0f3460"]}
+      colors={['#1a1a2e', '#16213e', '#0f3460']}
       style={styles.container}
     >
       <View style={styles.header}>
