@@ -91,16 +91,10 @@ function HomeScreen() {
             styles.brutalShadow,
           ]}
         >
-          <Text style={styles.heroTitle}>Discover Your Sound</Text>
+          <Text style={styles.heroTitle}>Welcome to Sonix</Text>
           <Text style={styles.heroSubtitle}>
-            Stream millions of songs with stunning audio quality and cutting-edge
-            design.
+            Fueling the Future of Independent Music.
           </Text>
-          <TouchableOpacity
-            style={[styles.button, styles.brutalBorder, styles.brutalShadow]}
-          >
-            <Text style={styles.buttonText}>Start Listening</Text>
-          </TouchableOpacity>
         </Animated.View>
 
         {/* Quick Stats */}
@@ -234,8 +228,8 @@ function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 24, paddingBottom: 140 },
-  hero: { padding: 24, marginBottom: 32 },
+  content: { padding: 24, paddingBottom: 110 },
+  hero: { padding: 24, marginTop: 32, marginBottom: 32 },
   heroTitle: {
     fontSize: 40,
     fontFamily: 'Poppins-Bold',

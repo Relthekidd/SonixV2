@@ -9,23 +9,20 @@ import {
 import { useRouter, useSegments, Href } from 'expo-router';
 import { Home, Search, Library, User, type LucideIcon } from 'lucide-react-native';
 
-// Define navigation items
 const navItems: { icon: LucideIcon; label: string; id: string; path: Href }[] = [
-  { icon: Home, label: 'Home', id: 'index', path: '/' },
-  { icon: Search, label: 'Search', id: 'search', path: '/(tabs)/search' },
-  { icon: Library, label: 'Library', id: 'library', path: '/(tabs)/library' },
-  { icon: User, label: 'Profile', id: 'profile', path: '/(tabs)/profile' },
+  { icon: Home,    label: 'Home',    id: 'index',   path: '/'         },
+  { icon: Search,  label: 'Search',  id: 'search',  path: '/search'   },
+  { icon: Library, label: 'Library', id: 'library', path: '/library'  },
+  { icon: User,    label: 'Profile', id: 'profile', path: '/profile'  },
 ];
 
 export function Navigation() {
   const router = useRouter();
   const segments = useSegments();
-  // Determine active route by the last segment
-  const activeTab =
-    segments.length > 0 ? segments[segments.length - 1] : 'index';
+  const activeTab = segments.length > 0 ? segments[segments.length - 1] : 'index';
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
       {navItems.map((item) => {
         const Icon = item.icon;
         const isActive = activeTab === item.id;
@@ -56,24 +53,38 @@ const styles = StyleSheet.create({
     ...Platform.select({
       web: {
         width: 256,
-        backgroundColor: 'rgba(255,255,255,0.1)',
-        borderRightWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
         paddingTop: 24,
         flexDirection: 'column',
       },
       default: {
         position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255,255,255,0.1)',
+        bottom: 16,
+        left: 16,
+        right: 16,
         flexDirection: 'row',
         justifyContent: 'space-around',
         paddingVertical: 8,
       },
     }),
   },
+
+  // Neobrutalist card styles
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+
   button: {
     alignItems: 'center',
     justifyContent: 'center',
