@@ -12,6 +12,8 @@ import {
   Modal,
   FlatList,
   TextInput,
+  ActionSheetIOS,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -31,6 +33,8 @@ import {
   MoveVertical as MoreVertical,
   X,
   Check,
+  ListPlus,
+  PlayCircle,
 } from 'lucide-react-native';
 
 export default function TrackDetailScreen() {
@@ -48,6 +52,7 @@ export default function TrackDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showLibraryModal, setShowLibraryModal] = useState(false);
+  const [showMoreModal, setShowMoreModal] = useState(false);
   const [selectedPlaylists, setSelectedPlaylists] = useState<string[]>([]);
   const [newPlaylistName, setNewPlaylistName] = useState('');
 
@@ -187,6 +192,47 @@ export default function TrackDetailScreen() {
     setShowLibraryModal(true);
   };
 
+  const handleMorePress = () => {
+    if (!track) return;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [
+            'Cancel',
+            'Add to Library',
+            track.isLiked ? 'Unlike' : 'Like',
+            'Add to Playlist',
+            'Add to Queue',
+            'Share',
+          ],
+          cancelButtonIndex: 0,
+        },
+        (buttonIndex) => {
+          switch (buttonIndex) {
+            case 1:
+              openLibraryModal();
+              break;
+            case 2:
+              handleLike();
+              break;
+            case 3:
+              openLibraryModal();
+              break;
+            case 4:
+              handleAddToQueue();
+              break;
+            case 5:
+              handleShare();
+              break;
+          }
+        }
+      );
+    } else {
+      setShowMoreModal(true);
+    }
+  };
+
   const togglePlaylistSelection = (playlistId: string) => {
     if (!track) return;
     const exists = selectedPlaylists.includes(playlistId);
@@ -267,7 +313,7 @@ export default function TrackDetailScreen() {
         >
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton}>
+        <TouchableOpacity style={styles.headerButton} onPress={handleMorePress}>
           <MoreVertical color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
@@ -328,13 +374,6 @@ export default function TrackDetailScreen() {
             styles.brutalShadow,
           ]}
         >
-          <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
-            <Heart
-              color={track.isLiked ? '#ef4444' : '#ffffff'}
-              size={24}
-              fill={track.isLiked ? '#ef4444' : 'transparent'}
-            />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
             <LinearGradient
               colors={['#8b5cf6', '#a855f7']}
@@ -347,22 +386,6 @@ export default function TrackDetailScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleAddToQueue}
-          >
-            <Plus color="#ffffff" size={24} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-            <ShareIcon color="#ffffff" size={24} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionRow} onPress={handleAddToQueue}>
-            <Plus color="#8b5cf6" size={20} />
-            <Text style={styles.actionText}>Add to Queue</Text>
-          </TouchableOpacity>
         </View>
 
         {track.lyrics && (
@@ -374,18 +397,95 @@ export default function TrackDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
-      <TouchableOpacity
-        style={[
-          styles.fab,
-          styles.glassCard,
-          styles.brutalBorder,
-          styles.brutalShadow,
-        ]}
-        onPress={openLibraryModal}
-      >
-        <Plus color="#8b5cf6" size={20} />
-        <Text style={styles.fabText}>Add to Library</Text>
-      </TouchableOpacity>
+
+      {/* More Actions Modal for Android */}
+      {showMoreModal && Platform.OS === 'android' && (
+        <Modal transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.moreModalContent,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+            >
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>More Actions</Text>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={() => setShowMoreModal(false)}
+                >
+                  <X color="#ffffff" size={24} />
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.moreActionRow}
+                onPress={() => {
+                  setShowMoreModal(false);
+                  openLibraryModal();
+                }}
+              >
+                <Plus color="#8b5cf6" size={20} />
+                <Text style={styles.moreActionText}>Add to Library</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.moreActionRow}
+                onPress={() => {
+                  setShowMoreModal(false);
+                  handleLike();
+                }}
+              >
+                <Heart
+                  color={track.isLiked ? '#ef4444' : '#8b5cf6'}
+                  fill={track.isLiked ? '#ef4444' : 'transparent'}
+                  size={20}
+                />
+                <Text style={styles.moreActionText}>
+                  {track.isLiked ? 'Unlike' : 'Like'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.moreActionRow}
+                onPress={() => {
+                  setShowMoreModal(false);
+                  openLibraryModal();
+                }}
+              >
+                <ListPlus color="#8b5cf6" size={20} />
+                <Text style={styles.moreActionText}>Add to Playlist</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.moreActionRow}
+                onPress={() => {
+                  setShowMoreModal(false);
+                  handleAddToQueue();
+                }}
+              >
+                <PlayCircle color="#8b5cf6" size={20} />
+                <Text style={styles.moreActionText}>Add to Queue</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.moreActionRow}
+                onPress={() => {
+                  setShowMoreModal(false);
+                  handleShare();
+                }}
+              >
+                <ShareIcon color="#8b5cf6" size={20} />
+                <Text style={styles.moreActionText}>Share</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Library Modal */}
       {showLibraryModal && (
         <Modal transparent animationType="fade">
           <View style={styles.modalOverlay}>
@@ -582,15 +682,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 24,
     marginBottom: 36,
-    gap: 16,
-  },
-  actionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   playButton: {
     width: 80,
@@ -602,23 +693,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
-    marginHorizontal: 16,
   },
   playButtonGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionsSection: { paddingHorizontal: 24, marginBottom: 32 },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  actionText: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#ffffff' },
   lyricsSection: { paddingHorizontal: 24, marginBottom: 32 },
   lyricsTitle: {
     fontSize: 20,
@@ -649,21 +729,6 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 8,
   },
-  fab: {
-    position: 'absolute',
-    right: 24,
-    bottom: 100,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  fabText: {
-    color: '#8b5cf6',
-    marginLeft: 8,
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-  },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -673,6 +738,11 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '90%',
     maxWidth: 400,
+    padding: 24,
+  },
+  moreModalContent: {
+    width: '80%',
+    maxWidth: 300,
     padding: 24,
   },
   modalHeader: {
@@ -687,6 +757,19 @@ const styles = StyleSheet.create({
     color: '#ffffff',
   },
   closeButton: { padding: 4 },
+  moreActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  moreActionText: {
+    marginLeft: 12,
+    color: '#ffffff',
+    fontFamily: 'Inter-Regular',
+    fontSize: 16,
+  },
   modalLikeRow: {
     flexDirection: 'row',
     alignItems: 'center',
