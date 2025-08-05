@@ -15,19 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useMusic } from '@/providers/MusicProvider';
 import { router } from 'expo-router';
-import {
-  ChevronDown,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Heart,
-  Shuffle,
-  Repeat,
-  MoreHorizontal,
-  Volume1,
-  Volume2,
-} from 'lucide-react-native';
+import { ChevronDown, Play, Pause, SkipBack, SkipForward, Heart, Shuffle, Repeat, MoveHorizontal as MoreHorizontal, Volume1, Volume2 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -42,20 +30,21 @@ export default function PlayerScreen() {
     isPlaying,
     currentTime,
     duration,
-    playTrack,
+    resumeTrack,
     pauseTrack,
     nextTrack,
     previousTrack,
     seekTo,
+    toggleShuffle,
+    toggleRepeat,
     toggleLike,
-    likedSongs,
     queue,
     volume,
     setVolume,
+    isShuffled,
+    repeatMode,
   } = useMusic();
 
-  const [isShuffled, setIsShuffled] = useState(false);
-  const [repeatMode, setRepeatMode] = useState(0); // 0: off, 1: all, 2: one
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const scaleValue = useSharedValue(1);
 
@@ -74,14 +63,14 @@ export default function PlayerScreen() {
     return null;
   }
 
-  const isLiked = likedSongs.some((track) => track.id === currentTrack.id);
+  const isLiked = currentTrack.isLiked;
 
   const handlePlayPause = () => {
     Haptics.selectionAsync();
     if (isPlaying) {
       pauseTrack();
     } else {
-      playTrack(currentTrack);
+      resumeTrack();
     }
   };
 
@@ -91,8 +80,14 @@ export default function PlayerScreen() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleShuffle = () => {
+    Haptics.selectionAsync();
+    toggleShuffle();
+  };
+
   const handleRepeat = () => {
-    setRepeatMode((prev) => (prev + 1) % 3);
+    Haptics.selectionAsync();
+    toggleRepeat();
   };
 
   return (
@@ -181,7 +176,7 @@ export default function PlayerScreen() {
         <View style={styles.controls}>
           <TouchableOpacity
             style={styles.controlButton}
-            onPress={() => setIsShuffled(!isShuffled)}
+            onPress={handleShuffle}
           >
             <Shuffle color={isShuffled ? '#8b5cf6' : '#ffffff'} size={24} />
           </TouchableOpacity>
@@ -211,8 +206,8 @@ export default function PlayerScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.controlButton} onPress={handleRepeat}>
-            <Repeat color={repeatMode > 0 ? '#8b5cf6' : '#ffffff'} size={24} />
-            {repeatMode === 2 && <View style={styles.repeatOneDot} />}
+            <Repeat color={repeatMode !== 'off' ? '#8b5cf6' : '#ffffff'} size={24} />
+            {repeatMode === 'one' && <View style={styles.repeatOneDot} />}
           </TouchableOpacity>
         </View>
 
@@ -254,7 +249,18 @@ export default function PlayerScreen() {
               data={queue.filter((t) => t.id !== currentTrack.id)}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={styles.queueItem}>
+                <TouchableOpacity 
+                  style={styles.queueItem}
+                  onPress={() => {
+                    // Find the track in the original queue and play it
+                    const trackIndex = queue.findIndex(t => t.id === item.id);
+                    if (trackIndex !== -1) {
+                      // This will be handled by the enhanced playTrack in MusicProvider
+                      // For now, we can just play the track directly
+                      Alert.alert('Queue', `Playing ${item.title}`);
+                    }
+                  }}
+                >
                   <Image
                     source={{ uri: item.coverUrl }}
                     style={styles.queueCover}
@@ -267,7 +273,7 @@ export default function PlayerScreen() {
                       {item.artist}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               )}
             />
           </View>

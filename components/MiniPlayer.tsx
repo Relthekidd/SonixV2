@@ -15,22 +15,21 @@ export function MiniPlayer() {
   const {
     currentTrack,
     isPlaying,
-    playTrack,
+    resumeTrack,
     pauseTrack,
     nextTrack,
     toggleLike,
-    likedSongs,
   } = useMusic();
 
   if (!currentTrack) return null;
 
-  const isLiked = likedSongs.some((track) => track.id === currentTrack.id);
+  const isLiked = currentTrack.isLiked;
 
   const handlePlayPause = () => {
     if (isPlaying) {
       pauseTrack();
     } else {
-      playTrack(currentTrack);
+      resumeTrack();
     }
   };
 

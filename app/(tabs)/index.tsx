@@ -62,7 +62,6 @@ function HomeScreen() {
     } else {
       playTrack(track, trendingTracks);
     }
-    router.push(`/track/${track.id}`);
   };
 
   // Loading state

@@ -184,12 +184,6 @@ function SearchScreen() {
 
   const handleToggleLike = (trackId: string) => {
     toggleLike(trackId);
-    setResults((prev) => ({
-      ...prev,
-      tracks: prev.tracks.map((t) =>
-        t.id === trackId ? { ...t, isLiked: !t.isLiked } : t,
-      ),
-    }));
   };
 
   const renderTrackItem = ({ item }: { item: Track }) => (
