@@ -73,9 +73,9 @@ const styles = StyleSheet.create({
 
   // Neobrutalist card styles
   glassCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-  },
+  backgroundColor: '#0f172a', // solid, not transparent
+  borderRadius: 20,
+},
   brutalBorder: {
     borderWidth: 2,
     borderColor: 'rgba(255,255,255,0.2)',
