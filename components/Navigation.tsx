@@ -11,7 +11,7 @@ import { Home, Search, Library, User, type LucideIcon } from 'lucide-react-nativ
 
 // Define navigation items
 const navItems: { icon: LucideIcon; label: string; id: string; path: Href }[] = [
-  { icon: Home, label: 'Home', id: 'home', path: '/(tabs)/index' },
+  { icon: Home, label: 'Home', id: 'index', path: '/' },
   { icon: Search, label: 'Search', id: 'search', path: '/(tabs)/search' },
   { icon: Library, label: 'Library', id: 'library', path: '/(tabs)/library' },
   { icon: User, label: 'Profile', id: 'profile', path: '/(tabs)/profile' },
