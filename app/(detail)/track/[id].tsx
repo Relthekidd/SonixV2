@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   trackHeader: {
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 30,
   },
   trackCover: {
     width: 280,
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 16,
-    marginBottom: 20,
+    marginBottom: 30,
   },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#94a3b8' },
