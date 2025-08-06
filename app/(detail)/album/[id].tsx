@@ -47,7 +47,7 @@ function AlbumDetailScreen() {
       const albumData = await apiService.getAlbumById(id!);
       setAlbum(albumData);
 
-      const transformed = (albumData.tracks || []).map(
+  const transformed = (albumData.tracks || []).map(
   (t: TrackData, idx: number): Track => ({
     id: t.id,
     title: t.title,
@@ -55,8 +55,10 @@ function AlbumDetailScreen() {
     artistId: albumData.artist_id || undefined,
     album: albumData.title,
     duration: t.duration,
-    coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
-    audioUrl: apiService.getPublicUrl('audio-files', `albums/${albumData.id}/${t.audio_url}`),
+    // ✅ FIXED COVER PATH
+    coverUrl: apiService.getPublicUrl('images', `album_covers/${albumData.id}/${albumData.cover_url}`),
+    // ✅ FIXED AUDIO PATH
+    audioUrl: apiService.getPublicUrl('audio-files', `audio/${albumData.id}/${t.audio_url}`),
     isLiked: likedSongIds.includes(t.id),
     trackNumber: t.track_number ?? idx + 1,
     releaseDate: albumData.release_date || '',
@@ -68,7 +70,7 @@ function AlbumDetailScreen() {
       ? new Date(albumData.release_date).getFullYear().toString()
       : undefined,
     description: '',
-  })
+  }),
 );
 
 
@@ -181,7 +183,7 @@ function AlbumDetailScreen() {
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <HeroCard
-          coverUrl={apiService.getPublicUrl('images', album.cover_url)}
+          coverUrl={apiService.getPublicUrl('images', `album_covers/${album.id}/${album.cover_url}`)}
           title={album.title}
           subtitle={album.artist}
           description={album.description}
