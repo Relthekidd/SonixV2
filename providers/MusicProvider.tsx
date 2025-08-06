@@ -63,16 +63,10 @@ export interface TrackRow {
   lyrics?: string | null;
 }
 
-interface Artist {
-  id: string;
-  name: string;
-  avatar_url?: string | null;
-}
-
 interface UserProfile {
   id: string;
-  display_name: string;
-  profile_picture_url?: string | null;
+  username: string;
+  avatar_url?: string | null;
 }
 
 export interface AlbumResult {
@@ -118,8 +112,6 @@ interface MusicContextType {
     tracks: Track[];
     albums: AlbumResult[];
     playlists: PlaylistResult[];
-    singles: Track[];
-    artists: Artist[];
     users: UserProfile[];
   }>;
   // Library-related state & actions
@@ -594,35 +586,20 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks: [],
         albums: [],
         playlists: [],
-        singles: [],
-        artists: [],
         users: [],
       };
     }
 
     try {
-      const [
-        trackRes,
-        artistRes,
-        albumRes,
-        playlistRes,
-        userRes,
-      ] = await Promise.all([
+      const [trackRes, albumRes, playlistRes, profileRes] = await Promise.all([
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
-          .or(
-            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{"${term}"}`,
-          )
+          .ilike('title', `%${term}%`)
           .eq('is_published', true)
           .order(sort === 'popular' ? 'play_count' : 'created_at', {
             ascending: false,
           })
-          .limit(10),
-        supabase
-          .from('artists')
-          .select('id,name,avatar_url')
-          .ilike('name', `%${term}%`)
           .limit(10),
         supabase
           .from('albums')
@@ -636,9 +613,9 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .ilike('title', `%${term}%`)
           .limit(10),
         supabase
-          .from('users')
-          .select('id,display_name,profile_picture_url')
-          .ilike('display_name', `%${term}%`)
+          .from('profiles')
+          .select('id,username,avatar_url')
+          .ilike('username', `%${term}%`)
           .limit(10),
       ]);
 
@@ -669,9 +646,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks,
         albums,
         playlists,
-        singles: [],
-        artists: (artistRes.data || []) as Artist[],
-        users: (userRes.data || []) as UserProfile[],
+        users: (profileRes.data || []) as UserProfile[],
       };
     } catch (err) {
       console.error('searchMusic error', err);
@@ -679,8 +654,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks: [],
         albums: [],
         playlists: [],
-        singles: [],
-        artists: [],
         users: [],
       };
     }
