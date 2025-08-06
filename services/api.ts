@@ -66,7 +66,18 @@ class ApiService {
    * Helper to convert a storage path into a public URL
    */
   getPublicUrl(bucket: string, path: string): string {
+    if (!path) {
+      console.warn('[ApiService] getPublicUrl called with empty path', bucket);
+      return '';
+    }
+
+    if (/^https?:\/\//.test(path)) {
+      console.log('[ApiService] getPublicUrl received full URL', path);
+      return path;
+    }
+
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    console.log('[ApiService] getPublicUrl resolved', { bucket, path: data.publicUrl });
     return data.publicUrl;
   }
 

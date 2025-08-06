@@ -58,44 +58,47 @@ function AlbumDetailScreen() {
       }
       setAlbum(albumData);
 
-  const transformed = (albumData.tracks || []).map(
-  (t: TrackData, idx: number): Track => ({
-    id: t.id,
-    title: t.title,
-    artist: albumData.artist || 'Unknown',
-    artistId: albumData.artist_id || undefined,
-    album: albumData.title,
-    duration: t.duration,
-    // ✅ FIXED COVER PATH
-    coverUrl: apiService.getPublicUrl('images', `album_covers/${albumData.id}/${albumData.cover_url}`),
-    // ✅ FIXED AUDIO PATH
-    audioUrl: apiService.getPublicUrl('audio-files', `audio/${albumData.id}/${t.audio_url}`),
-    isLiked: likedSongIds.includes(t.id),
-    trackNumber: t.track_number ?? idx + 1,
-    releaseDate: albumData.release_date || '',
-    playCount: t.play_count ?? undefined,
-    likeCount: t.like_count ?? undefined,
-    lyrics: t.lyrics || undefined,
-    genre: '',
-    year: albumData.release_date
-      ? new Date(albumData.release_date).getFullYear().toString()
-      : undefined,
-    description: '',
-  }),
-);
+      const transformed = (albumData.tracks || []).map(
+        (t: TrackData, idx: number): Track => ({
+          id: t.id,
+          title: t.title,
+          artist: albumData.artist || 'Unknown',
+          artistId: albumData.artist_id || undefined,
+          album: albumData.title,
+          duration: t.duration,
+          coverUrl: albumData.cover_url,
+          audioUrl: t.audio_url,
+          isLiked: likedSongIds.includes(t.id),
+          trackNumber: t.track_number ?? idx + 1,
+          releaseDate: albumData.release_date || '',
+          playCount: t.play_count ?? undefined,
+          likeCount: t.like_count ?? undefined,
+          lyrics: t.lyrics || undefined,
+          genre: '',
+          year: albumData.release_date
+            ? new Date(albumData.release_date).getFullYear().toString()
+            : undefined,
+          description: '',
+        }),
+      );
 
 
-      transformed.sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
-      transformed.forEach((t) => {
-        if (!t.audioUrl) {
-          console.warn('AlbumDetailScreen: track missing audio URL', t.id);
-        }
-        if (!t.coverUrl) {
-          console.warn('AlbumDetailScreen: track missing cover art', t.id);
-        }
-      });
-      console.log('AlbumDetailScreen: loaded tracks', transformed.length);
-      setTracks(transformed);
+        transformed.sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
+        transformed.forEach((t) => {
+          console.log('AlbumDetailScreen: track URLs', {
+            id: t.id,
+            audioUrl: t.audioUrl,
+            coverUrl: t.coverUrl,
+          });
+          if (!t.audioUrl) {
+            console.warn('AlbumDetailScreen: track missing audio URL', t.id);
+          }
+          if (!t.coverUrl) {
+            console.warn('AlbumDetailScreen: track missing cover art', t.id);
+          }
+        });
+        console.log('AlbumDetailScreen: loaded tracks', transformed.length);
+        setTracks(transformed);
 
       const totalDuration = transformed.reduce(
         (sum, t) => sum + (t.duration || 0),
@@ -222,7 +225,7 @@ function AlbumDetailScreen() {
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <HeroCard
-          coverUrl={apiService.getPublicUrl('images', `album_covers/${album.id}/${album.cover_url}`)}
+          coverUrl={album.cover_url}
           title={album.title}
           subtitle={album.artist}
           description={album.description}
