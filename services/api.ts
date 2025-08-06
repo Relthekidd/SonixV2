@@ -72,6 +72,25 @@ interface SingleDetails {
   release_date?: string | null;
 }
 
+interface TrackPayload {
+  title: string;
+  audio_url: string;
+  artist_id: string;
+  featured_artist_ids?: string[];
+  album_id?: string | null;
+  duration?: number | null;
+  cover_url?: string | null;
+}
+
+interface AlbumPayload {
+  title: string;
+  artist_id: string;
+  cover_url: string;
+  featured_artist_ids?: string[];
+  description?: string;
+  release_date?: string;
+}
+
 class ApiService {
   private authToken = '';
   private unauthorizedCallback: (() => void) | null = null;
@@ -91,7 +110,10 @@ class ApiService {
     }
 
     const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-    console.log('[ApiService] getPublicUrl resolved', { bucket, path: data.publicUrl });
+    console.log('[ApiService] getPublicUrl resolved', {
+      bucket,
+      path: data.publicUrl,
+    });
     return data.publicUrl;
   }
 
@@ -121,6 +143,11 @@ class ApiService {
       .in('id', ids);
     if (error) throw error;
     return (data as Artist[]) || [];
+  }
+
+  /** Public helper to fetch multiple artists by ID */
+  async getArtistsByIds(ids: string[]): Promise<Artist[]> {
+    return this.fetchArtists(ids);
   }
 
   /**
@@ -229,10 +256,9 @@ class ApiService {
         title: data.title,
         artist: mainArtistId ? artistMap.get(mainArtistId) || null : null,
         artist_id: mainArtistId,
-        featured_artists:
-          (data.featured_artist_ids || [])
-            .map((aid: string) => artistMap.get(aid))
-            .filter(Boolean) as Artist[],
+        featured_artists: (data.featured_artist_ids || [])
+          .map((aid: string) => artistMap.get(aid))
+          .filter(Boolean) as Artist[],
         featured_artist_ids: data.featured_artist_ids || [],
         cover_url: this.getPublicUrl('images', data.cover_url),
         description: data.description || undefined,
@@ -328,7 +354,9 @@ class ApiService {
   }
 
   /** Get artist info */
-  async getArtistById(id: string): Promise<{ id: string; name: string; avatar_url?: string | null }> {
+  async getArtistById(
+    id: string,
+  ): Promise<{ id: string; name: string; avatar_url?: string | null }> {
     const { data, error } = await supabase
       .from('artists')
       .select('*')
@@ -346,7 +374,15 @@ class ApiService {
       .eq('artist_id', id)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data || []).map((t: TrackDetails) => ({
+
+    const featuredIds = new Set<string>();
+    (data || []).forEach((t: any) =>
+      (t.featured_artist_ids || []).forEach((fid: string) => featuredIds.add(fid)),
+    );
+    const featuredArtists = await this.fetchArtists(Array.from(featuredIds));
+    const artistMap = new Map(featuredArtists.map((a) => [a.id, a]));
+
+    return (data || []).map((t: any) => ({
       id: t.id,
       title: t.title,
       duration: t.duration,
@@ -363,7 +399,197 @@ class ApiService {
       description: t.description,
       release_date: t.release_date,
       genres: t.genres,
+      featured_artist_ids: t.featured_artist_ids || [],
+      featured_artists: (t.featured_artist_ids || [])
+        .map((fid: string) => artistMap.get(fid))
+        .filter(Boolean) as Artist[],
     }));
+  }
+
+  /** Get artist details with follower info */
+  async getArtistDetails(id: string, userId?: string) {
+    const { data, error } = await supabase
+      .from('artists')
+      .select('*')
+      .eq('id', id)
+      .single();
+    if (error) throw error;
+
+    const { count } = await supabase
+      .from('artist_followers')
+      .select('*', { count: 'exact', head: true })
+      .eq('artist_id', id);
+
+    let isFollowing = false;
+    if (userId) {
+      const { data: followData } = await supabase
+        .from('artist_followers')
+        .select('id')
+        .eq('artist_id', id)
+        .eq('user_id', userId)
+        .single();
+      isFollowing = !!followData;
+    }
+
+    return {
+      ...data,
+      follower_count: count || 0,
+      is_following: isFollowing,
+    };
+  }
+
+  /** Get albums for an artist */
+  async getArtistAlbums(id: string) {
+    const { data, error } = await supabase
+      .from('albums')
+      .select('id,title,cover_url')
+      .eq('artist_id', id)
+      .order('release_date', { ascending: false });
+    if (error) throw error;
+    return (data || []).map((a: any) => ({
+      id: a.id,
+      title: a.title,
+      cover_url: this.getPublicUrl('images', a.cover_url),
+    }));
+  }
+
+  /** Get singles for an artist */
+  async getArtistSingles(id: string) {
+    const { data, error } = await supabase
+      .from('singles')
+      .select('id, track:track_id(*, artist:artist_id(*), album:album_id(*))')
+      .eq('artist_id', id)
+      .order('release_date', { ascending: false });
+    if (error) throw error;
+
+    const featuredIds = new Set<string>();
+    (data || []).forEach((s: any) =>
+      (s.track?.featured_artist_ids || []).forEach((fid: string) =>
+        featuredIds.add(fid),
+      ),
+    );
+    const featuredArtists = await this.fetchArtists(Array.from(featuredIds));
+    const artistMap = new Map(featuredArtists.map((a) => [a.id, a]));
+
+    return (data || []).map((s: any) => ({
+      id: s.id,
+      track: s.track
+        ? {
+            ...s.track,
+            audio_url: this.getPublicUrl('audio-files', s.track.audio_url),
+            cover_url: this.getPublicUrl('images', s.track.cover_url || ''),
+            featured_artist_ids: s.track.featured_artist_ids || [],
+            featured_artists: (s.track.featured_artist_ids || [])
+              .map((fid: string) => artistMap.get(fid))
+              .filter(Boolean) as Artist[],
+          }
+        : null,
+    }));
+  }
+
+  /** Get loose tracks (not part of albums or singles) */
+  async getArtistLooseTracks(id: string, excludeTrackIds: string[] = []) {
+    let query = supabase
+      .from('tracks')
+      .select('*, artist:artist_id(*), album:album_id(*)')
+      .eq('artist_id', id)
+      .is('album_id', null);
+    if (excludeTrackIds.length) {
+      query = query.not('id', 'in', `(${excludeTrackIds.join(',')})`);
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+
+    const featuredIds = new Set<string>();
+    (data || []).forEach((t: any) =>
+      (t.featured_artist_ids || []).forEach((fid: string) => featuredIds.add(fid)),
+    );
+    const featuredArtists = await this.fetchArtists(Array.from(featuredIds));
+    const artistMap = new Map(featuredArtists.map((a) => [a.id, a]));
+
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      duration: t.duration,
+      audio_url: this.getPublicUrl('audio-files', t.audio_url),
+      track_number: t.track_number,
+      play_count: t.play_count,
+      like_count: t.like_count,
+      lyrics: t.lyrics,
+      cover_url: this.getPublicUrl('images', t.cover_url || ''),
+      artist_id: t.artist_id,
+      artist: t.artist,
+      album_id: t.album_id,
+      album: t.album,
+      description: t.description,
+      release_date: t.release_date,
+      genres: t.genres,
+      featured_artist_ids: t.featured_artist_ids || [],
+      featured_artists: (t.featured_artist_ids || [])
+        .map((fid: string) => artistMap.get(fid))
+        .filter(Boolean) as Artist[],
+    }));
+  }
+
+  /** Follow or unfollow an artist */
+  async toggleArtistFollow(
+    userId: string,
+    artistId: string,
+    isFollowing: boolean,
+  ) {
+    if (isFollowing) {
+      await supabase
+        .from('artist_followers')
+        .delete()
+        .match({ user_id: userId, artist_id: artistId });
+    } else {
+      await supabase
+        .from('artist_followers')
+        .insert({ user_id: userId, artist_id: artistId });
+    }
+  }
+
+  /** Create a track (admin) */
+  async createTrack(payload: TrackPayload) {
+    if (!payload.title || !payload.audio_url || !payload.artist_id) {
+      throw new Error('Missing required fields');
+    }
+    const { data, error } = await supabase
+      .from('tracks')
+      .insert({
+        title: payload.title,
+        audio_url: payload.audio_url,
+        artist_id: payload.artist_id,
+        featured_artist_ids: payload.featured_artist_ids || [],
+        album_id: payload.album_id || null,
+        duration: payload.duration || null,
+        cover_url: payload.cover_url || null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  /** Create an album (admin) */
+  async createAlbum(payload: AlbumPayload) {
+    if (!payload.title || !payload.artist_id || !payload.cover_url) {
+      throw new Error('Missing required fields');
+    }
+    const { data, error } = await supabase
+      .from('albums')
+      .insert({
+        title: payload.title,
+        artist_id: payload.artist_id,
+        cover_url: payload.cover_url,
+        featured_artist_ids: payload.featured_artist_ids || [],
+        description: payload.description,
+        release_date: payload.release_date,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
   }
 
   /** Recent uploads across singles, albums and tracks */
