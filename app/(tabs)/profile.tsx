@@ -255,7 +255,8 @@ export default function ProfileScreen() {
           id,
           title,
           cover_url,
-          playlist_tracks(track_id)
+          playlist_tracks(track_id),
+          featured_playlists
         `)
         .in('id', playlistIds)
         .eq('user_id', user?.id);
