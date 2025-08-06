@@ -4,10 +4,8 @@ import {
   Text,
   Image,
   StyleSheet,
-  TouchableOpacity,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Play, Calendar, Clock, Music } from 'lucide-react-native';
+import { Calendar, Clock, Music } from 'lucide-react-native';
 
 interface Props {
   coverUrl: string;
@@ -18,8 +16,6 @@ interface Props {
   duration?: string;
   playCount?: number;
   genres?: string[];
-  onPlay?: () => void;
-  moreMenu?: React.ReactNode;
 }
 
 export default function Hero({
@@ -31,28 +27,10 @@ export default function Hero({
   duration,
   playCount,
   genres,
-  onPlay,
-  moreMenu,
 }: Props) {
   return (
     <View style={[styles.card, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
       <Image source={{ uri: coverUrl }} style={styles.cover} />
-      
-      {(onPlay || moreMenu) && (
-        <View style={styles.actions}>
-          {onPlay && (
-            <TouchableOpacity style={styles.playButton} onPress={onPlay}>
-              <LinearGradient
-                colors={["#8b5cf6", "#a855f7"]}
-                style={styles.playGradient}
-              >
-                <Play color="#ffffff" size={24} />
-              </LinearGradient>
-            </TouchableOpacity>
-          )}
-          {moreMenu}
-        </View>
-      )}
 
       <Text style={styles.title}>{title}</Text>
       {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
@@ -100,6 +78,7 @@ const styles = StyleSheet.create({
   card: {
     alignItems: 'center',
     paddingHorizontal: 24,
+    paddingTop: 24,
     paddingBottom: 24,
     marginBottom: 30,
   },
@@ -112,30 +91,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
-  },
-  actions: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  playButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-  },
-  playGradient: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
   },
   title: {
     fontSize: 28,
