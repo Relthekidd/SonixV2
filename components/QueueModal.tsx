@@ -3,9 +3,9 @@ import {
   Modal,
   View,
   Text,
-  StyleSheet,
   TouchableOpacity,
   Image,
+  StyleSheet,
 } from 'react-native';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import Animated, { SlideInUp, FadeOut } from 'react-native-reanimated';
@@ -18,19 +18,11 @@ interface Props {
 }
 
 export default function QueueModal({ visible, onClose }: Props) {
-  const {
-    queue,
-    currentTrack,
-    playTrack,
-    removeFromQueue,
-    clearQueue,
-    reorderQueue,
-  } = useMusic();
-
+  const { queue, currentTrack, playTrack, removeFromQueue } = useMusic();
   const listRef = useRef<DraggableFlatList<Track>>(null);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && currentTrack) {
       const index = queue.findIndex((t) => t.id === currentTrack?.id);
       if (index >= 0) {
         setTimeout(() => {
@@ -42,20 +34,22 @@ export default function QueueModal({ visible, onClose }: Props) {
 
   const renderItem = ({ item, drag }: RenderItemParams<Track>) => (
     <TouchableOpacity
-      style={[styles.trackItem, item.id === currentTrack?.id && styles.current]}
-      onLongPress={drag}
       onPress={() => playTrack(item, queue)}
+      className={`flex-row items-center p-2 mb-2 rounded-lg bg-white/5 ${
+        item.id === currentTrack?.id ? 'border border-violet-500' : ''
+      }`}
+      onLongPress={drag}
     >
-      <Image source={{ uri: item.coverUrl }} style={styles.cover} />
-      <View style={styles.info}>
-        <Text style={styles.title} numberOfLines={1}>
+      <Image source={{ uri: item.coverUrl }} className="w-12 h-12 rounded-md" />
+      <View className="flex-1 ml-3">
+        <Text className="text-white text-sm font-semibold" numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.artist} numberOfLines={1}>
+        <Text className="text-slate-400 text-xs" numberOfLines={1}>
           {item.artist}
         </Text>
       </View>
-      <TouchableOpacity onPress={() => removeFromQueue(item.id)} style={styles.remove}>
+      <TouchableOpacity onPress={() => removeFromQueue(item.id)} className="p-2">
         <Trash2 color="#ef4444" size={18} />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -76,18 +70,12 @@ export default function QueueModal({ visible, onClose }: Props) {
             </TouchableOpacity>
           </View>
 
-          {queue.length > 0 && (
-            <TouchableOpacity onPress={clearQueue} style={styles.clearBtn}>
-              <Text style={styles.clearText}>Clear Queue</Text>
-            </TouchableOpacity>
-          )}
-
           <DraggableFlatList
             ref={listRef}
             data={queue}
             keyExtractor={(item) => item.id}
-            onDragEnd={({ from, to }) => reorderQueue(from, to)}
             renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
           />
         </Animated.View>
       </View>
@@ -98,15 +86,15 @@ export default function QueueModal({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
   },
   content: {
     width: '90%',
     maxHeight: '80%',
-    borderRadius: 16,
     padding: 16,
+    borderRadius: 24,
     backgroundColor: '#1e293b',
   },
   header: {
@@ -117,32 +105,12 @@ const styles = StyleSheet.create({
   },
   heading: {
     fontSize: 20,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#fff',
+    fontWeight: '600',
+    color: 'white',
   },
-  closeBtn: { padding: 4 },
-  clearBtn: { alignSelf: 'flex-end', marginBottom: 8 },
-  clearText: {
-    fontFamily: 'Inter-SemiBold',
-    color: '#ef4444',
+  closeBtn: {
+    padding: 4,
   },
-  trackItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 8,
-    borderRadius: 8,
-  },
-  current: {
-    borderColor: '#8b5cf6',
-    borderWidth: 1,
-  },
-  cover: { width: 40, height: 40, borderRadius: 6 },
-  info: { flex: 1, marginLeft: 12 },
-  title: { color: '#fff', fontSize: 14, fontFamily: 'Inter-SemiBold' },
-  artist: { color: '#94a3b8', fontSize: 12, fontFamily: 'Inter-Regular' },
-  remove: { padding: 8 },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,
