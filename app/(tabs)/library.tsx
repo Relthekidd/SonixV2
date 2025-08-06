@@ -18,6 +18,7 @@ import { apiService } from '@/services/api';
 import { Heart, Music, Plus, X } from 'lucide-react-native';
 import TrackList from '@/components/TrackList';
 import { router } from 'expo-router';
+import { withAuthGuard } from '@/hoc/withAuthGuard'; // Added missing import
 
 type Filter = 'all' | 'singles' | 'albums' | 'liked' | 'playlists' | 'artists';
 
@@ -111,10 +112,24 @@ function LibraryScreen() {
           console.error('fetch artists', error);
           return;
         }
-        const rows = (data || []) as {
+        // Handle the case where data might be in different formats
+        if (!data) {
+          setFollowedArtists([]);
+          return;
+        }
+        
+        // Cast to unknown first, then to our expected type to handle the mismatch
+        const rows = data as unknown as {
           artist: { id: string; stage_name: string; avatar_url?: string | null };
         }[];
-        setFollowedArtists(rows.map((r) => r.artist));
+        
+        // Filter out any invalid entries and map to artists
+        const artists = rows
+          .filter(row => row.artist && typeof row.artist === 'object')
+          .map(row => row.artist)
+          .filter(artist => artist.id && artist.stage_name);
+          
+        setFollowedArtists(artists);
       });
   }, [user]);
 
@@ -487,4 +502,3 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 });
-
