@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ScrollView,
   ActivityIndicator,
   Share,
@@ -14,8 +13,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import { supabase } from '@/services/supabase';
-import { ArrowLeft, Play, Pause, Calendar, Music, Clock } from 'lucide-react-native';
+import { ArrowLeft, Play, Pause } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
+import HeroCard from '@/components/HeroCard';
 
 export default function TrackDetailScreen() {
   const router = useRouter();
@@ -197,52 +197,17 @@ export default function TrackDetailScreen() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.trackHeader,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-          ]}
-        >
-          <Image source={{ uri: track.coverUrl }} style={styles.trackCover} />
-          <Text style={styles.trackTitle}>{track.title}</Text>
-          <Text style={styles.trackArtist}>{track.artist}</Text>
-          {track.description && (
-            <Text style={styles.trackDescription}>{track.description}</Text>
-          )}
-          <View style={styles.trackMeta}>
-            <View style={styles.metaItem}>
-              <Calendar color="#94a3b8" size={16} />
-              <Text style={styles.metaText}>
-                {formatDate(track.releaseDate)}
-              </Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Clock color="#94a3b8" size={16} />
-              <Text style={styles.metaText}>
-                {formatDuration(track.duration)}
-              </Text>
-            </View>
-            {track.playCount && (
-              <View style={styles.metaItem}>
-                <Music color="#94a3b8" size={16} />
-                <Text style={styles.metaText}>
-                  {track.playCount.toLocaleString()} plays
-                </Text>
-              </View>
-            )}
-          </View>
-          {track.genres && track.genres.length > 0 && (
-            <View style={styles.genresContainer}>
-              {track.genres.map((genre, idx) => (
-                <View key={idx} style={styles.genreTag}>
-                  <Text style={styles.genreText}>{genre}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
+        <HeroCard
+          coverUrl={track.coverUrl}
+          title={track.title}
+          subtitle={track.artist}
+          description={track.description}
+          releaseDate={formatDate(track.releaseDate)}
+          duration={formatDuration(track.duration)}
+          playCount={track.playCount}
+          genres={track.genres}
+          moreMenu={<TrackMenu track={track} />}
+        />
 
         <View
           style={[
@@ -331,67 +296,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: { flex: 1 },
-  trackHeader: {
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 30,
-  },
-  trackCover: {
-    width: 280,
-    height: 280,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-  },
-  trackTitle: {
-    fontSize: 28,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  trackArtist: {
-    fontSize: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#a855f7',
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  trackDescription: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#cbd5e1',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  trackMeta: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 16,
-    marginBottom: 30,
-  },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#94a3b8' },
-  genresContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  genreTag: {
-    backgroundColor: 'rgba(139, 92, 246, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-  },
-  genreText: { fontSize: 12, fontFamily: 'Inter-Medium', color: '#8b5cf6' },
   controlsSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
