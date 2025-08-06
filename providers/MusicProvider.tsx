@@ -82,6 +82,12 @@ export interface AlbumResult {
   coverUrl: string;
 }
 
+export interface PlaylistResult {
+  id: string;
+  title: string;
+  coverUrl: string;
+}
+
 interface MusicContextType {
   currentTrack: Track | null;
   isPlaying: boolean;
@@ -111,6 +117,7 @@ interface MusicContextType {
   ) => Promise<{
     tracks: Track[];
     albums: AlbumResult[];
+    playlists: PlaylistResult[];
     singles: Track[];
     artists: Artist[];
     users: UserProfile[];
@@ -583,11 +590,24 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   ) => {
     const term = query.trim();
     if (!term) {
-      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+      return {
+        tracks: [],
+        albums: [],
+        playlists: [],
+        singles: [],
+        artists: [],
+        users: [],
+      };
     }
 
     try {
-      const [trackRes, artistRes, albumRes, userRes] = await Promise.all([
+      const [
+        trackRes,
+        artistRes,
+        albumRes,
+        playlistRes,
+        userRes,
+      ] = await Promise.all([
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
@@ -610,6 +630,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .ilike('title', `%${term}%`)
           .limit(10),
         supabase
+          .from('playlists')
+          .select('id,title,cover_url')
+          .eq('is_public', true)
+          .ilike('title', `%${term}%`)
+          .limit(10),
+        supabase
           .from('users')
           .select('id,display_name,profile_picture_url')
           .ilike('display_name', `%${term}%`)
@@ -618,7 +644,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
       const tracks = (trackRes.data || []).map((t: TrackRow) => mapTrack(t));
       const albums = (albumRes.data || []).map(
-        (a: { id: string; title: string; cover_url?: string | null; artist?: { name?: string } | null }) => ({
+        (a: {
+          id: string;
+          title: string;
+          cover_url?: string | null;
+          artist?: { name?: string } | null;
+        }) => ({
           id: a.id,
           title: a.title,
           artist: a.artist?.name || 'Unknown Artist',
@@ -626,16 +657,32 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         }),
       );
 
+      const playlists = (playlistRes.data || []).map(
+        (p: { id: string; title: string; cover_url?: string | null }) => ({
+          id: p.id,
+          title: p.title,
+          coverUrl: apiService.getPublicUrl('images', p.cover_url || ''),
+        }),
+      );
+
       return {
         tracks,
         albums,
+        playlists,
         singles: [],
         artists: (artistRes.data || []) as Artist[],
         users: (userRes.data || []) as UserProfile[],
       };
     } catch (err) {
       console.error('searchMusic error', err);
-      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+      return {
+        tracks: [],
+        albums: [],
+        playlists: [],
+        singles: [],
+        artists: [],
+        users: [],
+      };
     }
   };
 
