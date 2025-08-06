@@ -105,7 +105,7 @@ function LibraryScreen() {
     if (!user) return;
     supabase
       .from('artist_followers')
-      .select('artist:artist_id(id, stage_name, avatar_url)')
+      .select('artist:artist_id(id, avatar_url)')
       .eq('user_id', user.id)
       .then(({ data, error }) => {
         if (error) {
