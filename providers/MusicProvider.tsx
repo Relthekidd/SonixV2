@@ -9,7 +9,7 @@ import React, {
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
-import { apiService } from '@/services/api';
+import { apiService, Artist } from '@/services/api';
 import { useAuth } from './AuthProvider';
 import { useUserStats } from './UserStatsProvider';
 
@@ -33,6 +33,7 @@ export interface Track {
   trackNumber?: number;
   lyrics?: string;
   likeCount?: number;
+  featuredArtists?: Artist[];
 }
 
 export interface Playlist {

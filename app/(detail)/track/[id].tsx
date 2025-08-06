@@ -13,7 +13,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
-import { supabase } from '@/services/supabase';
 import { ArrowLeft, X } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
 import TrackList from '@/components/TrackList';
@@ -56,66 +55,36 @@ export default function TrackDetailScreen() {
     setError(null);
 
     try {
-      const { data, error } = await supabase
-        .from('tracks')
-        .select(`*, artist:artist_id(*), album:album_id(*)`)
-        .eq('id', id)
-        .single();
-
-      if (error || !data) throw error;
-
-      // If this track isn't part of an album, check if it's registered as a single
-      let singleExtra: {
-        release_date?: string;
-        lyrics?: string;
-        description?: string;
-      } | null = null;
-      if (!data.album_id) {
-        const { data: s } = await supabase
-          .from('singles')
-          .select('*')
-          .eq('track_id', data.id)
-          .single();
-        singleExtra = s || null;
-      }
+      const data = await apiService.getTrackById(id);
 
       const transformedTrack: Track = {
         id: data.id,
         title: data.title,
-        artist:
-          data.artist?.name ||
-          data.artist_name ||
-          data.artist ||
-          'Unknown Artist',
-        artistId: data.artist_id,
-        album: data.album?.title || data.album_title || 'Single',
+        artist: data.artist?.name || 'Unknown Artist',
+        artistId: data.artist_id || undefined,
+        album: data.album?.title || 'Single',
         duration: data.duration || 180,
-        coverUrl: apiService.getPublicUrl(
-          'images',
-          data.cover_url || data.album?.cover_url || '',
-        ),
-        audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
+        coverUrl:
+          data.cover_url ||
+          data.album?.cover_url ||
+          'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
+        audioUrl: data.audio_url,
         isLiked: likedSongIds.includes(data.id),
         genre: Array.isArray(data.genres)
           ? data.genres[0]
-          : data.genre || 'Unknown',
-        releaseDate:
-          data.release_date || singleExtra?.release_date || data.created_at,
-        year:
-          data.release_date || singleExtra?.release_date
-            ? new Date(
-                data.release_date ||
-                  singleExtra?.release_date ||
-                  data.created_at,
-              )
-                .getFullYear()
-                .toString()
-            : undefined,
+          : typeof data.genres === 'string'
+            ? data.genres
+            : 'Unknown',
+        releaseDate: data.release_date || '',
+        year: data.release_date
+          ? new Date(data.release_date).getFullYear().toString()
+          : undefined,
         playCount: data.play_count,
         likeCount: data.like_count,
-        lyrics: data.lyrics || singleExtra?.lyrics || '',
-        description: data.description || singleExtra?.description || '',
-        genres: data.genres,
+        lyrics: data.lyrics || '',
+        description: data.description || '',
+        genres: data.genres || undefined,
+        featuredArtists: data.featured_artists,
       };
       setTrack(transformedTrack);
     } catch (err) {
@@ -200,7 +169,8 @@ export default function TrackDetailScreen() {
         <HeroCard
           coverUrl={track.coverUrl}
           title={track.title}
-          subtitle={track.artist}
+          mainArtist={{ id: track.artistId || 'unknown', name: track.artist }}
+          featuredArtists={track.featuredArtists}
           description={track.description}
           releaseDate={formatDate(track.releaseDate)}
           duration={formatDuration(track.duration)}

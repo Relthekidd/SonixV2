@@ -5,7 +5,13 @@ import { supabase } from './supabase';
 // Base URL for any REST endpoints if needed
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || '';
 
-// Define types for album and track details
+// Define types for album, track, and artist details
+export interface Artist {
+  id: string;
+  name: string;
+  avatar_url?: string | null;
+}
+
 export interface TrackData {
   id: string;
   title: string;
@@ -15,13 +21,19 @@ export interface TrackData {
   play_count: number | null;
   like_count: number | null;
   lyrics: string | null;
+  artist_id?: string | null;
+  artist?: Artist | null;
+  featured_artist_ids?: string[] | null;
+  featured_artists?: Artist[];
 }
 
 export interface AlbumDetails {
   id: string;
   title: string;
-  artist: string; // aliased from artist_name
+  artist: Artist | null;
   artist_id?: string | null;
+  featured_artists: Artist[];
+  featured_artist_ids?: string[] | null;
   cover_url: string;
   description?: string;
   release_date?: string;
@@ -39,7 +51,9 @@ interface TrackDetails {
   lyrics?: string | null;
   cover_url?: string | null;
   artist_id?: string | null;
-  artist?: { name?: string } | null;
+  artist?: Artist | null;
+  featured_artist_ids?: string[] | null;
+  featured_artists?: Artist[];
   album_id?: string | null;
   album?: { title?: string; cover_url?: string | null } | null;
   description?: string | null;
@@ -97,6 +111,16 @@ class ApiService {
     } catch (err) {
       console.error('[ApiService] recordPlay error', err);
     }
+  }
+
+  private async fetchArtists(ids: string[]): Promise<Artist[]> {
+    if (!ids.length) return [];
+    const { data, error } = await supabase
+      .from('artists')
+      .select('id, name, avatar_url')
+      .in('id', ids);
+    if (error) throw error;
+    return (data as Artist[]) || [];
   }
 
   /**
@@ -160,7 +184,6 @@ class ApiService {
         .select(
           `
           *,
-          artist:artist_id(*),
           tracks (
             id,
             title,
@@ -169,12 +192,14 @@ class ApiService {
             track_number,
             play_count,
             like_count,
-            lyrics
+            lyrics,
+            artist_id,
+            featured_artist_ids
           )
         `,
         )
-        .eq('id', id) // ← filter by album id
-        .single(); // ← expect a single row
+        .eq('id', id)
+        .single();
 
       if (error) {
         console.error('[ApiService] getAlbumById supabase error', error);
@@ -182,17 +207,51 @@ class ApiService {
       }
 
       console.log('[ApiService] getAlbumById success', data);
+
+      const artistIds = new Set<string>();
+      const mainArtistId = data.main_artist_id || data.artist_id || null;
+      if (mainArtistId) artistIds.add(mainArtistId);
+      (data.featured_artist_ids || []).forEach((aid: string) =>
+        artistIds.add(aid),
+      );
+      (data.tracks || []).forEach((t: any) => {
+        if (t.artist_id) artistIds.add(t.artist_id);
+        (t.featured_artist_ids || []).forEach((fid: string) =>
+          artistIds.add(fid),
+        );
+      });
+
+      const artists = await this.fetchArtists(Array.from(artistIds));
+      const artistMap = new Map(artists.map((a) => [a.id, a]));
+
       const album: AlbumDetails = {
         id: data.id,
         title: data.title,
-        artist: data.artist?.name || data.artist_name || '',
-        artist_id: data.artist_id,
+        artist: mainArtistId ? artistMap.get(mainArtistId) || null : null,
+        artist_id: mainArtistId,
+        featured_artists:
+          (data.featured_artist_ids || [])
+            .map((aid: string) => artistMap.get(aid))
+            .filter(Boolean) as Artist[],
+        featured_artist_ids: data.featured_artist_ids || [],
         cover_url: this.getPublicUrl('images', data.cover_url),
         description: data.description || undefined,
         release_date: data.release_date || undefined,
-        tracks: (data.tracks || []).map((t: TrackData) => ({
-          ...t,
+        tracks: (data.tracks || []).map((t: any) => ({
+          id: t.id,
+          title: t.title,
+          duration: t.duration,
           audio_url: this.getPublicUrl('audio-files', t.audio_url),
+          track_number: t.track_number,
+          play_count: t.play_count,
+          like_count: t.like_count,
+          lyrics: t.lyrics,
+          artist_id: t.artist_id,
+          artist: t.artist_id ? artistMap.get(t.artist_id) || null : null,
+          featured_artist_ids: t.featured_artist_ids || [],
+          featured_artists: (t.featured_artist_ids || [])
+            .map((fid: string) => artistMap.get(fid))
+            .filter(Boolean) as Artist[],
         })),
       };
       return album;
@@ -208,10 +267,15 @@ class ApiService {
   async getTrackById(id: string): Promise<TrackDetails> {
     const { data, error } = await supabase
       .from('tracks')
-      .select(`*, artist:artist_id(*), album:album_id(*)`)
+      .select(`*, artist:artist_id(id,name,avatar_url), album:album_id(*)`)
       .eq('id', id)
       .single();
     if (error) throw error;
+
+    const featuredArtists = await this.fetchArtists(
+      data.featured_artist_ids || [],
+    );
+
     const track: TrackDetails = {
       id: data.id,
       title: data.title,
@@ -224,6 +288,8 @@ class ApiService {
       cover_url: this.getPublicUrl('images', data.cover_url),
       artist_id: data.artist_id,
       artist: data.artist,
+      featured_artist_ids: data.featured_artist_ids || [],
+      featured_artists: featuredArtists,
       album_id: data.album_id,
       album: data.album,
       description: data.description,
