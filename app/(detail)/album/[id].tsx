@@ -289,7 +289,10 @@ function AlbumDetailScreen() {
         {tracks.map((item) => (
           <TouchableOpacity
             key={item.id}
-            style={styles.trackItem}
+            style={[
+              styles.trackItem,
+              currentTrack?.id === item.id && styles.currentTrack,
+            ]}
             onPress={() => handleTrackPress(item)}
           >
             <View style={styles.trackNumber}>
@@ -405,6 +408,9 @@ const styles = StyleSheet.create({
     marginHorizontal: 20,
     marginBottom: 8,
     borderRadius: 8,
+  },
+  currentTrack: {
+    backgroundColor: 'rgba(139,92,246,0.15)',
   },
   trackNumber: { width: 24, alignItems: 'center' },
   trackNumberText: {

@@ -139,81 +139,105 @@ function SearchScreen() {
   };
   const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
-  const renderTrackItem = ({ item }: { item: Track }) => (
-    <TouchableOpacity
-      style={[
-        styles.resultItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/track/${item.id}`)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
-      <View style={styles.resultInfo}>
-        <Text style={styles.resultTitle} numberOfLines={1}>
+  const renderTrackItem = ({
+    item,
+    index,
+  }: {
+    item: Track;
+    index: number;
+  }) => (
+    <Animated.View entering={FadeInDown.delay(index * 50)}>
+      <TouchableOpacity
+        style={[
+          styles.resultItem,
+          styles.glassCard,
+          styles.brutalBorder,
+          styles.brutalShadow,
+        ]}
+        onPress={() => router.push(`/track/${item.id}`)}
+      >
+        <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
+        <View style={styles.resultInfo}>
+          <Text style={styles.resultTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.resultSubtitle} numberOfLines={1}>
+            {item.artist} • Song
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.likeButton}
+          onPress={() => handleToggleLike(item.id)}
+        >
+          <Heart
+            color={item.isLiked ? '#ef4444' : '#94a3b8'}
+            fill={item.isLiked ? '#ef4444' : 'transparent'}
+            size={18}
+          />
+        </TouchableOpacity>
+        <TrackMenu track={item} />
+        <TouchableOpacity
+          style={styles.playButton}
+          onPress={() => handleTrackPress(item)}
+        >
+          {currentTrack?.id === item.id && isPlaying ? (
+            <Pause color="#8b5cf6" size={20} />
+          ) : (
+            <Play color="#8b5cf6" size={20} />
+          )}
+        </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderAlbumItem = ({
+    item,
+    index,
+  }: {
+    item: AlbumResult;
+    index: number;
+  }) => (
+    <Animated.View entering={FadeInDown.delay(index * 50)}>
+      <TouchableOpacity
+        style={[
+          styles.artistItem,
+          styles.glassCard,
+          styles.brutalBorder,
+          styles.brutalShadow,
+        ]}
+        onPress={() => router.push(`/album/${item.id}`)}
+      >
+        <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
+        <Text style={styles.artistName} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text style={styles.resultSubtitle} numberOfLines={1}>
-          {item.artist} • Song
+      </TouchableOpacity>
+    </Animated.View>
+  );
+
+  const renderPlaylistItem = ({
+    item,
+    index,
+  }: {
+    item: PlaylistResult;
+    index: number;
+  }) => (
+    <Animated.View entering={FadeInDown.delay(index * 50)}>
+      <TouchableOpacity
+        style={[
+          styles.artistItem,
+          styles.glassCard,
+          styles.brutalBorder,
+          styles.brutalShadow,
+        ]}
+        onPress={() => router.push(`/playlist/${item.id}`)}
+      >
+        <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
+        <Text style={styles.artistName} numberOfLines={1}>
+          {item.title}
         </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.likeButton}
-        onPress={() => handleToggleLike(item.id)}
-      >
-        <Heart
-          color={item.isLiked ? '#ef4444' : '#94a3b8'}
-          fill={item.isLiked ? '#ef4444' : 'transparent'}
-          size={18}
-        />
       </TouchableOpacity>
-      <TrackMenu track={item} />
-      <TouchableOpacity
-        style={styles.playButton}
-        onPress={() => handleTrackPress(item)}
-      >
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
-  const renderAlbumItem = ({ item }: { item: AlbumResult }) => (
-    <TouchableOpacity
-      style={[
-        styles.artistItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/album/${item.id}`)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
-      <Text style={styles.artistName} numberOfLines={1}>
-        {item.title}
-      </Text>
-    </TouchableOpacity>
-  );
-
-  const renderPlaylistItem = ({ item }: { item: PlaylistResult }) => (
-    <TouchableOpacity
-      style={[
-        styles.artistItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/playlist/${item.id}`)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
-      <Text style={styles.artistName} numberOfLines={1}>
-        {item.title}
-      </Text>
-    </TouchableOpacity>
+    </Animated.View>
   );
 
   type PersonResult = {
@@ -240,32 +264,40 @@ function SearchScreen() {
     })),
   ];
 
-  const renderPersonItem = ({ item }: { item: PersonResult }) => (
-    <TouchableOpacity
-      style={[
-        styles.artistItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() =>
-        router.push(
-          item.type === 'artist' ? `/artist/${item.id}` : `/profile/${item.id}`,
-        )
-      }
-    >
-      <Image
-        source={{
-          uri:
-            item.avatar ||
-            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
-        }}
-        style={styles.artistImage}
-      />
-      <Text style={styles.artistName} numberOfLines={1}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
+  const renderPersonItem = ({
+    item,
+    index,
+  }: {
+    item: PersonResult;
+    index: number;
+  }) => (
+    <Animated.View entering={FadeInDown.delay(index * 50)}>
+      <TouchableOpacity
+        style={[
+          styles.artistItem,
+          styles.glassCard,
+          styles.brutalBorder,
+          styles.brutalShadow,
+        ]}
+        onPress={() =>
+          router.push(
+            item.type === 'artist' ? `/artist/${item.id}` : `/profile/${item.id}`,
+          )
+        }
+      >
+        <Image
+          source={{
+            uri:
+              item.avatar ||
+              'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
+          }}
+          style={styles.artistImage}
+        />
+        <Text style={styles.artistName} numberOfLines={1}>
+          {item.name}
+        </Text>
+      </TouchableOpacity>
+    </Animated.View>
   );
 
   return (
