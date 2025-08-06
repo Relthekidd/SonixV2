@@ -1,16 +1,15 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, Image, StyleSheet } from 'react-native';
 import { Calendar, Clock, Music } from 'lucide-react-native';
+import { router } from 'expo-router';
+import type { Artist } from '@/services/api';
 
 interface Props {
   coverUrl: string;
   title: string;
   subtitle?: string;
+  mainArtist?: Artist | null;
+  featuredArtists?: Artist[];
   description?: string;
   releaseDate?: string;
   duration?: string;
@@ -22,6 +21,8 @@ export default function Hero({
   coverUrl,
   title,
   subtitle,
+  mainArtist,
+  featuredArtists,
   description,
   releaseDate,
   duration,
@@ -33,7 +34,41 @@ export default function Hero({
       <Image source={{ uri: coverUrl }} style={styles.cover} />
 
       <Text style={styles.title}>{title}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      {mainArtist ? (
+        <Text
+          style={styles.subtitle}
+          onPress={() =>
+            router.push({
+              pathname: `/artist/${mainArtist.id}`,
+              params: { artist: JSON.stringify(mainArtist) },
+            })
+          }
+        >
+          {mainArtist.name || 'Unknown Artist'}
+        </Text>
+      ) : (
+        subtitle && <Text style={styles.subtitle}>{subtitle}</Text>
+      )}
+      {featuredArtists && featuredArtists.length > 0 && (
+        <Text style={styles.featured}>
+          {'feat. '}
+          {featuredArtists.map((a, idx) => (
+            <Text
+              key={a.id}
+              style={styles.featured}
+              onPress={() =>
+                router.push({
+                  pathname: `/artist/${a.id}`,
+                  params: { artist: JSON.stringify(a) },
+                })
+              }
+            >
+              {a.name}
+              {idx < featuredArtists.length - 1 ? ', ' : ''}
+            </Text>
+          ))}
+        </Text>
+      )}
       {description && <Text style={styles.description}>{description}</Text>}
 
       {(releaseDate || duration || playCount !== undefined) && (
@@ -103,6 +138,13 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontFamily: 'Inter-SemiBold',
     color: '#a855f7',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  featured: {
+    fontSize: 16,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
     textAlign: 'center',
     marginBottom: 12,
   },

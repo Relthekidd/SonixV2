@@ -62,8 +62,8 @@ function AlbumDetailScreen() {
         (t: TrackData, idx: number): Track => ({
           id: t.id,
           title: t.title,
-          artist: albumData.artist || 'Unknown',
-          artistId: albumData.artist_id || undefined,
+          artist: t.artist?.name || albumData.artist?.name || 'Unknown Artist',
+          artistId: t.artist?.id || albumData.artist_id || undefined,
           album: albumData.title,
           duration: t.duration,
           coverUrl: albumData.cover_url,
@@ -79,6 +79,7 @@ function AlbumDetailScreen() {
             ? new Date(albumData.release_date).getFullYear().toString()
             : undefined,
           description: '',
+          featuredArtists: t.featured_artists,
         }),
       );
 
@@ -227,7 +228,8 @@ function AlbumDetailScreen() {
         <HeroCard
           coverUrl={album.cover_url}
           title={album.title}
-          subtitle={album.artist}
+          mainArtist={album.artist}
+          featuredArtists={album.featured_artists}
           description={album.description}
           releaseDate={
             album.release_date ? formatDate(album.release_date) : undefined

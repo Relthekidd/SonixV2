@@ -35,7 +35,44 @@ export default function TrackItem({
             {track.title}
           </Text>
           <Text style={styles.artist} numberOfLines={1}>
-            {track.artist}
+            <Text
+              style={styles.artist}
+              onPress={() =>
+                track.artistId
+                  ? router.push({
+                      pathname: `/artist/${track.artistId}`,
+                      params: {
+                        artist: JSON.stringify({
+                          id: track.artistId,
+                          name: track.artist,
+                        }),
+                      },
+                    })
+                  : undefined
+              }
+            >
+              {track.artist || 'Unknown Artist'}
+            </Text>
+            {track.featuredArtists && track.featuredArtists.length > 0 && (
+              <Text style={styles.artist}>
+                {' feat. '}
+                {track.featuredArtists.map((a, idx) => (
+                  <Text
+                    key={a.id}
+                    style={styles.artist}
+                    onPress={() =>
+                      router.push({
+                        pathname: `/artist/${a.id}`,
+                        params: { artist: JSON.stringify(a) },
+                      })
+                    }
+                  >
+                    {a.name}
+                    {idx < track.featuredArtists.length - 1 ? ', ' : ''}
+                  </Text>
+                ))}
+              </Text>
+            )}
           </Text>
         </View>
       </TouchableOpacity>
