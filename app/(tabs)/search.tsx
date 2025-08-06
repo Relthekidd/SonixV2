@@ -25,23 +25,16 @@ import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { apiService } from '@/services/api';
 import TrackMenu from '@/components/TrackMenu';
 
-interface ArtistResult {
-  id: string;
-  name: string;
-  avatar_url?: string | null;
-}
-
 interface UserResult {
   id: string;
-  display_name: string;
-  profile_picture_url?: string | null;
+  username: string;
+  avatar_url?: string | null;
 }
 
 interface SearchResults {
   tracks: Track[];
   albums: AlbumResult[];
   playlists: PlaylistResult[];
-  artists: ArtistResult[];
   users: UserResult[];
 }
 
@@ -51,7 +44,6 @@ function SearchScreen() {
     tracks: [],
     albums: [],
     playlists: [],
-    artists: [],
     users: [],
   });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
@@ -93,7 +85,6 @@ function SearchScreen() {
         tracks: [],
         albums: [],
         playlists: [],
-        artists: [],
         users: [],
       });
       return;
@@ -114,7 +105,6 @@ function SearchScreen() {
         tracks: res.tracks,
         albums: res.albums as AlbumResult[],
         playlists: res.playlists as PlaylistResult[],
-        artists: res.artists as ArtistResult[],
         users: res.users as UserResult[],
       });
     } catch (err) {
@@ -139,13 +129,7 @@ function SearchScreen() {
   };
   const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
-  const renderTrackItem = ({
-    item,
-    index,
-  }: {
-    item: Track;
-    index: number;
-  }) => (
+  const renderTrackItem = ({ item, index }: { item: Track; index: number }) => (
     <Animated.View entering={FadeInDown.delay(index * 50)}>
       <TouchableOpacity
         style={[
@@ -240,35 +224,11 @@ function SearchScreen() {
     </Animated.View>
   );
 
-  type PersonResult = {
-    id: string;
-    name: string;
-    avatar: string | null;
-    type: 'artist' | 'user';
-  };
-
-  const people: PersonResult[] = [
-    ...results.artists.map((a) => ({
-      id: a.id,
-      name: a.name,
-      avatar: a.avatar_url
-        ? apiService.getPublicUrl('images', a.avatar_url)
-        : null,
-      type: 'artist' as const,
-    })),
-    ...results.users.map((u) => ({
-      id: u.id,
-      name: u.display_name,
-      avatar: u.profile_picture_url || null,
-      type: 'user' as const,
-    })),
-  ];
-
-  const renderPersonItem = ({
+  const renderUserItem = ({
     item,
     index,
   }: {
-    item: PersonResult;
+    item: UserResult;
     index: number;
   }) => (
     <Animated.View entering={FadeInDown.delay(index * 50)}>
@@ -279,22 +239,19 @@ function SearchScreen() {
           styles.brutalBorder,
           styles.brutalShadow,
         ]}
-        onPress={() =>
-          router.push(
-            item.type === 'artist' ? `/artist/${item.id}` : `/profile/${item.id}`,
-          )
-        }
+        onPress={() => router.push(`/profile/${item.id}`)}
       >
         <Image
           source={{
             uri:
-              item.avatar ||
-              'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
+              item.avatar_url
+                ? apiService.getPublicUrl('images', item.avatar_url)
+                : 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
           }}
           style={styles.artistImage}
         />
         <Text style={styles.artistName} numberOfLines={1}>
-          {item.name}
+          {item.username}
         </Text>
       </TouchableOpacity>
     </Animated.View>
@@ -318,7 +275,7 @@ function SearchScreen() {
               <Search color="#8b5cf6" size={20} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search for songs, artists, or albums..."
+                placeholder="Search for songs, albums, or users..."
                 placeholderTextColor="#64748b"
                 value={query}
                 onChangeText={setQuery}
@@ -415,25 +372,25 @@ function SearchScreen() {
                 </View>
               )}
 
-              {/* Artists/Users Section */}
-              {people.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Artists/Users</Text>
-                  <FlatList
-                    data={people}
-                    renderItem={renderPersonItem}
-                    keyExtractor={(item) => `${item.type}-${item.id}`}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                  />
-                </View>
-              )}
+          {/* Users Section */}
+          {results.users.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Users</Text>
+              <FlatList
+                data={results.users}
+                renderItem={renderUserItem}
+                keyExtractor={(item) => item.id}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+              />
+            </View>
+          )}
 
               {/* No Results */}
               {results.tracks.length === 0 &&
                 results.albums.length === 0 &&
                 results.playlists.length === 0 &&
-                people.length === 0 && (
+                results.users.length === 0 && (
                   <View style={styles.noResultsContainer}>
                     <Text style={styles.noResultsText}>
                       No results found for &quot;{query}&quot;

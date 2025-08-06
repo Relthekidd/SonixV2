@@ -118,7 +118,7 @@ function ProfileScreen() {
 
       if (displayName !== profile.display_name) {
         const { error: userErr } = await supabase
-          .from('users')
+          .from('profiles')
           .update({ display_name: displayName })
           .eq('id', profile.id);
         if (userErr) throw userErr;
