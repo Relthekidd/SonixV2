@@ -16,9 +16,6 @@ import { useAuth } from '@/providers/AuthProvider';
 import { apiService } from '@/services/api';
 import {
   ArrowLeft,
-  Play,
-  Pause,
-  MoreVertical,
   Users,
   UserPlus,
   UserCheck,
@@ -54,16 +51,16 @@ interface TrackDetailsRow {
   featured_artists?: { id: string; name: string }[];
 }
 
-interface SingleRow {
-  id: string;
-  track?: TrackDetailsRow | null;
-}
-
 interface AlbumSummary {
   id: string;
   title: string;
   cover_url: string;
+  release_date: string;
 }
+
+type RecentRelease =
+  | { type: 'album'; item: AlbumSummary }
+  | { type: 'track'; item: Track };
 
 interface ArtistInfo extends Artist {
   follower_count?: number | null;
@@ -79,16 +76,16 @@ export default function ArtistDetailScreen() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [topTracks, setTopTracks] = useState<Track[]>([]);
   const [singles, setSingles] = useState<Track[]>([]);
-  const [looseTracks, setLooseTracks] = useState<Track[]>([]);
-  const [albums, setAlbums] = useState<
-    { id: string; title: string; cover_url: string }[]
-  >([]);
+  const [albums, setAlbums] = useState<AlbumSummary[]>([]);
+  const [appearsOn, setAppearsOn] = useState<Track[]>([]);
+  const [recentRelease, setRecentRelease] = useState<RecentRelease | null>(null);
   const [followerCount, setFollowerCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
+    useMusic();
 
   useEffect(() => {
     if (id) loadArtistDetails();
@@ -97,12 +94,18 @@ export default function ArtistDetailScreen() {
   const loadArtistDetails = async () => {
     setIsLoading(true);
     try {
-      const [artistInfo, trackRows, singlesData, albumData] = (await Promise.all([
-        apiService.getArtistDetails(id!, user?.id),
-        apiService.getArtistTracks(id!),
-        apiService.getArtistSingles(id!),
-        apiService.getArtistAlbums(id!),
-      ])) as [ArtistInfo, TrackDetailsRow[], SingleRow[], AlbumSummary[]];
+      const [artistInfo, trackRows, albumData, appearsData] =
+        (await Promise.all([
+          apiService.getArtistDetails(id!, user?.id),
+          apiService.getArtistTracks(id!),
+          apiService.getArtistAlbums(id!),
+          apiService.getArtistAppearances(id!),
+        ])) as [
+          ArtistInfo,
+          TrackDetailsRow[],
+          AlbumSummary[],
+          TrackDetailsRow[],
+        ];
 
       setArtist({
         id: String(artistInfo.id),
@@ -121,22 +124,48 @@ export default function ArtistDetailScreen() {
       const allTracks = trackRows.map(transformTrack);
       setTracks(allTracks);
 
-      const singleIds = singlesData
-        .map((s) => s.track?.id)
-        .filter(Boolean) as string[];
-      const singleTracks = allTracks.filter((t) => singleIds.includes(t.id));
-      const loose = allTracks.filter(
-        (t) => !t.albumId && !singleIds.includes(t.id),
-      );
+      const singleTracks = allTracks
+        .filter((t) => !t.albumId)
+        .sort(
+          (a, b) =>
+            new Date(b.releaseDate).getTime() -
+            new Date(a.releaseDate).getTime(),
+        );
       setSingles(singleTracks);
-      setLooseTracks(loose);
 
       const top = [...allTracks]
         .sort((a, b) => (b.playCount || 0) - (a.playCount || 0))
-        .slice(0, 5);
+        .slice(0, 10);
       setTopTracks(top);
 
       setAlbums(albumData);
+
+      const appears = appearsData.map(transformTrack);
+      setAppearsOn(appears);
+
+      const latestTrack = allTracks
+        .slice()
+        .sort(
+          (a, b) =>
+            new Date(b.releaseDate).getTime() -
+            new Date(a.releaseDate).getTime(),
+        )[0];
+      const latestAlbum = albumData[0];
+      let recent: RecentRelease | null = null;
+      if (latestAlbum && latestTrack) {
+        const albumDate = new Date(latestAlbum.release_date).getTime();
+        const trackDate = new Date(latestTrack.releaseDate).getTime();
+        if (albumDate >= trackDate) {
+          recent = { type: 'album', item: latestAlbum };
+        } else {
+          recent = { type: 'track', item: latestTrack };
+        }
+      } else if (latestAlbum) {
+        recent = { type: 'album', item: latestAlbum };
+      } else if (latestTrack) {
+        recent = { type: 'track', item: latestTrack };
+      }
+      setRecentRelease(recent);
     } catch (err) {
       console.error(err);
       setError('Failed to load artist data');
@@ -158,7 +187,7 @@ export default function ArtistDetailScreen() {
       t.album?.cover_url ||
       'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
     audioUrl: t.audio_url,
-    isLiked: false,
+    isLiked: likedSongIds.includes(t.id),
     genre: Array.isArray(t.genres)
       ? String(t.genres[0] || '')
       : typeof t.genres === 'string'
@@ -173,29 +202,15 @@ export default function ArtistDetailScreen() {
     featuredArtists: t.featured_artists || [],
   });
 
-  const handleTrackPress = (track: Track) => {
+  const handleTrackPress = (track: Track, list: Track[] = tracks) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
         pauseTrack();
       } else {
-        playTrack(track, tracks);
+        playTrack(track, list);
       }
     } else {
-      playTrack(track, tracks);
-    }
-  };
-
-  const handlePlayAll = () => {
-    if (!tracks.length) return;
-    const first = tracks[0];
-    if (currentTrack?.id === first.id) {
-      if (isPlaying) {
-        pauseTrack();
-      } else {
-        playTrack(first, tracks);
-      }
-    } else {
-      playTrack(first, tracks);
+      playTrack(track, list);
     }
   };
 
@@ -242,9 +257,6 @@ export default function ArtistDetailScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <ArrowLeft color="#fff" size={24} />
           </TouchableOpacity>
-          <TouchableOpacity>
-            <MoreVertical color="#fff" size={24} />
-          </TouchableOpacity>
         </View>
 
         <View style={styles.artistInfo}>
@@ -280,28 +292,46 @@ export default function ArtistDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.playAllContainer}>
-          <TouchableOpacity
-            style={[
-              styles.playAllButton,
-              styles.glassCard,
-              styles.brutalBorder,
-              styles.brutalShadow,
-            ]}
-            onPress={handlePlayAll}
-          >
-            {currentTrack?.id === tracks[0]?.id && isPlaying ? (
-              <Pause size={24} color="#8b5cf6" />
-            ) : (
-              <Play size={24} color="#8b5cf6" />
-            )}
-            <Text style={styles.playAllText}>
-              {currentTrack?.id === tracks[0]?.id && isPlaying
-                ? 'Pause'
-                : 'Play All'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        {recentRelease && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Most Recent Release</Text>
+            <TouchableOpacity
+              style={[
+                styles.recentCard,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+              onPress={() =>
+                recentRelease.type === 'album'
+                  ? router.push(`/album/${recentRelease.item.id}` as const)
+                  : router.push(`/track/${recentRelease.item.id}` as const)
+              }
+            >
+              <Image
+                source={{
+                  uri:
+                    recentRelease.type === 'album'
+                      ? recentRelease.item.cover_url
+                      : recentRelease.item.coverUrl,
+                }}
+                style={styles.recentCover}
+              />
+              <View style={styles.recentInfo}>
+                <Text style={styles.recentTitle} numberOfLines={1}>
+                  {recentRelease.item.title}
+                </Text>
+                <Text style={styles.recentDate}>
+                  {new Date(
+                    recentRelease.type === 'album'
+                      ? recentRelease.item.release_date
+                      : recentRelease.item.releaseDate,
+                  ).toLocaleDateString()}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {topTracks.length > 0 && (
           <View style={styles.section}>
@@ -310,7 +340,23 @@ export default function ArtistDetailScreen() {
               tracks={topTracks}
               currentTrackId={currentTrack?.id}
               isPlaying={isPlaying}
-              onPlay={handleTrackPress}
+              onPlay={(t) => handleTrackPress(t, topTracks)}
+              showLikeButton
+              showOptionsMenu={false}
+            />
+          </View>
+        )}
+
+        {singles.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Singles</Text>
+            <TrackList
+              tracks={singles}
+              currentTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onPlay={(t) => handleTrackPress(t, singles)}
+              showLikeButton
+              showOptionsMenu={false}
             />
           </View>
         )}
@@ -334,32 +380,25 @@ export default function ArtistDetailScreen() {
                   <Text style={styles.albumTitle} numberOfLines={1}>
                     {a.title}
                   </Text>
+                  <Text style={styles.albumDate}>
+                    {new Date(a.release_date).toLocaleDateString()}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         )}
 
-        {singles.length > 0 && (
+        {appearsOn.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Singles</Text>
+            <Text style={styles.sectionTitle}>Appears On</Text>
             <TrackList
-              tracks={singles}
+              tracks={appearsOn}
               currentTrackId={currentTrack?.id}
               isPlaying={isPlaying}
-              onPlay={handleTrackPress}
-            />
-          </View>
-        )}
-
-        {looseTracks.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Loose Tracks</Text>
-            <TrackList
-              tracks={looseTracks}
-              currentTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlay={handleTrackPress}
+              onPlay={(t) => handleTrackPress(t, appearsOn)}
+              showLikeButton
+              showOptionsMenu={false}
             />
           </View>
         )}
@@ -426,23 +465,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-SemiBold',
     color: '#ffffff',
   },
-  playAllContainer: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  playAllButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 24,
-  },
-  playAllText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#ffffff',
-  },
   section: {
     marginBottom: 32,
     paddingHorizontal: 16,
@@ -474,6 +496,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     color: '#fff',
+  },
+  albumDate: {
+    fontSize: 12,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  recentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  recentCover: {
+    width: 64,
+    height: 64,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  recentInfo: { flex: 1 },
+  recentTitle: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  recentDate: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
   },
   errorText: {
     color: '#fff',

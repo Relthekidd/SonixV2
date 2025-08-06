@@ -442,7 +442,7 @@ class ApiService {
   async getArtistAlbums(id: string) {
     const { data, error } = await supabase
       .from('albums')
-      .select('id,title,cover_url')
+      .select('id,title,cover_url,release_date')
       .eq('artist_id', id)
       .order('release_date', { ascending: false });
     if (error) throw error;
@@ -450,40 +450,50 @@ class ApiService {
       id: a.id,
       title: a.title,
       cover_url: this.getPublicUrl('images', a.cover_url),
+      release_date: a.release_date,
     }));
   }
 
-  /** Get singles for an artist */
-  async getArtistSingles(id: string) {
+  /** Get tracks where artist is featured */
+  async getArtistAppearances(id: string) {
     const { data, error } = await supabase
-      .from('singles')
-      .select('id, track:track_id(*, artist:artist_id(*), album:album_id(*))')
-      .eq('artist_id', id)
+      .from('tracks')
+      .select('*, artist:artist_id(*), album:album_id(*)')
+      .contains('featured_artist_ids', [id])
+      .neq('artist_id', id)
       .order('release_date', { ascending: false });
     if (error) throw error;
 
     const featuredIds = new Set<string>();
-    (data || []).forEach((s: any) =>
-      (s.track?.featured_artist_ids || []).forEach((fid: string) =>
+    (data || []).forEach((t: any) =>
+      (t.featured_artist_ids || []).forEach((fid: string) =>
         featuredIds.add(fid),
       ),
     );
     const featuredArtists = await this.fetchArtists(Array.from(featuredIds));
     const artistMap = new Map(featuredArtists.map((a) => [a.id, a]));
 
-    return (data || []).map((s: any) => ({
-      id: s.id,
-      track: s.track
-        ? {
-            ...s.track,
-            audio_url: this.getPublicUrl('audio-files', s.track.audio_url),
-            cover_url: this.getPublicUrl('images', s.track.cover_url || ''),
-            featured_artist_ids: s.track.featured_artist_ids || [],
-            featured_artists: (s.track.featured_artist_ids || [])
-              .map((fid: string) => artistMap.get(fid))
-              .filter(Boolean) as Artist[],
-          }
-        : null,
+    return (data || []).map((t: any) => ({
+      id: t.id,
+      title: t.title,
+      duration: t.duration,
+      audio_url: this.getPublicUrl('audio-files', t.audio_url),
+      track_number: t.track_number,
+      play_count: t.play_count,
+      like_count: t.like_count,
+      lyrics: t.lyrics,
+      cover_url: this.getPublicUrl('images', t.cover_url || ''),
+      artist_id: t.artist_id,
+      artist: t.artist,
+      album_id: t.album_id,
+      album: t.album,
+      description: t.description,
+      release_date: t.release_date,
+      genres: t.genres,
+      featured_artist_ids: t.featured_artist_ids || [],
+      featured_artists: (t.featured_artist_ids || [])
+        .map((fid: string) => artistMap.get(fid))
+        .filter(Boolean) as Artist[],
     }));
   }
 
