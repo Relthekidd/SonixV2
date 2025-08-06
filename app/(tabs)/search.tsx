@@ -12,7 +12,12 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { useMusic, Track, AlbumResult } from '@/providers/MusicProvider';
+import {
+  useMusic,
+  Track,
+  AlbumResult,
+  PlaylistResult,
+} from '@/providers/MusicProvider';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { Search, Play, Pause, Heart } from 'lucide-react-native';
@@ -26,18 +31,28 @@ interface ArtistResult {
   avatar_url?: string | null;
 }
 
+interface UserResult {
+  id: string;
+  display_name: string;
+  profile_picture_url?: string | null;
+}
+
 interface SearchResults {
   tracks: Track[];
-  artists: ArtistResult[];
   albums: AlbumResult[];
+  playlists: PlaylistResult[];
+  artists: ArtistResult[];
+  users: UserResult[];
 }
 
 function SearchScreen() {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResults>({
     tracks: [],
-    artists: [],
     albums: [],
+    playlists: [],
+    artists: [],
+    users: [],
   });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -74,10 +89,16 @@ function SearchScreen() {
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults({ tracks: [], artists: [], albums: [] });
+      setResults({
+        tracks: [],
+        albums: [],
+        playlists: [],
+        artists: [],
+        users: [],
+      });
       return;
     }
-    const timer = setTimeout(() => handleSearch(query), 300);
+    const timer = setTimeout(() => handleSearch(query), 200);
     return () => clearTimeout(timer);
   }, [query, sort]);
 
@@ -91,8 +112,10 @@ function SearchScreen() {
       );
       setResults({
         tracks: res.tracks,
-        artists: res.artists as ArtistResult[],
         albums: res.albums as AlbumResult[],
+        playlists: res.playlists as PlaylistResult[],
+        artists: res.artists as ArtistResult[],
+        users: res.users as UserResult[],
       });
     } catch (err) {
       console.error('search error', err);
@@ -159,28 +182,6 @@ function SearchScreen() {
     </TouchableOpacity>
   );
 
-  const renderArtistItem = ({ item }: { item: ArtistResult }) => (
-    <TouchableOpacity
-      style={[
-        styles.artistItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/artist/${item.id}`)}
-    >
-      <Image
-        source={{
-          uri: apiService.getPublicUrl('images', item.avatar_url || ''),
-        }}
-        style={styles.artistImage}
-      />
-      <Text style={styles.artistName} numberOfLines={1}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
-
   const renderAlbumItem = ({ item }: { item: AlbumResult }) => (
     <TouchableOpacity
       style={[
@@ -194,6 +195,75 @@ function SearchScreen() {
       <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
       <Text style={styles.artistName} numberOfLines={1}>
         {item.title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderPlaylistItem = ({ item }: { item: PlaylistResult }) => (
+    <TouchableOpacity
+      style={[
+        styles.artistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+      onPress={() => router.push(`/playlist/${item.id}`)}
+    >
+      <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
+      <Text style={styles.artistName} numberOfLines={1}>
+        {item.title}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  type PersonResult = {
+    id: string;
+    name: string;
+    avatar: string | null;
+    type: 'artist' | 'user';
+  };
+
+  const people: PersonResult[] = [
+    ...results.artists.map((a) => ({
+      id: a.id,
+      name: a.name,
+      avatar: a.avatar_url
+        ? apiService.getPublicUrl('images', a.avatar_url)
+        : null,
+      type: 'artist' as const,
+    })),
+    ...results.users.map((u) => ({
+      id: u.id,
+      name: u.display_name,
+      avatar: u.profile_picture_url || null,
+      type: 'user' as const,
+    })),
+  ];
+
+  const renderPersonItem = ({ item }: { item: PersonResult }) => (
+    <TouchableOpacity
+      style={[
+        styles.artistItem,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+      onPress={() =>
+        router.push(
+          item.type === 'artist' ? `/artist/${item.id}` : `/profile/${item.id}`,
+        )
+      }
+    >
+      <Image
+        source={{
+          uri:
+            item.avatar ||
+            'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
+        }}
+        style={styles.artistImage}
+      />
+      <Text style={styles.artistName} numberOfLines={1}>
+        {item.name}
       </Text>
     </TouchableOpacity>
   );
@@ -285,13 +355,13 @@ function SearchScreen() {
                 </View>
               )}
 
-              {/* Artists Section */}
-              {results.artists.length > 0 && (
+              {/* Playlists Section */}
+              {results.playlists.length > 0 && (
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Artists</Text>
+                  <Text style={styles.sectionTitle}>Playlists</Text>
                   <FlatList
-                    data={results.artists}
-                    renderItem={renderArtistItem}
+                    data={results.playlists}
+                    renderItem={renderPlaylistItem}
                     keyExtractor={(item) => item.id}
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -313,10 +383,25 @@ function SearchScreen() {
                 </View>
               )}
 
+              {/* Artists/Users Section */}
+              {people.length > 0 && (
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>Artists/Users</Text>
+                  <FlatList
+                    data={people}
+                    renderItem={renderPersonItem}
+                    keyExtractor={(item) => `${item.type}-${item.id}`}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                  />
+                </View>
+              )}
+
               {/* No Results */}
               {results.tracks.length === 0 &&
-                results.artists.length === 0 &&
-                results.albums.length === 0 && (
+                results.albums.length === 0 &&
+                results.playlists.length === 0 &&
+                people.length === 0 && (
                   <View style={styles.noResultsContainer}>
                     <Text style={styles.noResultsText}>
                       No results found for &quot;{query}&quot;
