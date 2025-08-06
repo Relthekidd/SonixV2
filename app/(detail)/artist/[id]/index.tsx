@@ -22,7 +22,7 @@ import {
   Play,
   Pause,
 } from 'lucide-react-native';
-import TrackList from '@/components/TrackList';
+import MiniTrackCard from '@/components/MiniTrackCard';
 
 interface Artist {
   id: string;
@@ -80,7 +80,9 @@ export default function ArtistDetailScreen() {
   const [singles, setSingles] = useState<Track[]>([]);
   const [albums, setAlbums] = useState<AlbumSummary[]>([]);
   const [appearsOn, setAppearsOn] = useState<Track[]>([]);
-  const [recentRelease, setRecentRelease] = useState<RecentRelease | null>(null);
+  const [recentRelease, setRecentRelease] = useState<RecentRelease | null>(
+    null,
+  );
   const [followerCount, setFollowerCount] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -111,7 +113,8 @@ export default function ArtistDetailScreen() {
 
       setArtist({
         id: String(artistInfo.id),
-        stage_name: artistInfo.stage_name || artistInfo.name || 'Unknown Artist',
+        stage_name:
+          artistInfo.stage_name || artistInfo.name || 'Unknown Artist',
         avatar_url: artistInfo.avatar_url || undefined,
         bio: artistInfo.bio || undefined,
         monthly_listeners: artistInfo.monthly_listeners ?? 0,
@@ -316,10 +319,18 @@ export default function ArtistDetailScreen() {
                     style={styles.featuredCover}
                   />
                 </TouchableOpacity>
-                <Text style={styles.featuredTitle}>{recentRelease.item.title}</Text>
-                <Text style={styles.featuredArtist}>{recentRelease.item.artist}</Text>
+                <Text style={styles.featuredTitle}>
+                  {recentRelease.item.title}
+                </Text>
+                <Text style={styles.featuredArtist}>
+                  {recentRelease.item.artist}
+                </Text>
                 <TouchableOpacity
-                  style={[styles.playButton, styles.brutalBorder, styles.brutalShadow]}
+                  style={[
+                    styles.playButton,
+                    styles.brutalBorder,
+                    styles.brutalShadow,
+                  ]}
                   onPress={() =>
                     handleTrackPress(recentRelease.item, [recentRelease.item])
                   }
@@ -350,10 +361,16 @@ export default function ArtistDetailScreen() {
                     style={styles.featuredCover}
                   />
                 </TouchableOpacity>
-                <Text style={styles.featuredTitle}>{recentRelease.item.title}</Text>
+                <Text style={styles.featuredTitle}>
+                  {recentRelease.item.title}
+                </Text>
                 <Text style={styles.featuredArtist}>{artist?.stage_name}</Text>
                 <TouchableOpacity
-                  style={[styles.playButton, styles.brutalBorder, styles.brutalShadow]}
+                  style={[
+                    styles.playButton,
+                    styles.brutalBorder,
+                    styles.brutalShadow,
+                  ]}
                   onPress={() =>
                     router.push(`/album/${recentRelease.item.id}` as const)
                   }
@@ -367,13 +384,24 @@ export default function ArtistDetailScreen() {
 
         {topTracks.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Top Songs</Text>
-            <TrackList
-              tracks={topTracks.slice(0, 5)}
-              currentTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlay={(t) => handleTrackPress(t, topTracks)}
-            />
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Top Songs</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {topTracks.slice(0, 5).map((t) => (
+                <MiniTrackCard
+                  key={t.id}
+                  track={t}
+                  isCurrent={currentTrack?.id === t.id}
+                  isPlaying={isPlaying}
+                  onPlay={() => handleTrackPress(t, topTracks)}
+                />
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -387,12 +415,21 @@ export default function ArtistDetailScreen() {
                 <Text style={styles.showAll}>Show All</Text>
               </TouchableOpacity>
             </View>
-            <TrackList
-              tracks={singles.slice(0, 5)}
-              currentTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlay={(t) => handleTrackPress(t, singles)}
-            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {singles.slice(0, 5).map((t) => (
+                <MiniTrackCard
+                  key={t.id}
+                  track={t}
+                  isCurrent={currentTrack?.id === t.id}
+                  isPlaying={isPlaying}
+                  onPlay={() => handleTrackPress(t, singles)}
+                />
+              ))}
+            </ScrollView>
           </View>
         )}
 
@@ -406,7 +443,11 @@ export default function ArtistDetailScreen() {
                 <Text style={styles.showAll}>Show All</Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.albumList}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
               {albums.slice(0, 5).map((item) => (
                 <TouchableOpacity
                   key={item.id}
@@ -430,7 +471,7 @@ export default function ArtistDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               ))}
-            </View>
+            </ScrollView>
           </View>
         )}
 
@@ -444,12 +485,21 @@ export default function ArtistDetailScreen() {
                 <Text style={styles.showAll}>Show All</Text>
               </TouchableOpacity>
             </View>
-            <TrackList
-              tracks={appearsOn.slice(0, 5)}
-              currentTrackId={currentTrack?.id}
-              isPlaying={isPlaying}
-              onPlay={(t) => handleTrackPress(t, appearsOn)}
-            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
+              {appearsOn.slice(0, 5).map((t) => (
+                <MiniTrackCard
+                  key={t.id}
+                  track={t}
+                  isCurrent={currentTrack?.id === t.id}
+                  isPlaying={isPlaying}
+                  onPlay={() => handleTrackPress(t, appearsOn)}
+                />
+              ))}
+            </ScrollView>
           </View>
         )}
       </ScrollView>
@@ -566,7 +616,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
-  albumList: {
+  horizontalScroll: {
     paddingHorizontal: 16,
   },
   albumCard: {
@@ -614,4 +664,3 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 });
-
