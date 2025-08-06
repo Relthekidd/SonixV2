@@ -6,9 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
-  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
@@ -18,25 +16,16 @@ import {
   AlbumResult,
   PlaylistResult,
 } from '@/providers/MusicProvider';
-import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
-import { Search, Play, Pause, Heart } from 'lucide-react-native';
+import { Search } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
-import { apiService } from '@/services/api';
-import TrackOptionsMenu from '@/components/TrackOptionsMenu';
+import { Artist } from '@/services/api';
+import SearchResults, {
+  SearchResultsData,
+  UserResult,
+} from '@/components/SearchResults';
 
-interface UserResult {
-  id: string;
-  username: string;
-  avatar_url?: string | null;
-}
-
-interface SearchResults {
-  tracks: Track[];
-  albums: AlbumResult[];
-  playlists: PlaylistResult[];
-  users: UserResult[];
-}
+type SearchResults = SearchResultsData;
 
 function SearchScreen() {
   const [query, setQuery] = useState('');
@@ -44,6 +33,7 @@ function SearchScreen() {
     tracks: [],
     albums: [],
     playlists: [],
+    artists: [],
     users: [],
   });
   const [trendingSearches, setTrendingSearches] = useState<string[]>([]);
@@ -85,6 +75,7 @@ function SearchScreen() {
         tracks: [],
         albums: [],
         playlists: [],
+        artists: [],
         users: [],
       });
       return;
@@ -105,6 +96,7 @@ function SearchScreen() {
         tracks: res.tracks,
         albums: res.albums as AlbumResult[],
         playlists: res.playlists as PlaylistResult[],
+        artists: res.artists as Artist[],
         users: res.users as UserResult[],
       });
     } catch (err) {
@@ -129,134 +121,6 @@ function SearchScreen() {
   };
   const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
-  const renderTrackItem = ({ item, index }: { item: Track; index: number }) => (
-    <Animated.View entering={FadeInDown.delay(index * 50)}>
-      <TouchableOpacity
-        style={[
-          styles.resultItem,
-          styles.glassCard,
-          styles.brutalBorder,
-          styles.brutalShadow,
-        ]}
-        onPress={() => router.push(`/track/${item.id}`)}
-      >
-        <Image source={{ uri: item.coverUrl }} style={styles.resultImage} />
-        <View style={styles.resultInfo}>
-          <Text style={styles.resultTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={styles.resultSubtitle} numberOfLines={1}>
-            {item.artist} • Song
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.likeButton}
-          onPress={() => handleToggleLike(item.id)}
-        >
-          <Heart
-            color={item.isLiked ? '#ef4444' : '#94a3b8'}
-            fill={item.isLiked ? '#ef4444' : 'transparent'}
-            size={18}
-          />
-        </TouchableOpacity>
-        <TrackOptionsMenu track={item} />
-        <TouchableOpacity
-          style={styles.playButton}
-          onPress={() => handleTrackPress(item)}
-        >
-          {currentTrack?.id === item.id && isPlaying ? (
-            <Pause color="#8b5cf6" size={20} />
-          ) : (
-            <Play color="#8b5cf6" size={20} />
-          )}
-        </TouchableOpacity>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-
-  const renderAlbumItem = ({
-    item,
-    index,
-  }: {
-    item: AlbumResult;
-    index: number;
-  }) => (
-    <Animated.View entering={FadeInDown.delay(index * 50)}>
-      <TouchableOpacity
-        style={[
-          styles.artistItem,
-          styles.glassCard,
-          styles.brutalBorder,
-          styles.brutalShadow,
-        ]}
-        onPress={() => router.push(`/album/${item.id}`)}
-      >
-        <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
-        <Text style={styles.artistName} numberOfLines={1}>
-          {item.title}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-
-  const renderPlaylistItem = ({
-    item,
-    index,
-  }: {
-    item: PlaylistResult;
-    index: number;
-  }) => (
-    <Animated.View entering={FadeInDown.delay(index * 50)}>
-      <TouchableOpacity
-        style={[
-          styles.artistItem,
-          styles.glassCard,
-          styles.brutalBorder,
-          styles.brutalShadow,
-        ]}
-        onPress={() => router.push(`/playlist/${item.id}`)}
-      >
-        <Image source={{ uri: item.coverUrl }} style={styles.albumImage} />
-        <Text style={styles.artistName} numberOfLines={1}>
-          {item.title}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-
-  const renderUserItem = ({
-    item,
-    index,
-  }: {
-    item: UserResult;
-    index: number;
-  }) => (
-    <Animated.View entering={FadeInDown.delay(index * 50)}>
-      <TouchableOpacity
-        style={[
-          styles.artistItem,
-          styles.glassCard,
-          styles.brutalBorder,
-          styles.brutalShadow,
-        ]}
-        onPress={() => router.push(`/profile/${item.id}`)}
-      >
-        <Image
-          source={{
-            uri:
-              item.avatar_url
-                ? apiService.getPublicUrl('images', item.avatar_url)
-                : 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200',
-          }}
-          style={styles.artistImage}
-        />
-        <Text style={styles.artistName} numberOfLines={1}>
-          {item.username}
-        </Text>
-      </TouchableOpacity>
-    </Animated.View>
-  );
-
   return (
     <View style={styles.container}>
       <LinearGradient
@@ -275,7 +139,7 @@ function SearchScreen() {
               <Search color="#8b5cf6" size={20} style={styles.searchIcon} />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search for songs, albums, or users..."
+                placeholder="Search for songs, albums, artists, or users..."
                 placeholderTextColor="#64748b"
                 value={query}
                 onChangeText={setQuery}
@@ -327,79 +191,15 @@ function SearchScreen() {
 
           {/* Search Results */}
           {query.length > 0 && !isSearching && (
-            <Animated.View
-              entering={FadeInDown.delay(200)}
-              style={styles.resultsContainer}
-            >
-              {/* Tracks Section */}
-              {results.tracks.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Songs</Text>
-                  <FlatList
-                    data={results.tracks}
-                    renderItem={renderTrackItem}
-                    keyExtractor={(item) => item.id}
-                    scrollEnabled={false}
-                  />
-                </View>
-              )}
-
-              {/* Playlists Section */}
-              {results.playlists.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Playlists</Text>
-                  <FlatList
-                    data={results.playlists}
-                    renderItem={renderPlaylistItem}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                  />
-                </View>
-              )}
-
-              {/* Albums Section */}
-              {results.albums.length > 0 && (
-                <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Albums</Text>
-                  <FlatList
-                    data={results.albums}
-                    renderItem={renderAlbumItem}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                  />
-                </View>
-              )}
-
-          {/* Users Section */}
-          {results.users.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Users</Text>
-              <FlatList
-                data={results.users}
-                renderItem={renderUserItem}
-                keyExtractor={(item) => item.id}
-                horizontal
-                showsHorizontalScrollIndicator={false}
+            <Animated.View entering={FadeInDown.delay(200)}>
+              <SearchResults
+                results={results}
+                currentTrack={currentTrack}
+                isPlaying={isPlaying}
+                onTrackPress={handleTrackPress}
+                onToggleLike={handleToggleLike}
+                query={query}
               />
-            </View>
-          )}
-
-              {/* No Results */}
-              {results.tracks.length === 0 &&
-                results.albums.length === 0 &&
-                results.playlists.length === 0 &&
-                results.users.length === 0 && (
-                  <View style={styles.noResultsContainer}>
-                    <Text style={styles.noResultsText}>
-                      No results found for &quot;{query}&quot;
-                    </Text>
-                    <Text style={styles.noResultsSubtext}>
-                      Try different keywords or check your spelling
-                    </Text>
-                  </View>
-                )}
             </Animated.View>
           )}
 

@@ -113,6 +113,7 @@ interface MusicContextType {
     tracks: Track[];
     albums: AlbumResult[];
     playlists: PlaylistResult[];
+    artists: Artist[];
     users: UserProfile[];
   }>;
   // Library-related state & actions
@@ -587,12 +588,19 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks: [],
         albums: [],
         playlists: [],
+        artists: [],
         users: [],
       };
     }
 
     try {
-      const [trackRes, albumRes, playlistRes, profileRes] = await Promise.all([
+      const [
+        trackRes,
+        albumRes,
+        playlistRes,
+        artistRes,
+        profileRes,
+      ] = await Promise.all([
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
@@ -612,6 +620,11 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .select('id,title,cover_url')
           .eq('is_public', true)
           .ilike('title', `%${term}%`)
+          .limit(10),
+        supabase
+          .from('artists')
+          .select('id,name,avatar_url')
+          .ilike('name', `%${term}%`)
           .limit(10),
         supabase
           .from('profiles')
@@ -643,11 +656,29 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         }),
       );
 
+      const artists = (artistRes.data || []).map(
+        (a: { id: string; name: string; avatar_url?: string | null }) => ({
+          id: a.id,
+          name: a.name,
+          avatar_url: apiService.getPublicUrl('images', a.avatar_url || ''),
+        }),
+      );
+
+      const users = (profileRes.data || []).map(
+        (u: UserProfile) => ({
+          ...u,
+          avatar_url: u.avatar_url
+            ? apiService.getPublicUrl('images', u.avatar_url)
+            : null,
+        }),
+      );
+
       return {
         tracks,
         albums,
         playlists,
-        users: (profileRes.data || []) as UserProfile[],
+        artists,
+        users,
       };
     } catch (err) {
       console.error('searchMusic error', err);
@@ -655,6 +686,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         tracks: [],
         albums: [],
         playlists: [],
+        artists: [],
         users: [],
       };
     }
