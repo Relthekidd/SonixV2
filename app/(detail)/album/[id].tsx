@@ -45,6 +45,17 @@ function AlbumDetailScreen() {
     setError(null);
     try {
       const albumData = await apiService.getAlbumById(id!);
+      console.log('AlbumDetailScreen: fetched album', {
+        id: albumData?.id,
+        title: albumData?.title,
+        coverUrl: albumData?.cover_url,
+      });
+      if (!albumData?.cover_url) {
+        console.warn('AlbumDetailScreen: album missing cover art', id);
+      }
+      if (!albumData?.tracks || albumData.tracks.length === 0) {
+        console.warn('AlbumDetailScreen: album has no tracks', id);
+      }
       setAlbum(albumData);
 
   const transformed = (albumData.tracks || []).map(
@@ -75,6 +86,15 @@ function AlbumDetailScreen() {
 
 
       transformed.sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
+      transformed.forEach((t) => {
+        if (!t.audioUrl) {
+          console.warn('AlbumDetailScreen: track missing audio URL', t.id);
+        }
+        if (!t.coverUrl) {
+          console.warn('AlbumDetailScreen: track missing cover art', t.id);
+        }
+      });
+      console.log('AlbumDetailScreen: loaded tracks', transformed.length);
       setTracks(transformed);
 
       const totalDuration = transformed.reduce(
@@ -96,6 +116,18 @@ function AlbumDetailScreen() {
   };
 
   const handleTrackPlay = (track: Track) => {
+    console.log('AlbumDetailScreen: play track', {
+      id: track.id,
+      title: track.title,
+      audioUrl: track.audioUrl,
+      coverUrl: track.coverUrl,
+    });
+    if (!track.audioUrl) {
+      console.warn('AlbumDetailScreen: cannot play track without audio', track.id);
+    }
+    if (!track.coverUrl) {
+      console.warn('AlbumDetailScreen: track missing cover art', track.id);
+    }
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
         pauseTrack();
@@ -108,7 +140,14 @@ function AlbumDetailScreen() {
   };
 
   const handlePlayAlbum = () => {
-    if (tracks.length === 0) return;
+    console.log('AlbumDetailScreen: play album', {
+      albumId: album?.id,
+      trackCount: tracks.length,
+    });
+    if (tracks.length === 0) {
+      console.warn('AlbumDetailScreen: no tracks to play for album', album?.id);
+      return;
+    }
     const first = tracks[0];
     if (currentTrack?.id === first.id) {
       if (isPlaying) pauseTrack();
