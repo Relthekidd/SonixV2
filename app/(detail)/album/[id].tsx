@@ -59,28 +59,35 @@ function AlbumDetailScreen() {
       setAlbum(albumData);
 
       const transformed = (albumData.tracks || []).map(
-        (t: TrackData, idx: number): Track => ({
-          id: t.id,
-          title: t.title,
-          artist: t.artist?.name || albumData.artist?.name || 'Unknown Artist',
-          artistId: t.artist?.id || albumData.artist_id || undefined,
-          album: albumData.title,
-          duration: t.duration,
-          coverUrl: albumData.cover_url,
-          audioUrl: t.audio_url,
-          isLiked: likedSongIds.includes(t.id),
-          trackNumber: t.track_number ?? idx + 1,
-          releaseDate: albumData.release_date || '',
-          playCount: t.play_count ?? undefined,
-          likeCount: t.like_count ?? undefined,
-          lyrics: t.lyrics || undefined,
-          genre: '',
-          year: albumData.release_date
-            ? new Date(albumData.release_date).getFullYear().toString()
-            : undefined,
-          description: '',
-          featuredArtists: t.featured_artists,
-        }),
+        (t: TrackData, idx: number): Track => {
+          const mainArtistName =
+            t.artist?.name || albumData.artist?.name || 'Unknown Artist';
+
+          return {
+            id: t.id,
+            title: t.title,
+            artist: mainArtistName,
+            artistId: t.artist?.id || albumData.artist_id || undefined,
+            album: albumData.title,
+            duration: t.duration,
+            coverUrl: apiService.getPublicUrl('images', albumData.cover_url),
+            audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+            isLiked: likedSongIds.includes(t.id),
+            trackNumber: t.track_number ?? idx + 1,
+            releaseDate: albumData.release_date || '',
+            playCount:
+              typeof t.play_count === 'number' ? t.play_count : undefined,
+            likeCount:
+              typeof t.like_count === 'number' ? t.like_count : undefined,
+            lyrics: t.lyrics || undefined,
+            genre: '',
+            year: albumData.release_date
+              ? new Date(albumData.release_date).getFullYear().toString()
+              : undefined,
+            description: '',
+            featuredArtists: t.featured_artists,
+          };
+        },
       );
 
 
