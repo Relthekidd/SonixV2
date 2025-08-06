@@ -12,9 +12,9 @@ import { useMusic, Track, TrackRow } from '@/providers/MusicProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { Play, Pause, Music } from 'lucide-react-native';
-import DetailHeader from '@/components/DetailHeader';
+import { Play, Pause, Music, ArrowLeft } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
+import HeroCard from '@/components/HeroCard';
 
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,13 +22,30 @@ export default function PlaylistDetailScreen() {
     useMusic();
   const playlist = playlists.find((p) => p.id === id);
   const [tracks, setTracks] = useState<Track[]>([]);
+  const [playlistInfo, setPlaylistInfo] = useState<{
+    description?: string | null;
+    cover_url?: string | null;
+    created_at?: string | null;
+  } | null>(null);
+  const [runtime, setRuntime] = useState(0);
+  const [playCount, setPlayCount] = useState(0);
 
   useEffect(() => {
     if (!playlist) return;
+    supabase
+      .from('playlists')
+      .select('description,cover_url,created_at')
+      .eq('id', playlist.id)
+      .single()
+      .then(({ data }) => setPlaylistInfo(data));
+
     if (playlist.trackIds.length === 0) {
       setTracks([]);
+      setRuntime(0);
+      setPlayCount(0);
       return;
     }
+
     supabase
       .from('tracks')
       .select(`*, artist:artist_id(*), album:album_id(*)`)
@@ -56,11 +73,22 @@ export default function PlaylistDetailScreen() {
             ? t.genres[0]
             : (t.genres as string) || '',
           releaseDate: t.release_date || t.created_at || '',
+          playCount: t.play_count || undefined,
         }));
         const ordered = playlist.trackIds
           .map((tid) => mapped.find((m) => m.id === tid))
           .filter(Boolean) as Track[];
         setTracks(ordered);
+        const totalDuration = ordered.reduce(
+          (sum, t) => sum + (t.duration || 0),
+          0,
+        );
+        const totalPlays = ordered.reduce(
+          (sum, t) => sum + (t.playCount || 0),
+          0,
+        );
+        setRuntime(totalDuration);
+        setPlayCount(totalPlays);
       });
   }, [playlist]);
 
@@ -72,6 +100,30 @@ export default function PlaylistDetailScreen() {
       playTrack(track, tracks);
     }
   };
+
+  const handlePlayPlaylist = () => {
+    if (tracks.length === 0) return;
+    const first = tracks[0];
+    if (currentTrack?.id === first.id) {
+      if (isPlaying) pauseTrack();
+      else playTrack(first, tracks);
+    } else {
+      playTrack(first, tracks);
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
 
   const renderItem = ({ item }: { item: Track }) => (
     <TouchableOpacity
@@ -115,7 +167,14 @@ export default function PlaylistDetailScreen() {
         colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
-        <DetailHeader title="Playlist" onBack={() => router.back()} />
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => router.back()}
+          >
+            <ArrowLeft color="#ffffff" size={24} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.emptyState}>
           <Music color="#64748b" size={48} />
           <Text style={styles.emptyText}>Playlist not found</Text>
@@ -129,11 +188,36 @@ export default function PlaylistDetailScreen() {
       colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
-      <DetailHeader title={playlist.title} onBack={() => router.back()} />
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.headerButton}
+          onPress={() => router.back()}
+        >
+          <ArrowLeft color="#ffffff" size={24} />
+        </TouchableOpacity>
+      </View>
       <FlatList
         data={tracks}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
+        ListHeaderComponent={
+          <HeroCard
+            coverUrl={apiService.getPublicUrl(
+              'images',
+              playlistInfo?.cover_url || '',
+            )}
+            title={playlist.title}
+            description={playlistInfo?.description || undefined}
+            releaseDate={
+              playlistInfo?.created_at
+                ? formatDate(playlistInfo.created_at)
+                : undefined
+            }
+            duration={`${tracks.length} tracks${runtime ? ` • ${formatDuration(runtime)}` : ''}`}
+            playCount={playCount}
+            onPlay={handlePlayPlaylist}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Music color="#64748b" size={48} />
@@ -146,7 +230,21 @@ export default function PlaylistDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingTop: 48 },
+  container: { flex: 1 },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+  },
+  headerButton: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
