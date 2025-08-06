@@ -6,15 +6,17 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Share,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import { supabase } from '@/services/supabase';
-import { ArrowLeft, Play, Pause } from 'lucide-react-native';
+import { ArrowLeft, X } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
+import TrackList from '@/components/TrackList';
 import HeroCard from '@/components/HeroCard';
 
 export default function TrackDetailScreen() {
@@ -31,9 +33,19 @@ export default function TrackDetailScreen() {
   const [track, setTrack] = useState<Track | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showPlaylistSelect, setShowPlaylistSelect] = useState(false);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
-    useMusic();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    addToQueue,
+    toggleLike,
+    addToPlaylist,
+    playlists,
+    likedSongIds,
+  } = useMusic();
 
   useEffect(() => {
     if (id) loadTrackDetails();
@@ -124,18 +136,6 @@ export default function TrackDetailScreen() {
       playTrack(track, [track]);
     }
   };
-  const handleShare = async () => {
-    if (!track) return;
-    try {
-      await Share.share({
-        message: `Check out "${track.title}" by ${track.artist}`,
-        url: `https://sonix.app/track/${id}`,
-      });
-    } catch (err) {
-      console.error('Error sharing track:', err);
-    }
-  };
-
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -206,31 +206,25 @@ export default function TrackDetailScreen() {
           duration={formatDuration(track.duration)}
           playCount={track.playCount}
           genres={track.genres}
-          moreMenu={<TrackMenu track={track} />}
         />
 
-        <View
-          style={[
-            styles.controlsSection,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-          ]}
-        >
-          <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
-            <LinearGradient
-              colors={['#8b5cf6', '#a855f7']}
-              style={styles.playButtonGradient}
-            >
-              {currentTrack?.id === track.id && isPlaying ? (
-                <Pause color="#ffffff" size={32} />
-              ) : (
-                <Play color="#ffffff" size={32} />
-              )}
-            </LinearGradient>
-          </TouchableOpacity>
-          <TrackMenu track={track} onShare={handleShare} />
-        </View>
+        <TrackMenu
+          onPlay={handlePlayPause}
+          onAddToQueue={() => addToQueue(track)}
+          onToggleLike={() => {
+            toggleLike(track.id);
+            setTrack((t) => (t ? { ...t, isLiked: !t.isLiked } : t));
+          }}
+          liked={track.isLiked}
+          onAddToLibrary={() => setShowPlaylistSelect(true)}
+        />
+
+        <TrackList
+          tracks={[track]}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlay={handlePlayPause}
+        />
 
         {track.lyrics && (
           <View style={styles.lyricsSection}>
@@ -241,6 +235,41 @@ export default function TrackDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      <Modal transparent visible={showPlaylistSelect} animationType="fade">
+        <View style={styles.overlay}>
+          <View
+            style={[
+              styles.playlistSelect,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.close}
+              onPress={() => setShowPlaylistSelect(false)}
+            >
+              <X color="#fff" size={20} />
+            </TouchableOpacity>
+            <FlatList
+              data={playlists}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.menuItem}
+                  onPress={() => {
+                    addToPlaylist(item.id, track);
+                    setShowPlaylistSelect(false);
+                  }}
+                >
+                  <Text style={styles.menuText}>{item.title}</Text>
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </View>
+      </Modal>
 
     </LinearGradient>
   );
@@ -296,29 +325,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: { flex: 1 },
-  controlsSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    marginBottom: 36,
-  },
-  playButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: 'hidden',
-    elevation: 8,
-    shadowColor: '#8b5cf6',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-  },
-  playButtonGradient: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   lyricsSection: { paddingHorizontal: 24, marginBottom: 32 },
   lyricsTitle: {
     fontSize: 20,
@@ -348,5 +354,32 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 6,
     elevation: 8,
+  },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playlistSelect: {
+    width: 260,
+    maxHeight: '70%',
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+  },
+  close: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
+  },
+  menuItem: {
+    paddingVertical: 12,
+  },
+  menuText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
   },
 });

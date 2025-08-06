@@ -23,7 +23,7 @@ import { supabase } from '@/services/supabase';
 import { Search, Play, Pause, Heart } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { apiService } from '@/services/api';
-import TrackMenu from '@/components/TrackMenu';
+import TrackOptionsMenu from '@/components/TrackOptionsMenu';
 
 interface UserResult {
   id: string;
@@ -159,7 +159,7 @@ function SearchScreen() {
             size={18}
           />
         </TouchableOpacity>
-        <TrackMenu track={item} />
+        <TrackOptionsMenu track={item} />
         <TouchableOpacity
           style={styles.playButton}
           onPress={() => handleTrackPress(item)}

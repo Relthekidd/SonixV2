@@ -20,7 +20,7 @@ import {
   MoreVertical,
   Users,
 } from 'lucide-react-native';
-import TrackMenu from '@/components/TrackMenu';
+import TrackOptionsMenu from '@/components/TrackOptionsMenu';
 
 interface Artist {
   id: string;
@@ -223,7 +223,7 @@ export default function ArtistDetailScreen() {
                 {item.album}
               </Text>
             </View>
-            <TrackMenu track={item} />
+            <TrackOptionsMenu track={item} />
             <TouchableOpacity>
               {currentTrack?.id === item.id && isPlaying ? (
                 <Pause color="#8b5cf6" size={20} />
