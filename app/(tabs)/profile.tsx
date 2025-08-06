@@ -355,19 +355,28 @@ export default function ProfileScreen() {
     try {
       const response = await fetch(uri);
       const blob = await response.blob();
-      
+
       const fileExt = uri.split('.').pop() || 'jpg';
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('images')
-        .upload(`avatars/${fileName}`, blob);
+      const filePath = `user_${user.id}_${Date.now()}.${fileExt}`;
+
+      const { data, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, blob, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const newAvatarUrl = `avatars/${fileName}`;
-      setEditForm(prev => ({ ...prev, avatar_url: newAvatarUrl }));
-      
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('avatars').getPublicUrl(data.path);
+
+      const { error: dbError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('id', user.id);
+      if (dbError) throw dbError;
+
+      setProfile(prev => (prev ? { ...prev, avatar_url: publicUrl } : null));
+      setEditForm(prev => ({ ...prev, avatar_url: publicUrl }));
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
@@ -529,11 +538,11 @@ export default function ProfileScreen() {
 
   // Get the avatar URL with proper fallback
   const getAvatarUrl = () => {
-    const avatarPath = editing ? editForm.avatar_url : profile.avatar_url;
-    if (avatarPath) {
-      return apiService.getPublicUrl('images', avatarPath);
-    }
-    return 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200';
+    const avatar = editing ? editForm.avatar_url : profile.avatar_url;
+    return (
+      avatar ||
+      'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200'
+    );
   };
 
   return (
