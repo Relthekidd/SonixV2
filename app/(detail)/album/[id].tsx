@@ -6,15 +6,17 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Image,
+  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService, AlbumDetails, TrackData } from '@/services/api';
-import { ArrowLeft, Calendar } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import TrackItem from '@/components/TrackItem';
+import HeroCard from '@/components/HeroCard';
+import AlbumMenu from '@/components/AlbumMenu';
 
 function AlbumDetailScreen() {
   const router = useRouter();
@@ -23,6 +25,8 @@ function AlbumDetailScreen() {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runtime, setRuntime] = useState(0);
+  const [playCount, setPlayCount] = useState(0);
 
   const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
     useMusic();
@@ -64,6 +68,17 @@ function AlbumDetailScreen() {
 
       transformed.sort((a, b) => (a.trackNumber ?? 0) - (b.trackNumber ?? 0));
       setTracks(transformed);
+
+      const totalDuration = transformed.reduce(
+        (sum, t) => sum + (t.duration || 0),
+        0,
+      );
+      const totalPlays = transformed.reduce(
+        (sum, t) => sum + (t.playCount || 0),
+        0,
+      );
+      setRuntime(totalDuration);
+      setPlayCount(totalPlays);
     } catch (err) {
       console.error(err);
       setError('Failed to load album');
@@ -84,12 +99,45 @@ function AlbumDetailScreen() {
     }
   };
 
+  const handlePlayAlbum = () => {
+    if (tracks.length === 0) return;
+    const first = tracks[0];
+    if (currentTrack?.id === first.id) {
+      if (isPlaying) pauseTrack();
+      else playTrack(first, tracks);
+    } else {
+      playTrack(first, tracks);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!album) return;
+    try {
+      await Share.share({
+        message: `Check out "${album.title}" by ${album.artist}`,
+        url: `https://sonix.app/album/${id}`,
+      });
+    } catch (err) {
+      console.error('Error sharing album:', err);
+    }
+  };
+
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
     });
+
+  const formatDuration = (seconds: number) => {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    if (hrs > 0) {
+      return `${hrs}h ${mins}m`;
+    }
+    return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+  };
 
   if (isLoading) {
     return (
@@ -138,40 +186,45 @@ function AlbumDetailScreen() {
         </TouchableOpacity>
       </View>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View
-          style={[
-            styles.albumHeader,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-          ]}
-        >
-          <Image
-            source={{ uri: apiService.getPublicUrl('images', album.cover_url) }}
-            style={styles.albumCover}
-          />
-          <Text style={styles.albumTitle}>{album.title}</Text>
-          <Text style={styles.albumArtist}>{album.artist}</Text>
-          {album.description && (
-            <Text style={styles.albumDescription}>{album.description}</Text>
-          )}
-          {album.release_date && (
-            <View style={styles.albumMeta}>
-              <Calendar color="#94a3b8" size={16} />
-              <Text style={styles.metaText}>{formatDate(album.release_date)}</Text>
-            </View>
-          )}
-        </View>
+        <HeroCard
+          coverUrl={apiService.getPublicUrl('images', album.cover_url)}
+          title={album.title}
+          subtitle={album.artist}
+          description={album.description}
+          releaseDate={
+            album.release_date ? formatDate(album.release_date) : undefined
+          }
+          duration={`${tracks.length} tracks • ${formatDuration(runtime)}`}
+          playCount={playCount}
+          onPlay={handlePlayAlbum}
+          moreMenu={<AlbumMenu onShare={handleShare} />}
+        />
 
+        {tracks.length > 0 && (
+          <TouchableOpacity
+            style={[styles.playAllButton, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+            onPress={handlePlayAlbum}
+          >
+            <LinearGradient
+              colors={["#8b5cf6", "#a855f7"]}
+              style={styles.playAllGradient}
+            >
+              <Text style={styles.playAllText}>Play All</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
+
+        <Text style={styles.trackHeading}>Tracklist</Text>
         <View style={styles.trackList}>
           {tracks.map((t) => (
-            <TrackItem
-              key={t.id}
-              track={t}
-              isCurrent={currentTrack?.id === t.id}
-              isPlaying={isPlaying}
-              onPlay={() => handleTrackPlay(t)}
-            />
+            <View key={t.id} style={styles.trackItemWrapper}>
+              <TrackItem
+                track={t}
+                isCurrent={currentTrack?.id === t.id}
+                isPlaying={isPlaying}
+                onPlay={() => handleTrackPlay(t)}
+              />
+            </View>
           ))}
         </View>
         <View style={styles.bottomPadding} />
@@ -199,42 +252,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   content: { flex: 1 },
-  albumHeader: { alignItems: 'center', paddingHorizontal: 24, marginBottom: 30 },
-  albumCover: {
-    width: 280,
-    height: 280,
-    borderRadius: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-  },
-  albumTitle: {
-    fontSize: 28,
-    fontFamily: 'Poppins-Bold',
-    color: '#ffffff',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  albumArtist: {
+  trackHeading: {
     fontSize: 20,
-    fontFamily: 'Inter-SemiBold',
-    color: '#a855f7',
-    textAlign: 'center',
+    fontFamily: 'Poppins-SemiBold',
+    color: '#ffffff',
     marginBottom: 12,
+    paddingHorizontal: 20,
   },
-  albumDescription: {
-    fontSize: 16,
-    fontFamily: 'Inter-Regular',
-    color: '#cbd5e1',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  albumMeta: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  metaText: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#94a3b8' },
   trackList: { paddingHorizontal: 20 },
+  trackItemWrapper: { marginBottom: 12 },
+  playAllButton: {
+    alignSelf: 'center',
+    marginBottom: 20,
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  playAllGradient: {
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playAllText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+  },
   bottomPadding: { height: 80 },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
