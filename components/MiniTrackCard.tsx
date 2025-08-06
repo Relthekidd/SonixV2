@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { Play, Pause, Heart } from 'lucide-react-native';
-import { Track, useMusic } from '@/providers/MusicProvider';
+import { Play, Pause } from 'lucide-react-native';
+import { Track } from '@/providers/MusicProvider';
+import TrackOptionsMenu from './TrackOptionsMenu';
 import { router } from 'expo-router';
 
 interface Props {
@@ -9,7 +10,6 @@ interface Props {
   isCurrent?: boolean;
   isPlaying?: boolean;
   onPlay: () => void;
-  showLikeButton?: boolean;
 }
 
 export default function MiniTrackCard({
@@ -17,10 +17,7 @@ export default function MiniTrackCard({
   isCurrent,
   isPlaying,
   onPlay,
-  showLikeButton,
 }: Props) {
-  const { toggleLike, likedSongIds } = useMusic();
-  const isLiked = track.isLiked || likedSongIds.includes(track.id);
 
   const subtitle =
     track.artist +
@@ -48,18 +45,6 @@ export default function MiniTrackCard({
         {subtitle}
       </Text>
       <View style={styles.actions}>
-        {showLikeButton && (
-          <TouchableOpacity
-            style={[styles.iconButton, styles.brutalBorder]}
-            onPress={() => toggleLike(track.id)}
-          >
-            <Heart
-              size={16}
-              color={isLiked ? '#ef4444' : '#8b5cf6'}
-              fill={isLiked ? '#ef4444' : 'transparent'}
-            />
-          </TouchableOpacity>
-        )}
         <TouchableOpacity
           style={[styles.iconButton, styles.brutalBorder]}
           onPress={onPlay}
@@ -70,6 +55,7 @@ export default function MiniTrackCard({
             <Play color="#8b5cf6" size={16} />
           )}
         </TouchableOpacity>
+        <TrackOptionsMenu track={track} />
       </View>
     </View>
   );

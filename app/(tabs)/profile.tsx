@@ -32,7 +32,7 @@ import {
   Heart,
   Settings,
 } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Artist {
@@ -97,7 +97,8 @@ interface DatabaseArtist {
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
-  
+  const params = useLocalSearchParams<{ edit?: string }>();
+
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -121,13 +122,15 @@ export default function ProfileScreen() {
   const [topArtists, setTopArtists] = useState<Artist[]>([]);
   const [featuredPlaylists, setFeaturedPlaylists] = useState<Playlist[]>([]);
   const [allPlaylists, setAllPlaylists] = useState<Playlist[]>([]);
+  const [requestCount, setRequestCount] = useState(0);
   
   // Modal state
   const [showPlaylistSelector, setShowPlaylistSelector] = useState(false);
 
   useEffect(() => {
     loadProfile();
-  }, [user]);
+    if (params.edit) setEditing(true);
+  }, [user, params.edit]);
 
   const loadProfile = async () => {
     if (!user) return;
@@ -164,6 +167,7 @@ export default function ProfileScreen() {
         loadFeaturedPlaylists(profileData.featured_playlists, profileData.show_playlists),
         loadAllPlaylists(), // For playlist selector
       ]);
+      await loadRequestCount();
 
     } catch (error) {
       console.error('Error loading profile:', error);
@@ -314,6 +318,15 @@ export default function ProfileScreen() {
     } catch (error) {
       console.error('Error loading playlists:', error);
     }
+  };
+
+  const loadRequestCount = async () => {
+    if (!user) return;
+    const { count } = await supabase
+      .from('follower_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('requested_id', user.id);
+    setRequestCount(count || 0);
   };
 
   const handleImagePick = async () => {
@@ -534,6 +547,17 @@ export default function ProfileScreen() {
       >
         {/* Profile Header */}
         <View style={[styles.header, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
+          <TouchableOpacity
+            style={styles.settingsButton}
+            onPress={() => router.push('/profile/settings' as const)}
+          >
+            <Settings color="#fff" size={20} />
+            {requestCount > 0 && (
+              <View style={styles.requestBadge}>
+                <Text style={styles.requestBadgeText}>{requestCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
           <View style={styles.avatarContainer}>
             <Image
               source={{ uri: getAvatarUrl() }}
@@ -685,14 +709,20 @@ export default function ProfileScreen() {
               <Text style={styles.email}>{profile.email}</Text>
               
               <View style={styles.statsRow}>
-                <View style={styles.statItem}>
+                <TouchableOpacity
+                  style={styles.statItem}
+                  onPress={() => router.push('/profile/followers' as const)}
+                >
                   <Text style={styles.statValue}>{profile.follower_count}</Text>
                   <Text style={styles.statLabel}>Followers</Text>
-                </View>
-                <View style={styles.statItem}>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.statItem}
+                  onPress={() => router.push('/profile/following' as const)}
+                >
                   <Text style={styles.statValue}>{profile.following_count}</Text>
                   <Text style={styles.statLabel}>Following</Text>
-                </View>
+                </TouchableOpacity>
               </View>
 
               <TouchableOpacity
@@ -867,6 +897,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 24,
     marginBottom: 24,
+  },
+  settingsButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+  },
+  requestBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#ef4444',
+    borderRadius: 8,
+    paddingHorizontal: 4,
+  },
+  requestBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Inter-SemiBold',
   },
   avatarContainer: {
     position: 'relative',
