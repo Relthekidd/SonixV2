@@ -12,6 +12,8 @@ interface Props {
   playlistId?: string;
   editable?: boolean;
   onReorder?: (tracks: Track[]) => void;
+  showLikeButton?: boolean;
+  showOptionsMenu?: boolean;
 }
 
 export default function TrackList({
@@ -22,6 +24,8 @@ export default function TrackList({
   playlistId,
   editable,
   onReorder,
+  showLikeButton,
+  showOptionsMenu = true,
 }: Props) {
   if (editable) {
     const renderItem = ({ item, drag }: RenderItemParams<Track>) => (
@@ -32,6 +36,8 @@ export default function TrackList({
         isPlaying={isPlaying}
         onPlay={() => onPlay(item)}
         onLongPress={drag}
+        showLikeButton={showLikeButton}
+        showOptionsMenu={showOptionsMenu}
       />
     );
 
@@ -56,6 +62,8 @@ export default function TrackList({
             isCurrent={currentTrackId === t.id}
             isPlaying={isPlaying}
             onPlay={() => onPlay(t)}
+            showLikeButton={showLikeButton}
+            showOptionsMenu={showOptionsMenu}
           />
         </View>
       ))}

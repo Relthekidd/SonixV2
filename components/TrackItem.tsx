@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { Play, Pause } from 'lucide-react-native';
-import { Track } from '@/providers/MusicProvider';
+import { Play, Pause, Heart } from 'lucide-react-native';
+import { Track, useMusic } from '@/providers/MusicProvider';
 import TrackOptionsMenu from './TrackOptionsMenu';
 import { router } from 'expo-router';
 
@@ -12,6 +12,8 @@ interface Props {
   isPlaying?: boolean;
   onPlay: () => void;
   onLongPress?: () => void;
+  showLikeButton?: boolean;
+  showOptionsMenu?: boolean;
 }
 
 export default function TrackItem({
@@ -21,7 +23,11 @@ export default function TrackItem({
   isPlaying,
   onPlay,
   onLongPress,
+  showLikeButton,
+  showOptionsMenu = true,
 }: Props) {
+  const { toggleLike, likedSongIds } = useMusic();
+  const isLiked = track.isLiked || likedSongIds.includes(track.id);
   return (
     <View style={[styles.row, isCurrent && styles.currentRow]}>
       <TouchableOpacity
@@ -76,7 +82,21 @@ export default function TrackItem({
           </Text>
         </View>
       </TouchableOpacity>
-      <TrackOptionsMenu track={track} playlistId={playlistId} />
+      {showOptionsMenu && (
+        <TrackOptionsMenu track={track} playlistId={playlistId} />
+      )}
+      {showLikeButton && (
+        <TouchableOpacity
+          style={[styles.action, styles.brutalBorder]}
+          onPress={() => toggleLike(track.id)}
+        >
+          <Heart
+            color={isLiked ? '#ef4444' : '#8b5cf6'}
+            fill={isLiked ? '#ef4444' : 'transparent'}
+            size={16}
+          />
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
         style={[styles.action, styles.brutalBorder]}
         onPress={onPlay}
