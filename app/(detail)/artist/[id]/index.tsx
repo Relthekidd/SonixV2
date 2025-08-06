@@ -19,9 +19,10 @@ import {
   Users,
   UserPlus,
   UserCheck,
+  Play,
+  Pause,
 } from 'lucide-react-native';
 import TrackList from '@/components/TrackList';
-import TrackItem from '@/components/TrackItem';
 
 interface Artist {
   id: string;
@@ -297,40 +298,69 @@ export default function ArtistDetailScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Most Recent Release</Text>
             {recentRelease.type === 'track' ? (
-              <TrackItem
-                track={recentRelease.item}
-                isCurrent={currentTrack?.id === recentRelease.item.id}
-                isPlaying={isPlaying}
-                onPlay={() =>
-                  handleTrackPress(recentRelease.item, [recentRelease.item])
-                }
-                showLikeButton
-              />
-            ) : (
-              <TouchableOpacity
+              <View
                 style={[
-                  styles.albumCard,
+                  styles.featuredContainer,
                   styles.glassCard,
                   styles.brutalBorder,
                   styles.brutalShadow,
                 ]}
-                onPress={() =>
-                  router.push(`/album/${recentRelease.item.id}` as const)
-                }
               >
-                <Image
-                  source={{ uri: recentRelease.item.cover_url }}
-                  style={styles.albumCover}
-                />
-                <Text style={styles.albumTitle} numberOfLines={1}>
-                  {recentRelease.item.title}
-                </Text>
-                <Text style={styles.albumDate}>
-                  {new Date(
-                    recentRelease.item.release_date,
-                  ).toLocaleDateString()}
-                </Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(`/track/${recentRelease.item.id}` as const)
+                  }
+                >
+                  <Image
+                    source={{ uri: recentRelease.item.coverUrl }}
+                    style={styles.featuredCover}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.featuredTitle}>{recentRelease.item.title}</Text>
+                <Text style={styles.featuredArtist}>{recentRelease.item.artist}</Text>
+                <TouchableOpacity
+                  style={[styles.playButton, styles.brutalBorder, styles.brutalShadow]}
+                  onPress={() =>
+                    handleTrackPress(recentRelease.item, [recentRelease.item])
+                  }
+                >
+                  {currentTrack?.id === recentRelease.item.id && isPlaying ? (
+                    <Pause color="#fff" size={24} />
+                  ) : (
+                    <Play color="#fff" size={24} />
+                  )}
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.featuredContainer,
+                  styles.glassCard,
+                  styles.brutalBorder,
+                  styles.brutalShadow,
+                ]}
+              >
+                <TouchableOpacity
+                  onPress={() =>
+                    router.push(`/album/${recentRelease.item.id}` as const)
+                  }
+                >
+                  <Image
+                    source={{ uri: recentRelease.item.cover_url }}
+                    style={styles.featuredCover}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.featuredTitle}>{recentRelease.item.title}</Text>
+                <Text style={styles.featuredArtist}>{artist?.stage_name}</Text>
+                <TouchableOpacity
+                  style={[styles.playButton, styles.brutalBorder, styles.brutalShadow]}
+                  onPress={() =>
+                    router.push(`/album/${recentRelease.item.id}` as const)
+                  }
+                >
+                  <Play color="#fff" size={24} />
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         )}
@@ -504,6 +534,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Inter-SemiBold',
     color: '#8b5cf6',
+  },
+  featuredContainer: {
+    alignItems: 'center',
+    padding: 16,
+    marginTop: 16,
+    borderRadius: 12,
+  },
+  featuredCover: {
+    width: 220,
+    height: 220,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  featuredTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
+    color: '#fff',
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  featuredArtist: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+    textAlign: 'center',
+  },
+  playButton: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   albumList: {
     paddingHorizontal: 16,
