@@ -3,41 +3,60 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
-  Image,
   TouchableOpacity,
+  ScrollView,
+  TextInput,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useMusic, Track, TrackRow } from '@/providers/MusicProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { Play, Pause, Music, ArrowLeft } from 'lucide-react-native';
+import { Music, ArrowLeft } from 'lucide-react-native';
 import TrackMenu from '@/components/TrackMenu';
+import TrackList from '@/components/TrackList';
 import HeroCard from '@/components/HeroCard';
 
 export default function PlaylistDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { playlists, playTrack, pauseTrack, currentTrack, isPlaying } =
-    useMusic();
+  const { user } = useAuth();
+  const {
+    playlists,
+    playTrack,
+    pauseTrack,
+    currentTrack,
+    isPlaying,
+    addToQueue,
+  } = useMusic();
   const playlist = playlists.find((p) => p.id === id);
   const [tracks, setTracks] = useState<Track[]>([]);
   const [playlistInfo, setPlaylistInfo] = useState<{
     description?: string | null;
     cover_url?: string | null;
     created_at?: string | null;
+    user_id?: string | null;
+    title?: string | null;
   } | null>(null);
   const [runtime, setRuntime] = useState(0);
   const [playCount, setPlayCount] = useState(0);
+  const isOwner = user?.id === playlistInfo?.user_id;
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingTitle, setEditingTitle] = useState('');
+  const [editingDesc, setEditingDesc] = useState('');
 
   useEffect(() => {
     if (!playlist) return;
     supabase
       .from('playlists')
-      .select('description,cover_url,created_at')
+      .select('description,cover_url,created_at,user_id,title')
       .eq('id', playlist.id)
       .single()
-      .then(({ data }) => setPlaylistInfo(data));
+      .then(({ data }) => {
+        setPlaylistInfo(data);
+        setEditingTitle(data?.title || '');
+        setEditingDesc(data?.description || '');
+      });
 
     if (playlist.trackIds.length === 0) {
       setTracks([]);
@@ -112,6 +131,31 @@ export default function PlaylistDetailScreen() {
     }
   };
 
+  const handleReorder = async (data: Track[]) => {
+    setTracks(data);
+    await Promise.all(
+      data.map((t, index) =>
+        supabase
+          .from('playlist_tracks')
+          .update({ position: index })
+          .match({ playlist_id: playlist?.id, track_id: t.id }),
+      ),
+    );
+  };
+
+  const handleSaveMetadata = async () => {
+    await supabase
+      .from('playlists')
+      .update({ title: editingTitle, description: editingDesc })
+      .eq('id', playlist?.id);
+    setPlaylistInfo((info) =>
+      info
+        ? { ...info, title: editingTitle, description: editingDesc }
+        : info,
+    );
+    setIsEditing(false);
+  };
+
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -124,42 +168,6 @@ export default function PlaylistDetailScreen() {
       month: 'long',
       day: 'numeric',
     });
-
-  const renderItem = ({ item }: { item: Track }) => (
-    <TouchableOpacity
-      style={[
-        styles.trackItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/track/${item.id}`)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {item.artist}
-        </Text>
-      </View>
-      <TrackMenu track={item} playlistId={playlist?.id} />
-      <TouchableOpacity
-        style={styles.playButton}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleTrackPress(item);
-        }}
-      >
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
 
   if (!playlist) {
     return (
@@ -196,35 +204,92 @@ export default function PlaylistDetailScreen() {
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
-      <FlatList
-        data={tracks}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={
-          <HeroCard
-            coverUrl={apiService.getPublicUrl(
-              'images',
-              playlistInfo?.cover_url || '',
-            )}
-            title={playlist.title}
-            description={playlistInfo?.description || undefined}
-            releaseDate={
-              playlistInfo?.created_at
-                ? formatDate(playlistInfo.created_at)
-                : undefined
-            }
-            duration={`${tracks.length} tracks${runtime ? ` • ${formatDuration(runtime)}` : ''}`}
-            playCount={playCount}
-            onPlay={handlePlayPlaylist}
-          />
-        }
-        ListEmptyComponent={
+      <ScrollView>
+        <HeroCard
+          coverUrl={apiService.getPublicUrl(
+            'images',
+            playlistInfo?.cover_url || '',
+          )}
+          title={playlistInfo?.title || playlist.title}
+          description={playlistInfo?.description || undefined}
+          releaseDate={
+            playlistInfo?.created_at
+              ? formatDate(playlistInfo.created_at)
+              : undefined
+          }
+          duration={`${tracks.length} tracks${
+            runtime ? ` • ${formatDuration(runtime)}` : ''
+          }`}
+          playCount={playCount}
+        />
+
+        <TrackMenu
+          onPlay={handlePlayPlaylist}
+          onAddToQueue={() => tracks.forEach(addToQueue)}
+        />
+
+        {isOwner && (
+          <View style={styles.ownerActions}>
+            <TouchableOpacity
+              style={[styles.ownerButton, styles.glassCard, styles.brutalBorder]}
+              onPress={() => router.push('/search')}
+            >
+              <Text style={styles.ownerButtonText}>Add Song</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.ownerButton, styles.glassCard, styles.brutalBorder]}
+              onPress={() => setIsEditing((e) => !e)}
+            >
+              <Text style={styles.ownerButtonText}>
+                {isEditing ? 'Done' : 'Edit Details'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {isOwner && isEditing && (
+          <View style={styles.editSection}>
+            <TextInput
+              style={styles.input}
+              value={editingTitle}
+              onChangeText={setEditingTitle}
+              placeholder="Title"
+              placeholderTextColor="#94a3b8"
+            />
+            <TextInput
+              style={[styles.input, styles.inputMultiline]}
+              value={editingDesc}
+              onChangeText={setEditingDesc}
+              placeholder="Description"
+              placeholderTextColor="#94a3b8"
+              multiline
+            />
+            <TouchableOpacity
+              style={[styles.saveButton, styles.glassCard, styles.brutalBorder]}
+              onPress={handleSaveMetadata}
+            >
+              <Text style={styles.saveText}>Save</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        <TrackList
+          tracks={tracks}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlay={handleTrackPress}
+          editable={isOwner}
+          onReorder={handleReorder}
+          playlistId={playlist?.id}
+        />
+
+        {tracks.length === 0 && (
           <View style={styles.emptyState}>
             <Music color="#64748b" size={48} />
             <Text style={styles.emptyText}>No tracks in this playlist</Text>
           </View>
-        }
-      />
+        )}
+      </ScrollView>
     </LinearGradient>
   );
 }
@@ -245,19 +310,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  trackItem: {
+  ownerActions: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 12,
-    padding: 12,
-    borderRadius: 16,
+    justifyContent: 'center',
+    gap: 12,
+    marginBottom: 20,
   },
-  trackCover: { width: 48, height: 48, borderRadius: 8, marginRight: 12 },
-  trackInfo: { flex: 1 },
-  trackTitle: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-  trackArtist: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 14 },
-  playButton: { padding: 8 },
+  ownerButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+  },
+  ownerButtonText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+  },
+  editSection: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+    gap: 12,
+  },
+  input: {
+    backgroundColor: '#1e293b',
+    color: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    fontFamily: 'Inter-Regular',
+  },
+  inputMultiline: { height: 80, textAlignVertical: 'top' },
+  saveButton: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 12,
+  },
+  saveText: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 14,
+  },
   emptyState: { alignItems: 'center', marginTop: 80, gap: 8 },
   emptyText: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
   glassCard: {

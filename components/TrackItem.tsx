@@ -2,22 +2,32 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Play, Pause } from 'lucide-react-native';
 import { Track } from '@/providers/MusicProvider';
-import TrackMenu from './TrackMenu';
+import TrackOptionsMenu from './TrackOptionsMenu';
 import { router } from 'expo-router';
 
 interface Props {
   track: Track;
+  playlistId?: string;
   isCurrent?: boolean;
   isPlaying?: boolean;
   onPlay: () => void;
+  onLongPress?: () => void;
 }
 
-export default function TrackItem({ track, isCurrent, isPlaying, onPlay }: Props) {
+export default function TrackItem({
+  track,
+  playlistId,
+  isCurrent,
+  isPlaying,
+  onPlay,
+  onLongPress,
+}: Props) {
   return (
     <View style={[styles.row, isCurrent && styles.currentRow]}>
       <TouchableOpacity
         style={styles.info}
         onPress={() => router.push(`/track/${track.id}`)}
+        onLongPress={onLongPress}
       >
         <Image source={{ uri: track.coverUrl }} style={styles.image} />
         <View style={styles.meta}>
@@ -29,7 +39,7 @@ export default function TrackItem({ track, isCurrent, isPlaying, onPlay }: Props
           </Text>
         </View>
       </TouchableOpacity>
-      <TrackMenu track={track} />
+      <TrackOptionsMenu track={track} playlistId={playlistId} />
       <TouchableOpacity
         style={[styles.action, styles.brutalBorder]}
         onPress={onPlay}

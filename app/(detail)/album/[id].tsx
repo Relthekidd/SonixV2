@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   ActivityIndicator,
-  Share,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -14,9 +13,9 @@ import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService, AlbumDetails, TrackData } from '@/services/api';
 import { ArrowLeft } from 'lucide-react-native';
-import TrackItem from '@/components/TrackItem';
+import TrackList from '@/components/TrackList';
+import TrackMenu from '@/components/TrackMenu';
 import HeroCard from '@/components/HeroCard';
-import AlbumMenu from '@/components/AlbumMenu';
 
 function AlbumDetailScreen() {
   const router = useRouter();
@@ -28,8 +27,14 @@ function AlbumDetailScreen() {
   const [runtime, setRuntime] = useState(0);
   const [playCount, setPlayCount] = useState(0);
 
-  const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
-    useMusic();
+  const {
+    currentTrack,
+    isPlaying,
+    playTrack,
+    pauseTrack,
+    addToQueue,
+    likedSongIds,
+  } = useMusic();
 
   useEffect(() => {
     if (id) loadAlbumDetails();
@@ -111,18 +116,6 @@ function AlbumDetailScreen() {
     }
   };
 
-  const handleShare = async () => {
-    if (!album) return;
-    try {
-      await Share.share({
-        message: `Check out "${album.title}" by ${album.artist}`,
-        url: `https://sonix.app/album/${id}`,
-      });
-    } catch (err) {
-      console.error('Error sharing album:', err);
-    }
-  };
-
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -197,37 +190,20 @@ function AlbumDetailScreen() {
           }
           duration={`${tracks.length} tracks • ${formatDuration(runtime)}`}
           playCount={playCount}
-          onPlay={handlePlayAlbum}
-          moreMenu={<AlbumMenu onShare={handleShare} />}
         />
 
-        {tracks.length > 0 && (
-          <TouchableOpacity
-            style={[styles.playAllButton, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-            onPress={handlePlayAlbum}
-          >
-            <LinearGradient
-              colors={["#8b5cf6", "#a855f7"]}
-              style={styles.playAllGradient}
-            >
-              <Text style={styles.playAllText}>Play All</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+        <TrackMenu
+          onPlay={handlePlayAlbum}
+          onAddToQueue={() => tracks.forEach(addToQueue)}
+        />
 
         <Text style={styles.trackHeading}>Tracklist</Text>
-        <View style={styles.trackList}>
-          {tracks.map((t) => (
-            <View key={t.id} style={styles.trackItemWrapper}>
-              <TrackItem
-                track={t}
-                isCurrent={currentTrack?.id === t.id}
-                isPlaying={isPlaying}
-                onPlay={() => handleTrackPlay(t)}
-              />
-            </View>
-          ))}
-        </View>
+        <TrackList
+          tracks={tracks}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlay={handleTrackPlay}
+        />
         <View style={styles.bottomPadding} />
       </ScrollView>
     </LinearGradient>
@@ -259,25 +235,6 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     marginBottom: 12,
     paddingHorizontal: 20,
-  },
-  trackList: { paddingHorizontal: 20 },
-  trackItemWrapper: { marginBottom: 12 },
-  playAllButton: {
-    alignSelf: 'center',
-    marginBottom: 20,
-    borderRadius: 24,
-    overflow: 'hidden',
-  },
-  playAllGradient: {
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playAllText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
   },
   bottomPadding: { height: 80 },
   glassCard: {

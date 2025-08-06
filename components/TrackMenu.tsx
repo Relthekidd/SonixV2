@@ -1,179 +1,83 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  FlatList,
-} from 'react-native';
-import { MoreVertical, X } from 'lucide-react-native';
-import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
+import React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Play, ListPlus, Heart, Library } from 'lucide-react-native';
 
 interface Props {
-  track: Track;
-  playlistId?: string;
-  onShare?: () => void;
+  onPlay?: () => void;
+  onAddToQueue?: () => void;
+  onToggleLike?: () => void;
+  liked?: boolean;
+  onAddToLibrary?: () => void;
 }
 
-export default function TrackMenu({ track, playlistId, onShare }: Props) {
-  const {
-    toggleLike,
-    addToQueue,
-    playlists,
-    addToPlaylist,
-    removeFromPlaylist,
-  } = useMusic();
-  const [visible, setVisible] = useState(false);
-  const [selectPlaylist, setSelectPlaylist] = useState(false);
-
-  const handleAddToPlaylist = (pl: Playlist) => {
-    addToPlaylist(pl.id, track);
-    setSelectPlaylist(false);
-    setVisible(false);
-  };
-
+export default function TrackMenu({
+  onPlay,
+  onAddToQueue,
+  onToggleLike,
+  liked,
+  onAddToLibrary,
+}: Props) {
   return (
-    <>
-      <TouchableOpacity onPress={() => setVisible(true)} style={styles.button}>
-        <MoreVertical color="#94a3b8" size={20} />
-      </TouchableOpacity>
-      <Modal transparent visible={visible} animationType="fade">
-        <View style={styles.overlay}>
-          <View
-            style={[
-              styles.menu,
-              styles.glassCard,
-              styles.brutalBorder,
-              styles.brutalShadow,
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.close}
-              onPress={() => setVisible(false)}
-            >
-              <X color="#fff" size={20} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => setSelectPlaylist(true)}
-            >
-              <Text style={styles.menuText}>Add to Playlist</Text>
-            </TouchableOpacity>
-            {playlistId && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  removeFromPlaylist(playlistId, track.id);
-                  setVisible(false);
-                }}
-              >
-                <Text style={styles.menuText}>Remove from Playlist</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                toggleLike(track.id);
-                setVisible(false);
-              }}
-            >
-              <Text style={styles.menuText}>
-                {track.isLiked ? 'Unlike' : 'Like'} Song
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={() => {
-                addToQueue(track);
-                setVisible(false);
-              }}
-            >
-              <Text style={styles.menuText}>Add to Queue</Text>
-            </TouchableOpacity>
-            {onShare && (
-              <TouchableOpacity
-                style={styles.menuItem}
-                onPress={() => {
-                  onShare();
-                  setVisible(false);
-                }}
-              >
-                <Text style={styles.menuText}>Share</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Modal>
-      <Modal transparent visible={selectPlaylist} animationType="fade">
-        <View style={styles.overlay}>
-          <View
-            style={[
-              styles.playlistSelect,
-              styles.glassCard,
-              styles.brutalBorder,
-              styles.brutalShadow,
-            ]}
-          >
-            <TouchableOpacity
-              style={styles.close}
-              onPress={() => setSelectPlaylist(false)}
-            >
-              <X color="#fff" size={20} />
-            </TouchableOpacity>
-            <FlatList
-              data={playlists}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => handleAddToPlaylist(item)}
-                >
-                  <Text style={styles.menuText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </View>
-      </Modal>
-    </>
+    <View
+      style={[
+        styles.container,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+      ]}
+    >
+      {onPlay && (
+        <TouchableOpacity style={styles.button} onPress={onPlay}>
+          <Play color="#ffffff" size={24} />
+          <Text style={styles.label}>Play</Text>
+        </TouchableOpacity>
+      )}
+
+      {onAddToQueue && (
+        <TouchableOpacity style={styles.button} onPress={onAddToQueue}>
+          <ListPlus color="#ffffff" size={24} />
+          <Text style={styles.label}>Queue</Text>
+        </TouchableOpacity>
+      )}
+
+      {onToggleLike && (
+        <TouchableOpacity style={styles.button} onPress={onToggleLike}>
+          <Heart
+            color={liked ? '#ef4444' : '#ffffff'}
+            fill={liked ? '#ef4444' : 'none'}
+            size={24}
+          />
+          <Text style={styles.label}>{liked ? 'Unlike' : 'Like'}</Text>
+        </TouchableOpacity>
+      )}
+
+      {onAddToLibrary && (
+        <TouchableOpacity style={styles.button} onPress={onAddToLibrary}>
+          <Library color="#ffffff" size={24} />
+          <Text style={styles.label}>Library</Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  button: { padding: 8 },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
+  container: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 20,
+  },
+  button: {
     alignItems: 'center',
+    gap: 8,
   },
-  menu: {
-    width: 220,
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#1e293b',
-  },
-  close: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 4,
-  },
-  menuItem: {
-    paddingVertical: 12,
-  },
-  menuText: {
-    color: '#fff',
+  label: {
+    color: '#ffffff',
+    fontSize: 12,
     fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
-  },
-  playlistSelect: {
-    width: 260,
-    maxHeight: '70%',
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: '#1e293b',
   },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',

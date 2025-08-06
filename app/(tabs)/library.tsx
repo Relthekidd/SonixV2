@@ -17,7 +17,7 @@ import { apiService } from '@/services/api';
 import { Heart, Music, Plus, Play, Pause, X } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { router } from 'expo-router';
-import TrackMenu from '@/components/TrackMenu';
+import TrackOptionsMenu from '@/components/TrackOptionsMenu';
 
 function LibraryScreen() {
   const [activeTab, setActiveTab] = useState<'liked' | 'playlists'>('liked');
@@ -114,7 +114,7 @@ function LibraryScreen() {
           {item.artist}
         </Text>
       </View>
-      <TrackMenu track={item} />
+      <TrackOptionsMenu track={item} />
       <TouchableOpacity
         style={styles.playButton}
         onPress={(e) => {
