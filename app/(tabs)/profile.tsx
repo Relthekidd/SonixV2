@@ -84,7 +84,7 @@ interface DatabaseTrack {
   duration: number | null;
   audio_url: string;
   cover_url: string;
-  artist: { name: string } | null;
+  artist: { name: string } | { name: string }[] | null;
 }
 
 // Database artist interface
@@ -194,19 +194,26 @@ export default function ProfileScreen() {
 
       if (error) throw error;
 
-      const tracks: Track[] = (data as DatabaseTrack[])?.map(track => ({
-        id: track.id,
-        title: track.title,
-        artist: track.artist?.name || 'Unknown Artist',
-        duration: track.duration || 0,
-        audioUrl: apiService.getPublicUrl('audio-files', track.audio_url),
-        coverUrl: apiService.getPublicUrl('images', track.cover_url),
-        // Add required Track properties with defaults
-        album: 'Unknown Album',
-        isLiked: false,
-        genre: 'Unknown',
-        releaseDate: new Date().getFullYear().toString(),
-      })) || [];
+      const tracks: Track[] =
+        (data as DatabaseTrack[])?.map((track) => {
+          const artistName = Array.isArray(track.artist)
+            ? track.artist[0]?.name
+            : track.artist?.name;
+
+          return {
+            id: track.id,
+            title: track.title,
+            artist: artistName || 'Unknown Artist',
+            duration: track.duration || 0,
+            audioUrl: apiService.getPublicUrl('audio-files', track.audio_url),
+            coverUrl: apiService.getPublicUrl('images', track.cover_url),
+            // Add required Track properties with defaults
+            album: 'Unknown Album',
+            isLiked: false,
+            genre: 'Unknown',
+            releaseDate: new Date().getFullYear().toString(),
+          };
+        }) || [];
 
       setTopTracks(tracks);
     } catch (error) {

@@ -39,7 +39,7 @@ export default function Hero({
           style={styles.subtitle}
           onPress={() =>
             router.push({
-              pathname: `/artist/${mainArtist.id}`,
+              pathname: `/artist/${mainArtist.id}` as const,
               params: { artist: JSON.stringify(mainArtist) },
             })
           }
@@ -58,7 +58,7 @@ export default function Hero({
               style={styles.featured}
               onPress={() =>
                 router.push({
-                  pathname: `/artist/${a.id}`,
+                  pathname: `/artist/${a.id}` as const,
                   params: { artist: JSON.stringify(a) },
                 })
               }

@@ -92,7 +92,8 @@ export default function PlaylistDetailScreen() {
             ? t.genres[0]
             : (t.genres as string) || '',
           releaseDate: t.release_date || t.created_at || '',
-          playCount: t.play_count || undefined,
+          playCount:
+            typeof t.play_count === 'number' ? t.play_count : undefined,
         }));
         const ordered = playlist.trackIds
           .map((tid) => mapped.find((m) => m.id === tid))

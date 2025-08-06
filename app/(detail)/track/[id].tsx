@@ -64,11 +64,11 @@ export default function TrackDetailScreen() {
         artistId: data.artist_id || undefined,
         album: data.album?.title || 'Single',
         duration: data.duration || 180,
-        coverUrl:
-          data.cover_url ||
-          data.album?.cover_url ||
-          'https://images.pexels.com/photos/167092/pexels-photo-167092.jpeg?auto=compress&cs=tinysrgb&w=400',
-        audioUrl: data.audio_url,
+        coverUrl: apiService.getPublicUrl(
+          'images',
+          data.cover_url || data.album?.cover_url || '',
+        ),
+        audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
         isLiked: likedSongIds.includes(data.id),
         genre: Array.isArray(data.genres)
           ? data.genres[0]
@@ -79,8 +79,10 @@ export default function TrackDetailScreen() {
         year: data.release_date
           ? new Date(data.release_date).getFullYear().toString()
           : undefined,
-        playCount: data.play_count,
-        likeCount: data.like_count,
+        playCount:
+          typeof data.play_count === 'number' ? data.play_count : undefined,
+        likeCount:
+          typeof data.like_count === 'number' ? data.like_count : undefined,
         lyrics: data.lyrics || '',
         description: data.description || '',
         genres: data.genres || undefined,

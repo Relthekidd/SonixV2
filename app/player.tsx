@@ -152,14 +152,16 @@ export default function PlayerScreen() {
           <TouchableOpacity
             onPress={() =>
               currentTrack.artistId &&
-              router.push(`/artist/${currentTrack.artistId}`)
+              router.push(`/artist/${currentTrack.artistId}` as const)
             }
           >
             <Text style={styles.artist}>{currentTrack.artist}</Text>
           </TouchableOpacity>
           {currentTrack.albumId && (
             <TouchableOpacity
-              onPress={() => router.push(`/album/${currentTrack.albumId}`)}
+              onPress={() =>
+                router.push(`/album/${currentTrack.albumId}` as const)
+              }
             >
               <Text style={styles.album}>{currentTrack.album}</Text>
             </TouchableOpacity>

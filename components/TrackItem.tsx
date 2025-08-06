@@ -26,7 +26,7 @@ export default function TrackItem({
     <View style={[styles.row, isCurrent && styles.currentRow]}>
       <TouchableOpacity
         style={styles.info}
-        onPress={() => router.push(`/track/${track.id}`)}
+        onPress={() => router.push(`/track/${track.id}` as const)}
         onLongPress={onLongPress}
       >
         <Image source={{ uri: track.coverUrl }} style={styles.image} />
@@ -40,7 +40,7 @@ export default function TrackItem({
               onPress={() =>
                 track.artistId
                   ? router.push({
-                      pathname: `/artist/${track.artistId}`,
+                      pathname: `/artist/${track.artistId}` as const,
                       params: {
                         artist: JSON.stringify({
                           id: track.artistId,
@@ -61,8 +61,8 @@ export default function TrackItem({
                     key={a.id}
                     style={styles.artist}
                     onPress={() =>
-                      router.push({
-                        pathname: `/artist/${a.id}`,
+                    router.push({
+                        pathname: `/artist/${a.id}` as const,
                         params: { artist: JSON.stringify(a) },
                       })
                     }
