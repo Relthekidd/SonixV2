@@ -1,29 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
   TouchableOpacity,
   Image,
   FlatList,
   Alert,
   TextInput,
+  ScrollView,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useMusic, Track, Playlist, TrackRow } from '@/providers/MusicProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { Heart, Music, Plus, Play, Pause, X } from 'lucide-react-native';
-import { withAuthGuard } from '@/hoc/withAuthGuard';
+import { Heart, Music, Plus, X } from 'lucide-react-native';
+import TrackList from '@/components/TrackList';
 import { router } from 'expo-router';
-import TrackOptionsMenu from '@/components/TrackOptionsMenu';
+
+type Filter = 'all' | 'singles' | 'albums' | 'liked' | 'playlists' | 'artists';
 
 function LibraryScreen() {
-  const [activeTab, setActiveTab] = useState<'liked' | 'playlists'>('liked');
-  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
-  const [playlistName, setPlaylistName] = useState('');
-
+  const { user } = useAuth();
   const {
     likedSongIds,
     playlists,
@@ -34,20 +33,36 @@ function LibraryScreen() {
     createPlaylist,
   } = useMusic();
 
+  const [filter, setFilter] = useState<Filter>('all');
+  const [showCreatePlaylist, setShowCreatePlaylist] = useState(false);
+  const [playlistName, setPlaylistName] = useState('');
+
+  const [allTracks, setAllTracks] = useState<Track[]>([]);
   const [likedTracks, setLikedTracks] = useState<Track[]>([]);
+  const [savedAlbums, setSavedAlbums] = useState<
+    { id: string; title: string; coverUrl: string }[]
+  >([]);
+  const [followedArtists, setFollowedArtists] = useState<
+    { id: string; stage_name: string; avatar_url?: string | null }[]
+  >([]);
 
   useEffect(() => {
-    if (likedSongIds.length === 0) {
+    const trackIds = Array.from(
+      new Set([...likedSongIds, ...playlists.flatMap((p) => p.trackIds)]),
+    );
+    if (trackIds.length === 0) {
+      setAllTracks([]);
       setLikedTracks([]);
+      setSavedAlbums([]);
       return;
     }
     supabase
       .from('tracks')
       .select(`*, artist:artist_id(*), album:album_id(*)`)
-      .in('id', likedSongIds)
+      .in('id', trackIds)
       .then(({ data, error }) => {
         if (error) {
-          console.error('fetch liked tracks', error);
+          console.error('fetch tracks', error);
           return;
         }
         const mapped = (data || []).map((t: TrackRow) => ({
@@ -63,25 +78,52 @@ function LibraryScreen() {
             t.cover_url || t.album?.cover_url || '',
           ),
           audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-          isLiked: true,
+          isLiked: likedSongIds.includes(t.id),
           genre: Array.isArray(t.genres)
             ? t.genres[0]
             : (t.genres as string) || '',
           releaseDate: t.release_date || t.created_at || '',
         }));
-        const ordered = likedSongIds
-          .map((id) => mapped.find((m) => m.id === id))
-          .filter(Boolean) as Track[];
-        setLikedTracks(ordered);
+        setAllTracks(mapped);
+        setLikedTracks(mapped.filter((m) => likedSongIds.includes(m.id)));
+        const albumMap = new Map<string, { id: string; title: string; coverUrl: string }>();
+        mapped.forEach((m) => {
+          if (m.albumId) {
+            albumMap.set(m.albumId, {
+              id: m.albumId,
+              title: m.album,
+              coverUrl: m.coverUrl,
+            });
+          }
+        });
+        setSavedAlbums(Array.from(albumMap.values()));
       });
-  }, [likedSongIds]);
+  }, [likedSongIds, playlists]);
 
-  const handleTrackPress = (track: Track) => {
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from('artist_followers')
+      .select('artist:artist_id(id, stage_name, avatar_url)')
+      .eq('user_id', user.id)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('fetch artists', error);
+          return;
+        }
+        const rows = (data || []) as {
+          artist: { id: string; stage_name: string; avatar_url?: string | null };
+        }[];
+        setFollowedArtists(rows.map((r) => r.artist));
+      });
+  }, [user]);
+
+  const handleTrackPress = (track: Track, list: Track[]) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) pauseTrack();
-      else playTrack(track, likedTracks);
+      else playTrack(track, list);
     } else {
-      playTrack(track, likedTracks);
+      playTrack(track, list);
     }
   };
 
@@ -94,42 +136,6 @@ function LibraryScreen() {
     setPlaylistName('');
     setShowCreatePlaylist(false);
   };
-
-  const renderTrackItem = ({ item }: { item: Track }) => (
-    <TouchableOpacity
-      style={[
-        styles.trackItem,
-        styles.glassCard,
-        styles.brutalBorder,
-        styles.brutalShadow,
-      ]}
-      onPress={() => router.push(`/track/${item.id}`)}
-    >
-      <Image source={{ uri: item.coverUrl }} style={styles.trackCover} />
-      <View style={styles.trackInfo}>
-        <Text style={styles.trackTitle} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.trackArtist} numberOfLines={1}>
-          {item.artist}
-        </Text>
-      </View>
-      <TrackOptionsMenu track={item} />
-      <TouchableOpacity
-        style={styles.playButton}
-        onPress={(e) => {
-          e.stopPropagation();
-          handleTrackPress(item);
-        }}
-      >
-        {currentTrack?.id === item.id && isPlaying ? (
-          <Pause color="#8b5cf6" size={20} />
-        ) : (
-          <Play color="#8b5cf6" size={20} />
-        )}
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
 
   const renderPlaylistItem = ({ item }: { item: Playlist }) => (
     <TouchableOpacity
@@ -167,75 +173,90 @@ function LibraryScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={[
-            styles.tabCard,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-            activeTab === 'liked' && styles.activeTabCard,
-          ]}
-          onPress={() => setActiveTab('liked')}
-        >
-          <Heart
-            color={activeTab === 'liked' ? '#8b5cf6' : '#64748b'}
-            size={20}
-          />
-          <Text
+      <View style={styles.filterBar}>
+        {[
+          { key: 'singles', label: 'Singles' },
+          { key: 'albums', label: 'Albums' },
+          { key: 'liked', label: 'Liked Songs' },
+          { key: 'playlists', label: 'Playlists' },
+          { key: 'artists', label: 'Artists' },
+        ].map(({ key, label }) => (
+          <TouchableOpacity
+            key={key}
             style={[
-              styles.tabText,
-              activeTab === 'liked' && styles.activeTabText,
+              styles.filterButton,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+              filter === (key as Filter) && styles.activeFilterButton,
             ]}
+            onPress={() => setFilter(key as Filter)}
           >
-            Liked Songs
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.tabCard,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-            activeTab === 'playlists' && styles.activeTabCard,
-          ]}
-          onPress={() => setActiveTab('playlists')}
-        >
-          <Music
-            color={activeTab === 'playlists' ? '#8b5cf6' : '#64748b'}
-            size={20}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'playlists' && styles.activeTabText,
-            ]}
-          >
-            Playlists
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterText,
+                filter === (key as Filter) && styles.activeFilterText,
+              ]}
+            >
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {activeTab === 'liked' && (
-          <FlatList
-            data={likedTracks}
-            renderItem={renderTrackItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-            ListEmptyComponent={
-              <View style={styles.emptyState}>
-                <Heart color="#64748b" size={48} />
-                <Text style={styles.emptyText}>No liked songs yet</Text>
-                <Text style={styles.emptySubtext}>
-                  Heart songs you love to find them here
-                </Text>
-              </View>
+        {filter === 'all' && (
+          <TrackList
+            tracks={allTracks}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onPlay={(t) => handleTrackPress(t, allTracks)}
+          />
+        )}
+
+        {filter === 'singles' && (
+          <TrackList
+            tracks={allTracks.filter((t) => !t.albumId)}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onPlay={(t) =>
+              handleTrackPress(t, allTracks.filter((a) => !a.albumId))
             }
           />
         )}
 
-        {activeTab === 'playlists' && (
+        {filter === 'albums' && (
+          <View style={styles.albumList}>
+            {savedAlbums.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={[
+                  styles.albumCard,
+                  styles.glassCard,
+                  styles.brutalBorder,
+                  styles.brutalShadow,
+                ]}
+                onPress={() => router.push(`/album/${a.id}` as const)}
+              >
+                <Image source={{ uri: a.coverUrl }} style={styles.albumCover} />
+                <Text style={styles.albumTitle} numberOfLines={1}>
+                  {a.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
+        {filter === 'liked' && (
+          <TrackList
+            tracks={likedTracks}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onPlay={(t) => handleTrackPress(t, likedTracks)}
+          />
+        )}
+
+        {filter === 'playlists' && (
           <FlatList
             data={playlists}
             renderItem={renderPlaylistItem}
@@ -252,6 +273,36 @@ function LibraryScreen() {
             }
           />
         )}
+
+        {filter === 'artists' && (
+          <View style={styles.artistList}>
+            {followedArtists.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={[
+                  styles.artistItem,
+                  styles.glassCard,
+                  styles.brutalBorder,
+                  styles.brutalShadow,
+                ]}
+                onPress={() => router.push(`/artist/${a.id}` as const)}
+              >
+                {a.avatar_url ? (
+                  <Image
+                    source={{ uri: a.avatar_url }}
+                    style={styles.artistAvatar}
+                  />
+                ) : (
+                  <Heart color="#8b5cf6" size={24} />
+                )}
+                <Text style={styles.artistName} numberOfLines={1}>
+                  {a.stage_name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+
         <View style={styles.bottomPadding} />
       </ScrollView>
 
@@ -302,42 +353,47 @@ const styles = StyleSheet.create({
   },
   title: { color: '#fff', fontSize: 24, fontFamily: 'Poppins-Bold' },
   addButton: { padding: 8 },
-  tabBar: {
+  filterBar: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingVertical: 12,
-    marginBottom: 16,
-    gap: 12,
+    gap: 8,
   },
-  tabCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
+  filterButton: {
+    paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 16,
-    gap: 6,
   },
-  activeTabCard: { backgroundColor: 'rgba(139,92,246,0.1)' },
-  tabText: { fontFamily: 'Inter-SemiBold', color: '#64748b' },
-  activeTabText: { color: '#8b5cf6' },
+  filterText: {
+    fontFamily: 'Inter-SemiBold',
+    color: '#64748b',
+  },
+  activeFilterButton: { backgroundColor: 'rgba(139,92,246,0.1)' },
+  activeFilterText: { color: '#8b5cf6' },
   content: { paddingHorizontal: 16 },
-  trackItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 16,
-    borderRadius: 16,
+  albumList: {
+    paddingHorizontal: 16,
   },
-  trackCover: { width: 48, height: 48, borderRadius: 8, marginRight: 12 },
-  trackInfo: { flex: 1 },
-  trackTitle: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
-  trackArtist: { color: '#94a3b8', fontFamily: 'Inter-Regular', fontSize: 14 },
-  playButton: { padding: 8 },
+  albumCard: {
+    marginBottom: 16,
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+  },
+  albumCover: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  albumTitle: {
+    color: '#fff',
+    fontFamily: 'Inter-SemiBold',
+    fontSize: 16,
+  },
   playlistItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 16,
     marginBottom: 16,
     padding: 20,
     borderRadius: 16,
@@ -349,6 +405,16 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter-Regular',
     fontSize: 14,
   },
+  artistList: { paddingHorizontal: 16 },
+  artistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    padding: 12,
+    borderRadius: 12,
+  },
+  artistAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
+  artistName: { color: '#fff', fontFamily: 'Inter-SemiBold', fontSize: 16 },
   emptyState: {
     alignItems: 'center',
     paddingVertical: 80,
@@ -421,3 +487,4 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 });
+
