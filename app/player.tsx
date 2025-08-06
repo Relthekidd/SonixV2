@@ -8,7 +8,6 @@ import {
   Dimensions,
   StatusBar,
   FlatList,
-  Alert,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +23,7 @@ import {
   Heart,
   Shuffle,
   Repeat,
-  MoveHorizontal as MoreHorizontal,
+  ListMusic,
   Volume1,
   Volume2,
 } from 'lucide-react-native';
@@ -33,6 +32,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
+import QueueModal from '@/components/QueueModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -57,6 +57,9 @@ export default function PlayerScreen() {
     isShuffled,
     repeatMode,
   } = useMusic();
+
+  const [queueVisible, setQueueVisible] = useState(false);
+
 
   const [seekTime, setSeekTime] = useState<number | null>(null);
   const scaleValue = useSharedValue(1);
@@ -130,9 +133,9 @@ export default function PlayerScreen() {
 
         <TouchableOpacity
           style={styles.headerButton}
-          onPress={() => Alert.alert('More actions coming soon')}
+          onPress={() => setQueueVisible(true)}
         >
-          <MoreHorizontal color="#ffffff" size={24} />
+          <ListMusic color="#ffffff" size={24} />
         </TouchableOpacity>
       </View>
 
@@ -290,6 +293,7 @@ export default function PlayerScreen() {
           </View>
         )}
       </View>
+      <QueueModal visible={queueVisible} onClose={() => setQueueVisible(false)} />
     </View>
   );
 }

@@ -11,6 +11,7 @@ import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
 import { useAuth } from './AuthProvider';
+import { useUserStats } from './UserStatsProvider';
 
 export interface Track {
   id: string;
@@ -37,8 +38,7 @@ export interface Track {
 export interface Playlist {
   id: string;
   title: string;
-  tracks: Track[];
-  coverUrl?: string;
+  trackIds: string[];
 }
 
 export interface TrackRow {
@@ -63,31 +63,23 @@ export interface TrackRow {
   lyrics?: string | null;
 }
 
-interface PlaylistTrackRow {
-  track: TrackRow;
-}
-
-interface PlaylistRow {
+interface UserProfile {
   id: string;
-  title: string;
-  cover_url?: string | null;
-  playlist_tracks?: PlaylistTrackRow[];
-}
-
-interface LikedSongRow {
-  track: TrackRow;
-}
-
-interface Artist {
-  id: string;
-  name: string;
+  username: string;
   avatar_url?: string | null;
 }
 
-interface UserProfile {
+export interface AlbumResult {
   id: string;
-  display_name: string;
-  profile_picture_url?: string | null;
+  title: string;
+  artist?: string;
+  coverUrl: string;
+}
+
+export interface PlaylistResult {
+  id: string;
+  title: string;
+  coverUrl: string;
 }
 
 interface MusicContextType {
@@ -118,18 +110,17 @@ interface MusicContextType {
     sort?: 'recent' | 'popular',
   ) => Promise<{
     tracks: Track[];
-    albums: Track[];
-    singles: Track[];
-    artists: Artist[];
+    albums: AlbumResult[];
+    playlists: PlaylistResult[];
     users: UserProfile[];
   }>;
   // Library-related state & actions
-  likedSongs: Track[];
+  likedSongIds: string[];
   playlists: Playlist[];
-  albums: Track[];
-  createPlaylist: (title: string, description?: string) => Promise<void>;
-  toggleLike: (trackId: string) => void;
-  addToPlaylist: (playlistId: string, track: Track) => void;
+  createPlaylist: (title: string) => Promise<Playlist | null>;
+  toggleLike: (trackId: string) => Promise<void>;
+  addToPlaylist: (playlistId: string, track: Track) => Promise<void>;
+  removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
   setVolume: (value: number) => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
@@ -141,6 +132,7 @@ const MusicContext = createContext<MusicContextType | null>(null);
 
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { refreshStats } = useUserStats();
   const soundRef = useRef<Audio.Sound | null>(null);
   const statusSubRef = useRef<(() => void) | null>(null);
   const originalQueueRef = useRef<Track[]>([]);
@@ -161,11 +153,30 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   // Library-related state
-  const [likedSongs, setLikedSongs] = useState<Track[]>([]);
+  const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
-  const [albums] = useState<Track[]>([]);
 
-  const mapTrack = (t: TrackRow, liked = false): Track => ({
+  const logPlay = useCallback(
+    (duration: number) => {
+      if (user && currentTrack) {
+        apiService
+          .recordPlay(
+            currentTrack.id,
+            currentTrack.artistId,
+            user.id,
+            Math.floor(duration),
+          )
+          .then(() => refreshStats());
+      }
+    },
+    [user, currentTrack, refreshStats],
+  );
+
+  const mapTrack = (
+    t: TrackRow,
+    liked = false,
+    likedIds: string[] = likedSongIds,
+  ): Track => ({
     id: t.id,
     title: t.title,
     artist: t.artist?.name || t.artist_name || 'Unknown Artist',
@@ -178,7 +189,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       t.cover_url || t.album?.cover_url || '',
     ),
     audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
-    isLiked: liked || likedSongs.some((l) => l.id === t.id),
+    isLiked: liked || likedIds.includes(t.id),
     genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
     genres: Array.isArray(t.genres)
       ? (t.genres as string[])
@@ -205,43 +216,27 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     return copy;
   };
 
-  const createPlaylist = async (title: string, description = '') => {
-    if (!user) return;
-    const { data, error } = await supabase
-      .from('playlists')
-      .insert({ title, description, user_id: user.id })
-      .select()
-      .single();
-    if (!error && data) {
-      const newPL: Playlist = {
-        id: data.id,
-        title: data.title,
-        tracks: [],
-        coverUrl: data.cover_url || '',
-      };
+  const createPlaylist = async (title: string): Promise<Playlist | null> => {
+    if (!user) return null;
+    try {
+      const data = await apiService.createPlaylist(user.id, title);
+      const newPL: Playlist = { id: data.id, title: data.title, trackIds: [] };
       setPlaylists((prev) => [newPL, ...prev]);
+      return newPL;
+    } catch (err) {
+      console.error('createPlaylist error', err);
+      return null;
     }
   };
 
   const toggleLike = async (trackId: string) => {
     if (!user) return;
-    const already = likedSongs.some((t) => t.id === trackId);
+    const already = likedSongIds.includes(trackId);
     try {
-      if (already) {
-        await supabase
-          .from('liked_songs')
-          .delete()
-          .match({ user_id: user.id, track_id: trackId });
-        setLikedSongs((prev) => prev.filter((t) => t.id !== trackId));
-      } else {
-        const track = queue.find((t) => t.id === trackId) || currentTrack;
-        if (track) {
-          await supabase
-            .from('liked_songs')
-            .upsert({ user_id: user.id, track_id: trackId });
-          setLikedSongs((prev) => [...prev, { ...track, isLiked: true }]);
-        }
-      }
+      await apiService.toggleLike(user.id, trackId, already);
+      setLikedSongIds((prev) =>
+        already ? prev.filter((id) => id !== trackId) : [...prev, trackId],
+      );
 
       const updateTrack = (t: Track) =>
         t.id === trackId ? { ...t, isLiked: !already } : t;
@@ -250,12 +245,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       setTrendingTracks((prev) => prev.map(updateTrack));
       setNewReleases((prev) => prev.map(updateTrack));
       setRecentlyPlayed((prev) => prev.map(updateTrack));
-      setPlaylists((prev) =>
-        prev.map((pl) => ({
-          ...pl,
-          tracks: pl.tracks.map(updateTrack),
-        })),
-      );
       setCurrentTrack((ct) =>
         ct && ct.id === trackId ? { ...ct, isLiked: !already } : ct,
       );
@@ -266,37 +255,87 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   const addToPlaylist = async (playlistId: string, track: Track) => {
     if (!user) return;
-    await supabase
-      .from('playlist_tracks')
-      .upsert({ playlist_id: playlistId, track_id: track.id });
-    setPlaylists((prev) =>
-      prev.map((pl) =>
-        pl.id === playlistId ? { ...pl, tracks: [...pl.tracks, track] } : pl,
-      ),
-    );
+    const pl = playlists.find((p) => p.id === playlistId);
+    const position = pl ? pl.trackIds.length : 0;
+    try {
+      await apiService.addTrackToPlaylist(playlistId, track.id, position);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId
+            ? { ...p, trackIds: [...p.trackIds, track.id] }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('addToPlaylist error', err);
+    }
+  };
+
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => {
+    if (!user) return;
+    try {
+      await apiService.removeTrackFromPlaylist(playlistId, trackId);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId
+            ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('removeFromPlaylist error', err);
+    }
   };
 
   const addToQueue = (track: Track) => {
-    setQueue((prev) => [...prev, track]);
+    setQueue((prev) => {
+      const updated = [...prev, track];
+      originalQueueRef.current = updated;
+      return updated;
+    });
   };
 
   const removeFromQueue = (trackId: string) => {
-    setQueue((prev) => prev.filter((t) => t.id !== trackId));
+    setQueue((prev) => {
+      const index = prev.findIndex((t) => t.id === trackId);
+      const updated = prev.filter((t) => t.id !== trackId);
+      originalQueueRef.current = updated;
+      if (index !== -1) {
+        setCurrentIndex((prevIdx) => {
+          if (index < prevIdx) return prevIdx - 1;
+          if (index === prevIdx) return Math.min(prevIdx, updated.length - 1);
+          return prevIdx;
+        });
+      }
+      return updated;
+    });
   };
 
-  const clearQueue = () => setQueue([]);
+  const clearQueue = () => {
+    setQueue([]);
+    originalQueueRef.current = [];
+    setCurrentIndex(-1);
+  };
 
   const reorderQueue = (from: number, to: number) => {
     setQueue((prev) => {
       const updated = [...prev];
       const [moved] = updated.splice(from, 1);
       updated.splice(to, 0, moved);
+      originalQueueRef.current = updated;
       return updated;
+    });
+    setCurrentIndex((prevIdx) => {
+      if (prevIdx === from) return to;
+      if (from < prevIdx && to >= prevIdx) return prevIdx - 1;
+      if (from > prevIdx && to <= prevIdx) return prevIdx + 1;
+      return prevIdx;
     });
   };
 
   const handleTrackEnd = async () => {
     if (!queue.length) return;
+    logPlay(duration);
     if (repeatMode === 'one') {
       try {
         await soundRef.current?.setPositionAsync(0);
@@ -312,10 +351,14 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         nextIdx = 0;
       } else {
         setIsPlaying(false);
+        setCurrentTrack(null);
+        setCurrentTime(0);
         return;
       }
     }
     const next = queue[nextIdx];
+    setCurrentTrack(null);
+    setCurrentTime(0);
     await playTrack(next);
   };
 
@@ -334,6 +377,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
         soundRef.current.setOnPlaybackStatusUpdate(null);
+      }
+
+      if (currentTrack) {
+        logPlay(currentTime);
       }
 
       if (queueParam.length) {
@@ -367,9 +414,6 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       sound.setOnPlaybackStatusUpdate(handlePlaybackStatusUpdate);
       statusSubRef.current = () => sound.setOnPlaybackStatusUpdate(null);
       setCurrentTrack(track);
-      if (user && track.artistId) {
-        apiService.recordPlay(track.id, track.artistId);
-      }
       setRecentlyPlayed((prev) => {
         const filtered = prev.filter((t) => t.id !== track.id);
         return [track, ...filtered].slice(0, 20);
@@ -502,49 +546,29 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      const [trendingRes, newRes, likedRes, playlistRes] = await Promise.all([
+      const [trendingRes, newRes, library] = await Promise.all([
         trendingQuery,
         newQuery,
-        user
-          ? supabase
-              .from('liked_songs')
-              .select('track:tracks!fk_liked_songs_track(*)')
-              .eq('user_id', user.id)
-          : Promise.resolve(null),
-        user
-          ? supabase
-              .from('playlists')
-              .select(
-                'id,title,cover_url,playlist_tracks:playlist_tracks!fk_playlist_tracks_playlist(track:tracks!fk_playlist_tracks_track(*))',
-              )
-              .eq('user_id', user.id)
-          : Promise.resolve(null),
+        user ? apiService.getUserLibrary(user.id) : Promise.resolve(null),
       ]);
+
+      const libraryData = (library as {
+        likedSongIds: string[];
+        playlists: Playlist[];
+      }) || { likedSongIds: [], playlists: [] };
+      setLikedSongIds(libraryData.likedSongIds);
+      setPlaylists(libraryData.playlists);
 
       const trendingData =
         (trendingRes as { data?: TrackRow[] | null })?.data ?? [];
-      setTrendingTracks(trendingData.map((t) => mapTrack(t)));
+      setTrendingTracks(
+        trendingData.map((t) => mapTrack(t, false, libraryData.likedSongIds)),
+      );
 
       const newData = (newRes as { data?: TrackRow[] | null })?.data ?? [];
-      setNewReleases(newData.map((t) => mapTrack(t)));
-
-      if (user && likedRes && playlistRes) {
-        const likedData =
-          (likedRes as { data?: LikedSongRow[] | null })?.data ?? [];
-        const liked = likedData.map((r) => mapTrack(r.track, true));
-        setLikedSongs(liked);
-        const plsData =
-          (playlistRes as { data?: PlaylistRow[] | null })?.data ?? [];
-        const pls = plsData.map((p) => ({
-          id: p.id,
-          title: p.title,
-          coverUrl: p.cover_url || '',
-          tracks: (p.playlist_tracks || []).map((pt: PlaylistTrackRow) =>
-            mapTrack(pt.track),
-          ),
-        }));
-        setPlaylists(pls);
-      }
+      setNewReleases(
+        newData.map((t) => mapTrack(t, false, libraryData.likedSongIds)),
+      );
     } catch (err) {
       setError((err as Error).message);
     } finally {
@@ -558,42 +582,80 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   ) => {
     const term = query.trim();
     if (!term) {
-      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+      return {
+        tracks: [],
+        albums: [],
+        playlists: [],
+        users: [],
+      };
     }
 
     try {
-      const [trackRes, artistRes, userRes] = await Promise.all([
+      const [trackRes, albumRes, playlistRes, profileRes] = await Promise.all([
         supabase
           .from('tracks')
           .select(`*, artist:artist_id(*), album:album_id(*)`)
-          .or(
-            `title.ilike.%${term}%,artist.name.ilike.%${term}%,genres.cs.{"${term}"}`,
-          )
+          .ilike('title', `%${term}%`)
           .eq('is_published', true)
           .order(sort === 'popular' ? 'play_count' : 'created_at', {
             ascending: false,
           })
           .limit(10),
         supabase
-          .from('artists')
-          .select('id,name,avatar_url')
-          .ilike('name', `%${term}%`)
+          .from('albums')
+          .select('id,title,cover_url,artist:artist_id(name)')
+          .ilike('title', `%${term}%`)
           .limit(10),
-        supabase.rpc('search_users', { search_query: term, limit_count: 10 }),
+        supabase
+          .from('playlists')
+          .select('id,title,cover_url')
+          .eq('is_public', true)
+          .ilike('title', `%${term}%`)
+          .limit(10),
+        supabase
+          .from('profiles')
+          .select('id,username,avatar_url')
+          .ilike('username', `%${term}%`)
+          .limit(10),
       ]);
 
       const tracks = (trackRes.data || []).map((t: TrackRow) => mapTrack(t));
+      const albums = (albumRes.data || []).map(
+        (a: {
+          id: string;
+          title: string;
+          cover_url?: string | null;
+          artist?: { name?: string } | null;
+        }) => ({
+          id: a.id,
+          title: a.title,
+          artist: a.artist?.name || 'Unknown Artist',
+          coverUrl: apiService.getPublicUrl('images', a.cover_url || ''),
+        }),
+      );
+
+      const playlists = (playlistRes.data || []).map(
+        (p: { id: string; title: string; cover_url?: string | null }) => ({
+          id: p.id,
+          title: p.title,
+          coverUrl: apiService.getPublicUrl('images', p.cover_url || ''),
+        }),
+      );
 
       return {
         tracks,
-        albums: [],
-        singles: [],
-        artists: (artistRes.data || []) as Artist[],
-        users: (userRes.data || []) as UserProfile[],
+        albums,
+        playlists,
+        users: (profileRes.data || []) as UserProfile[],
       };
     } catch (err) {
       console.error('searchMusic error', err);
-      return { tracks: [], albums: [], singles: [], artists: [], users: [] };
+      return {
+        tracks: [],
+        albums: [],
+        playlists: [],
+        users: [],
+      };
     }
   };
 
@@ -623,12 +685,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         seekTo,
         refreshData,
         searchMusic,
-        likedSongs,
+        likedSongIds,
         playlists,
-        albums,
         createPlaylist,
         toggleLike,
         addToPlaylist,
+        removeFromPlaylist,
         setVolume,
         addToQueue,
         removeFromQueue,

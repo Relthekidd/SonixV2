@@ -8,25 +8,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Share,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { apiService } from '@/services/api';
 import { supabase } from '@/services/supabase';
-import {
-  ArrowLeft,
-  Play,
-  Pause,
-  Heart,
-  Share as ShareIcon,
-  Plus,
-  Calendar,
-  Music,
-  Clock,
-  MoveVertical as MoreVertical,
-} from 'lucide-react-native';
+import { ArrowLeft, Play, Pause, Calendar, Music, Clock } from 'lucide-react-native';
+import TrackMenu from '@/components/TrackMenu';
 
 export default function TrackDetailScreen() {
   const router = useRouter();
@@ -43,14 +32,8 @@ export default function TrackDetailScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const {
-    currentTrack,
-    isPlaying,
-    playTrack,
-    pauseTrack,
-    toggleLike,
-    likedSongs,
-  } = useMusic();
+  const { currentTrack, isPlaying, playTrack, pauseTrack, likedSongIds } =
+    useMusic();
 
   useEffect(() => {
     if (id) loadTrackDetails();
@@ -100,19 +83,22 @@ export default function TrackDetailScreen() {
           data.cover_url || data.album?.cover_url || '',
         ),
         audioUrl: apiService.getPublicUrl('audio-files', data.audio_url),
-        isLiked: likedSongs.some((l) => l.id === data.id),
+        isLiked: likedSongIds.includes(data.id),
         genre: Array.isArray(data.genres)
           ? data.genres[0]
           : data.genre || 'Unknown',
         releaseDate:
           data.release_date || singleExtra?.release_date || data.created_at,
-        year: (data.release_date || singleExtra?.release_date)
-          ? new Date(
-              data.release_date || singleExtra?.release_date || data.created_at,
-            )
-              .getFullYear()
-              .toString()
-          : undefined,
+        year:
+          data.release_date || singleExtra?.release_date
+            ? new Date(
+                data.release_date ||
+                  singleExtra?.release_date ||
+                  data.created_at,
+              )
+                .getFullYear()
+                .toString()
+            : undefined,
         playCount: data.play_count,
         likeCount: data.like_count,
         lyrics: data.lyrics || singleExtra?.lyrics || '',
@@ -138,18 +124,6 @@ export default function TrackDetailScreen() {
       playTrack(track, [track]);
     }
   };
-
-  const handleLike = () => {
-    if (!track) return;
-    toggleLike(track.id);
-    setTrack((prev) => (prev ? { ...prev, isLiked: !prev.isLiked } : prev));
-  };
-
-  const handleAddToQueue = () => {
-    if (!track) return;
-    Alert.alert('Added to Queue', `"${track.title}" added to your queue`);
-  };
-
   const handleShare = async () => {
     if (!track) return;
     try {
@@ -178,7 +152,7 @@ export default function TrackDetailScreen() {
   if (isLoading) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.loadingContainer}>
@@ -192,7 +166,7 @@ export default function TrackDetailScreen() {
   if (error || !track) {
     return (
       <LinearGradient
-        colors={['#1a1a2e', '#16213e', '#0f3460']}
+        colors={['#0f172a', '#1e293b', '#0f172a']}
         style={styles.container}
       >
         <View style={styles.errorContainer}>
@@ -210,7 +184,7 @@ export default function TrackDetailScreen() {
 
   return (
     <LinearGradient
-      colors={['#1a1a2e', '#16213e', '#0f3460']}
+      colors={['#0f172a', '#1e293b', '#0f172a']}
       style={styles.container}
     >
       <View style={styles.header}>
@@ -220,13 +194,17 @@ export default function TrackDetailScreen() {
         >
           <ArrowLeft color="#ffffff" size={24} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.headerButton}>
-          <MoreVertical color="#ffffff" size={24} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.trackHeader}>
+        <View
+          style={[
+            styles.trackHeader,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <Image source={{ uri: track.coverUrl }} style={styles.trackCover} />
           <Text style={styles.trackTitle}>{track.title}</Text>
           <Text style={styles.trackArtist}>{track.artist}</Text>
@@ -266,14 +244,14 @@ export default function TrackDetailScreen() {
           )}
         </View>
 
-        <View style={styles.controlsSection}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleLike}>
-            <Heart
-              color={track.isLiked ? '#ef4444' : '#ffffff'}
-              size={24}
-              fill={track.isLiked ? '#ef4444' : 'transparent'}
-            />
-          </TouchableOpacity>
+        <View
+          style={[
+            styles.controlsSection,
+            styles.glassCard,
+            styles.brutalBorder,
+            styles.brutalShadow,
+          ]}
+        >
           <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
             <LinearGradient
               colors={['#8b5cf6', '#a855f7']}
@@ -286,22 +264,7 @@ export default function TrackDetailScreen() {
               )}
             </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleAddToQueue}
-          >
-            <Plus color="#ffffff" size={24} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-            <ShareIcon color="#ffffff" size={24} />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionRow} onPress={handleAddToQueue}>
-            <Plus color="#8b5cf6" size={20} />
-            <Text style={styles.actionText}>Add to Queue</Text>
-          </TouchableOpacity>
+          <TrackMenu track={track} onShare={handleShare} />
         </View>
 
         {track.lyrics && (
@@ -313,6 +276,7 @@ export default function TrackDetailScreen() {
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
     </LinearGradient>
   );
 }
@@ -370,7 +334,7 @@ const styles = StyleSheet.create({
   trackHeader: {
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 32,
+    marginBottom: 30,
   },
   trackCover: {
     width: 280,
@@ -409,7 +373,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     flexWrap: 'wrap',
     gap: 16,
-    marginBottom: 20,
+    marginBottom: 30,
   },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   metaText: { fontSize: 14, fontFamily: 'Inter-Regular', color: '#94a3b8' },
@@ -430,19 +394,10 @@ const styles = StyleSheet.create({
   genreText: { fontSize: 12, fontFamily: 'Inter-Medium', color: '#8b5cf6' },
   controlsSection: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 24,
-    marginBottom: 32,
-    gap: 16,
-  },
-  actionButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 36,
   },
   playButton: {
     width: 80,
@@ -454,23 +409,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 12,
-    marginHorizontal: 16,
   },
   playButtonGradient: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  actionsSection: { paddingHorizontal: 24, marginBottom: 32 },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  actionText: { fontSize: 16, fontFamily: 'Inter-SemiBold', color: '#ffffff' },
   lyricsSection: { paddingHorizontal: 24, marginBottom: 32 },
   lyricsTitle: {
     fontSize: 20,
@@ -485,4 +429,20 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   bottomPadding: { height: 120 },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+    padding: 16,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
 });

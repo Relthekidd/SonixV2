@@ -1,20 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { useUserStats } from '@/hooks/useUserStats';
-import { Play, TrendingUp, Clock, Star, User, Music } from 'lucide-react-native';
+import { useFocusEffect } from 'expo-router';
+import {
+  Play,
+  TrendingUp,
+  Clock,
+  Star,
+  User,
+  Music,
+} from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
+import TrackItem from '@/components/TrackItem';
 
 interface FeaturedPlaylist {
   id: string;
@@ -24,8 +32,10 @@ interface FeaturedPlaylist {
 }
 
 function HomeScreen() {
-  const { playTrack, trendingTracks } = useMusic();
-  const { stats } = useUserStats();
+  const { playTrack, pauseTrack, currentTrack, isPlaying, trendingTracks } =
+    useMusic();
+  const { listeningTime, topSong, topArtist, playsCount, refreshStats } =
+    useUserStats();
   const [featuredPlaylists, setFeaturedPlaylists] = useState<
     FeaturedPlaylist[]
   >([]);
@@ -52,10 +62,24 @@ function HomeScreen() {
     fetchFeatured();
   }, []);
 
+  useFocusEffect(
+    useCallback(() => {
+      refreshStats();
+    }, [refreshStats]),
+  );
+
   const tracks = trendingTracks;
 
-  const handlePlay = (track: Track, list: Track[] = tracks) => {
-    playTrack(track, list);
+  const handleTrackPlay = (track: Track, list: Track[] = tracks) => {
+    if (currentTrack?.id === track.id) {
+      if (isPlaying) {
+        pauseTrack();
+      } else {
+        playTrack(track, list);
+      }
+    } else {
+      playTrack(track, list);
+    }
   };
 
   return (
@@ -85,44 +109,48 @@ function HomeScreen() {
 
         {/* User Stats */}
         <View style={styles.statsGrid}>
-  {[
-    {
-      Icon: Play,
-      label: 'Tracks Played',
-      value: stats.playsCount.toString(),
-      color: '#22c55e',
-    },
-    {
-      Icon: Clock,
-      label: 'Hours Listened',
-      value: (stats.totalTime / 3600).toFixed(1),
-      color: '#fb923c',
-    },
-    {
-      Icon: User,
-      label: 'Top Artist',
-      value: stats.topArtist,
-      color: '#3b82f6',
-    },
-    {
-      Icon: Music,
-      label: 'Top Song',
-      value: stats.topSong,
-      color: '#8b5cf6',
-    },
-  ].map((stat, i) => (
-    <Animated.View 
-      entering={FadeIn.delay(i * 100)} 
-      key={stat.label}
-      style={[styles.statCard, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
-    >
-      <stat.Icon color={stat.color} size={32} />
-      <Text style={styles.statValue}>{stat.value}</Text>
-      <Text style={styles.statLabel}>{stat.label}</Text>
-    </Animated.View>
-  ))}
-</View>
-
+          {[
+            {
+              Icon: Play,
+              label: 'Tracks Played',
+              value: playsCount.toString(),
+              color: '#22c55e',
+            },
+            {
+              Icon: Clock,
+              label: 'Hours Listened',
+              value: (listeningTime / 3600).toFixed(1),
+              color: '#fb923c',
+            },
+            {
+              Icon: User,
+              label: 'Top Artist',
+              value: topArtist,
+              color: '#3b82f6',
+            },
+            {
+              Icon: Music,
+              label: 'Top Song',
+              value: topSong,
+              color: '#8b5cf6',
+            },
+          ].map((stat, i) => (
+            <Animated.View
+              entering={FadeIn.delay(i * 100)}
+              key={stat.label}
+              style={[
+                styles.statCard,
+                styles.glassCard,
+                styles.brutalBorder,
+                styles.brutalShadow,
+              ]}
+            >
+              <stat.Icon color={stat.color} size={32} />
+              <Text style={styles.statValue}>{stat.value}</Text>
+              <Text style={styles.statLabel}>{stat.label}</Text>
+            </Animated.View>
+          ))}
+        </View>
 
         {/* Featured Playlists */}
         <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
@@ -173,45 +201,12 @@ function HomeScreen() {
                 entering={FadeInDown.delay(400 + index * 50)}
                 key={track.id}
               >
-                <TouchableOpacity
-                  style={[
-                    styles.trackRow,
-                    index !== tracks.length - 1 && styles.trackRowBorder,
-                  ]}
-                  onPress={() => handlePlay(track, tracks)}
-                >
-                  <View style={[styles.trackCover, styles.brutalBorder]}>
-                    {track.coverUrl ? (
-                      <Image
-                        source={{ uri: track.coverUrl }}
-                        style={styles.trackImage}
-                      />
-                    ) : (
-                      <Play color="#8b5cf6" size={20} />
-                    )}
-                  </View>
-                  <View style={styles.trackInfo}>
-                    <Text style={styles.trackTitle} numberOfLines={1}>
-                      {track.title}
-                    </Text>
-                    <Text style={styles.trackArtist} numberOfLines={1}>
-                      {track.artist}
-                    </Text>
-                  </View>
-                  <Text style={styles.trackDuration}>
-                    {Math.floor(track.duration / 60)}:
-                    {(track.duration % 60).toString().padStart(2, '0')}
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.trackAction, styles.brutalBorder]}
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      handlePlay(track, tracks);
-                    }}
-                  >
-                    <Play color="#8b5cf6" size={16} />
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                <TrackItem
+                  track={track}
+                  isCurrent={currentTrack?.id === track.id}
+                  isPlaying={isPlaying}
+                  onPlay={() => handleTrackPlay(track, tracks)}
+                />
               </Animated.View>
             ))}
           </View>
@@ -227,13 +222,13 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   content: { padding: 24, paddingBottom: 110 },
   hero: {
-  padding: 24,
-  marginTop: 32,
-  marginBottom: 32,
-  alignItems: 'center',         // centers children horizontally
-  justifyContent: 'center',     // centers children vertically
-  minHeight: 180,               // 👈 add this for vertical centering
-},
+    padding: 24,
+    marginTop: 32,
+    marginBottom: 32,
+    alignItems: 'center', // centers children horizontally
+    justifyContent: 'center', // centers children vertically
+    minHeight: 180, // 👈 add this for vertical centering
+  },
   heroTitle: {
     fontSize: 40,
     fontFamily: 'Poppins-Bold',
@@ -322,50 +317,6 @@ const styles = StyleSheet.create({
   trackList: {
     borderRadius: 16,
   },
-  trackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  trackRowBorder: {
-    borderBottomWidth: 2,
-    borderColor: 'rgba(255,255,255,0.1)',
-  },
-  trackCover: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  trackImage: { width: 48, height: 48, borderRadius: 12 },
-  trackInfo: { flex: 1 },
-  trackTitle: {
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: '#fff',
-  },
-  trackArtist: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: 'rgba(255,255,255,0.7)',
-  },
-  trackDuration: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: 'rgba(255,255,255,0.7)',
-    marginRight: 8,
-  },
-  trackAction: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(139,92,246,0.1)',
-  },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
     borderRadius: 20,
@@ -384,4 +335,3 @@ const styles = StyleSheet.create({
 });
 
 export default withAuthGuard(HomeScreen);
-

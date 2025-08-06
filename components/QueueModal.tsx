@@ -5,11 +5,12 @@ import {
   Text,
   TouchableOpacity,
   Image,
-  FlatList,
-  ListRenderItem,
+  StyleSheet,
 } from 'react-native';
-import { X, Trash2 } from 'lucide-react-native';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import Animated, { SlideInUp, FadeOut } from 'react-native-reanimated';
 import { useMusic, Track } from '@/providers/MusicProvider';
+import { X, Trash2 } from 'lucide-react-native';
 
 interface Props {
   visible: boolean;
@@ -18,29 +19,26 @@ interface Props {
 
 export default function QueueModal({ visible, onClose }: Props) {
   const { queue, currentTrack, playTrack, removeFromQueue } = useMusic();
-  const listRef = useRef<FlatList<Track>>(null);
+  const listRef = useRef<DraggableFlatList<Track>>(null);
 
   useEffect(() => {
     if (visible && currentTrack) {
-      const idx = queue.findIndex((t) => t.id === currentTrack.id);
-      if (idx >= 0) {
+      const index = queue.findIndex((t) => t.id === currentTrack?.id);
+      if (index >= 0) {
         setTimeout(() => {
-          try {
-            listRef.current?.scrollToIndex({ index: idx, animated: true });
-          } catch {
-            // ignore scroll errors
-          }
+          listRef.current?.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
         }, 100);
       }
     }
-  }, [visible, currentTrack, queue]);
+  }, [visible, queue, currentTrack]);
 
-  const renderItem: ListRenderItem<Track> = ({ item }) => (
+  const renderItem = ({ item, drag }: RenderItemParams<Track>) => (
     <TouchableOpacity
       onPress={() => playTrack(item, queue)}
       className={`flex-row items-center p-2 mb-2 rounded-lg bg-white/5 ${
         item.id === currentTrack?.id ? 'border border-violet-500' : ''
       }`}
+      onLongPress={drag}
     >
       <Image source={{ uri: item.coverUrl }} className="w-12 h-12 rounded-md" />
       <View className="flex-1 ml-3">
@@ -58,25 +56,74 @@ export default function QueueModal({ visible, onClose }: Props) {
   );
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View className="flex-1 items-center justify-center bg-black/60">
-        <View className="w-11/12 max-h-[80%] rounded-2xl p-4 bg-slate-800 glassCard brutalBorder brutalShadow">
-          <View className="mb-3 flex-row items-center justify-between">
-            <Text className="text-xl font-semibold text-white">Queue</Text>
-            <TouchableOpacity onPress={onClose} className="p-1">
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View style={styles.modal}>
+        <Animated.View
+          entering={SlideInUp.springify()}
+          exiting={FadeOut}
+          style={[styles.content, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}
+        >
+          <View style={styles.header}>
+            <Text style={styles.heading}>Queue</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
               <X color="#fff" size={24} />
             </TouchableOpacity>
           </View>
-          <FlatList
+
+          <DraggableFlatList
             ref={listRef}
             data={queue}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
             showsVerticalScrollIndicator={false}
           />
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 }
 
+const styles = StyleSheet.create({
+  modal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  content: {
+    width: '90%',
+    maxHeight: '80%',
+    padding: 16,
+    borderRadius: 24,
+    backgroundColor: '#1e293b',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  heading: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: 'white',
+  },
+  closeBtn: {
+    padding: 4,
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
+  },
+});
