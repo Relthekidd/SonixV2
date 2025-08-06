@@ -14,7 +14,6 @@ import {
   Modal,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { withAuthGuard } from '@/hoc/withAuthGuard';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
@@ -78,7 +77,24 @@ interface EditableProfile {
   featured_playlists: string[];
 }
 
-function ProfileScreen() {
+// Database track interface to match your query structure
+interface DatabaseTrack {
+  id: string;
+  title: string;
+  duration: number | null;
+  audio_url: string;
+  cover_url: string;
+  artist: { name: string } | null;
+}
+
+// Database artist interface
+interface DatabaseArtist {
+  id: string;
+  name: string;
+  avatar_url: string | null;
+}
+
+export default function ProfileScreen() {
   const { user, logout } = useAuth();
   const { currentTrack, isPlaying, playTrack, pauseTrack } = useMusic();
   
@@ -178,14 +194,19 @@ function ProfileScreen() {
 
       if (error) throw error;
 
-      const tracks: Track[] = (data || []).map(track => ({
+      const tracks: Track[] = (data as DatabaseTrack[])?.map(track => ({
         id: track.id,
         title: track.title,
         artist: track.artist?.name || 'Unknown Artist',
         duration: track.duration || 0,
         audioUrl: apiService.getPublicUrl('audio-files', track.audio_url),
         coverUrl: apiService.getPublicUrl('images', track.cover_url),
-      }));
+        // Add required Track properties with defaults
+        album: 'Unknown Album',
+        isLiked: false,
+        genre: 'Unknown',
+        releaseDate: new Date().getFullYear().toString(),
+      })) || [];
 
       setTopTracks(tracks);
     } catch (error) {
@@ -207,12 +228,13 @@ function ProfileScreen() {
 
       if (error) throw error;
 
-      const artists: Artist[] = (data || []).map(artist => ({
-        ...artist,
+      const artists: Artist[] = (data as DatabaseArtist[])?.map(artist => ({
+        id: artist.id,
+        name: artist.name,
         avatar_url: artist.avatar_url 
           ? apiService.getPublicUrl('images', artist.avatar_url)
           : undefined,
-      }));
+      })) || [];
 
       setTopArtists(artists);
     } catch (error) {
@@ -246,7 +268,7 @@ function ProfileScreen() {
         cover_url: playlist.cover_url 
           ? apiService.getPublicUrl('images', playlist.cover_url)
           : undefined,
-        track_count: playlist.playlist_tracks?.length || 0,
+        track_count: Array.isArray(playlist.playlist_tracks) ? playlist.playlist_tracks.length : 0,
       }));
 
       setFeaturedPlaylists(playlists);
@@ -277,7 +299,7 @@ function ProfileScreen() {
         cover_url: playlist.cover_url 
           ? apiService.getPublicUrl('images', playlist.cover_url)
           : undefined,
-        track_count: playlist.playlist_tracks?.length || 0,
+        track_count: Array.isArray(playlist.playlist_tracks) ? playlist.playlist_tracks.length : 0,
       }));
 
       setAllPlaylists(playlists);
@@ -484,6 +506,15 @@ function ProfileScreen() {
     );
   }
 
+  // Get the avatar URL with proper fallback
+  const getAvatarUrl = () => {
+    const avatarPath = editing ? editForm.avatar_url : profile.avatar_url;
+    if (avatarPath) {
+      return apiService.getPublicUrl('images', avatarPath);
+    }
+    return 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200';
+  };
+
   return (
     <LinearGradient
       colors={['#0f172a', '#1e293b', '#0f172a']}
@@ -497,11 +528,7 @@ function ProfileScreen() {
         <View style={[styles.header, styles.glassCard, styles.brutalBorder, styles.brutalShadow]}>
           <View style={styles.avatarContainer}>
             <Image
-              source={{
-                uri: (editing ? editForm.avatar_url : profile.avatar_url)
-                  ? apiService.getPublicUrl('images', editing ? editForm.avatar_url : profile.avatar_url)
-                  : 'https://images.pexels.com/photos/771742/pexels-photo-771742.jpeg?auto=compress&cs=tinysrgb&w=200'
-              }}
+              source={{ uri: getAvatarUrl() }}
               style={styles.avatar}
             />
             {editing && (
