@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Platform,
   ScrollView,
-  FlatList,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -21,7 +20,8 @@ import {
   UserPlus,
   UserCheck,
 } from 'lucide-react-native';
-import MiniTrackCard from '@/components/MiniTrackCard';
+import TrackList from '@/components/TrackList';
+import TrackItem from '@/components/TrackItem';
 
 interface Artist {
   id: string;
@@ -296,106 +296,90 @@ export default function ArtistDetailScreen() {
         {recentRelease && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Most Recent Release</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-            >
-              {recentRelease.type === 'track' ? (
-                <MiniTrackCard
-                  track={recentRelease.item}
-                  isCurrent={currentTrack?.id === recentRelease.item.id}
-                  isPlaying={isPlaying}
-                  onPlay={() =>
-                    handleTrackPress(recentRelease.item, [recentRelease.item])
-                  }
-                  showLikeButton
+            {recentRelease.type === 'track' ? (
+              <TrackItem
+                track={recentRelease.item}
+                isCurrent={currentTrack?.id === recentRelease.item.id}
+                isPlaying={isPlaying}
+                onPlay={() =>
+                  handleTrackPress(recentRelease.item, [recentRelease.item])
+                }
+                showLikeButton
+              />
+            ) : (
+              <TouchableOpacity
+                style={[
+                  styles.albumCard,
+                  styles.glassCard,
+                  styles.brutalBorder,
+                  styles.brutalShadow,
+                ]}
+                onPress={() =>
+                  router.push(`/album/${recentRelease.item.id}` as const)
+                }
+              >
+                <Image
+                  source={{ uri: recentRelease.item.cover_url }}
+                  style={styles.albumCover}
                 />
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.albumCard,
-                    styles.glassCard,
-                    styles.brutalBorder,
-                    styles.brutalShadow,
-                  ]}
-                  onPress={() =>
-                    router.push(`/album/${recentRelease.item.id}` as const)
-                  }
-                >
-                  <Image
-                    source={{ uri: recentRelease.item.cover_url }}
-                    style={styles.albumCover}
-                  />
-                  <Text style={styles.albumTitle} numberOfLines={1}>
-                    {recentRelease.item.title}
-                  </Text>
-                  <Text style={styles.albumDate}>
-                    {new Date(
-                      recentRelease.item.release_date,
-                    ).toLocaleDateString()}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
+                <Text style={styles.albumTitle} numberOfLines={1}>
+                  {recentRelease.item.title}
+                </Text>
+                <Text style={styles.albumDate}>
+                  {new Date(
+                    recentRelease.item.release_date,
+                  ).toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         {topTracks.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Top Songs</Text>
-            <FlatList
-              data={topTracks}
-              horizontal
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-              renderItem={({ item }) => (
-                <MiniTrackCard
-                  track={item}
-                  isCurrent={currentTrack?.id === item.id}
-                  isPlaying={isPlaying}
-                  onPlay={() => handleTrackPress(item, topTracks)}
-                  showLikeButton
-                />
-              )}
+            <TrackList
+              tracks={topTracks.slice(0, 5)}
+              currentTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onPlay={(t) => handleTrackPress(t, topTracks)}
             />
           </View>
         )}
 
         {singles.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Singles</Text>
-            <FlatList
-              data={singles}
-              horizontal
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-              renderItem={({ item }) => (
-                <MiniTrackCard
-                  track={item}
-                  isCurrent={currentTrack?.id === item.id}
-                  isPlaying={isPlaying}
-                  onPlay={() => handleTrackPress(item, singles)}
-                  showLikeButton
-                />
-              )}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Singles</Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/artist/${id}/singles` as const)}
+              >
+                <Text style={styles.showAll}>Show All</Text>
+              </TouchableOpacity>
+            </View>
+            <TrackList
+              tracks={singles.slice(0, 5)}
+              currentTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onPlay={(t) => handleTrackPress(t, singles)}
             />
           </View>
         )}
 
         {albums.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Albums</Text>
-            <FlatList
-              data={albums}
-              horizontal
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-              renderItem={({ item }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Albums</Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/artist/${id}/albums` as const)}
+              >
+                <Text style={styles.showAll}>Show All</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.albumList}>
+              {albums.slice(0, 5).map((item) => (
                 <TouchableOpacity
+                  key={item.id}
                   style={[
                     styles.albumCard,
                     styles.glassCard,
@@ -415,29 +399,26 @@ export default function ArtistDetailScreen() {
                     {new Date(item.release_date).toLocaleDateString()}
                   </Text>
                 </TouchableOpacity>
-              )}
-            />
+              ))}
+            </View>
           </View>
         )}
 
         {appearsOn.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Appears On</Text>
-            <FlatList
-              data={appearsOn}
-              horizontal
-              keyExtractor={(item) => item.id}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
-              renderItem={({ item }) => (
-                <MiniTrackCard
-                  track={item}
-                  isCurrent={currentTrack?.id === item.id}
-                  isPlaying={isPlaying}
-                  onPlay={() => handleTrackPress(item, appearsOn)}
-                  showLikeButton
-                />
-              )}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Appears On</Text>
+              <TouchableOpacity
+                onPress={() => router.push(`/artist/${id}/appears-on` as const)}
+              >
+                <Text style={styles.showAll}>Show All</Text>
+              </TouchableOpacity>
+            </View>
+            <TrackList
+              tracks={appearsOn.slice(0, 5)}
+              currentTrackId={currentTrack?.id}
+              isPlaying={isPlaying}
+              onPlay={(t) => handleTrackPress(t, appearsOn)}
             />
           </View>
         )}
@@ -507,14 +488,24 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 32,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontFamily: 'Poppins-Bold',
     color: '#fff',
-    marginBottom: 16,
-    paddingHorizontal: 16,
   },
-  horizontalList: {
+  showAll: {
+    fontSize: 14,
+    fontFamily: 'Inter-SemiBold',
+    color: '#8b5cf6',
+  },
+  albumList: {
     paddingHorizontal: 16,
   },
   albumCard: {

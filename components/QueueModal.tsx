@@ -35,21 +35,28 @@ export default function QueueModal({ visible, onClose }: Props) {
   const renderItem = ({ item, drag }: RenderItemParams<Track>) => (
     <TouchableOpacity
       onPress={() => playTrack(item, queue)}
-      className={`flex-row items-center p-2 mb-2 rounded-lg bg-white/5 ${
-        item.id === currentTrack?.id ? 'border border-violet-500' : ''
-      }`}
       onLongPress={drag}
+      style={[
+        styles.row,
+        styles.glassCard,
+        styles.brutalBorder,
+        styles.brutalShadow,
+        item.id === currentTrack?.id && styles.currentRow,
+      ]}
     >
-      <Image source={{ uri: item.coverUrl }} className="w-12 h-12 rounded-md" />
-      <View className="flex-1 ml-3">
-        <Text className="text-white text-sm font-semibold" numberOfLines={1}>
+      <Image source={{ uri: item.coverUrl }} style={styles.image} />
+      <View style={styles.meta}>
+        <Text style={styles.title} numberOfLines={1}>
           {item.title}
         </Text>
-        <Text className="text-slate-400 text-xs" numberOfLines={1}>
+        <Text style={styles.artist} numberOfLines={1}>
           {item.artist}
         </Text>
       </View>
-      <TouchableOpacity onPress={() => removeFromQueue(item.id)} className="p-2">
+      <TouchableOpacity
+        onPress={() => removeFromQueue(item.id)}
+        style={styles.removeBtn}
+      >
         <Trash2 color="#ef4444" size={18} />
       </TouchableOpacity>
     </TouchableOpacity>
@@ -110,6 +117,39 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     padding: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  currentRow: {
+    backgroundColor: 'rgba(139,92,246,0.15)',
+  },
+  image: {
+    width: 40,
+    height: 40,
+    borderRadius: 6,
+    marginRight: 12,
+  },
+  meta: { flex: 1 },
+  title: {
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    color: '#ffffff',
+  },
+  artist: {
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: '#94a3b8',
+  },
+  removeBtn: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 8,
   },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',
