@@ -9,20 +9,79 @@ import React, {
 import { Audio, AVPlaybackStatus } from 'expo-av';
 import { Alert } from 'react-native';
 import { supabase } from '@/services/supabase';
-import { apiService } from '@/services/api';
+import { apiService, Artist } from '@/services/api';
 import { useAuth } from './AuthProvider';
 import { useUserStats } from './UserStatsProvider';
-import { useLibrary } from './LibraryProvider';
-import {
-  Track,
-  Playlist,
-  TrackRow,
-  Artist,
-  AlbumResult,
-  PlaylistResult,
-  UserResult,
-} from '@/types';
-import { transformTrack, transformAlbum, transformPlaylist, transformArtist, transformUser } from '@/utils/dataTransformers';
+
+export interface Track {
+  id: string;
+  title: string;
+  artist: string;
+  artistId?: string;
+  album: string;
+  albumId?: string;
+  duration: number;
+  coverUrl: string;
+  audioUrl: string;
+  isLiked: boolean;
+  genre: string;
+  genres?: string[];
+  releaseDate: string;
+  year?: string;
+  description?: string;
+  playCount?: number;
+  trackNumber?: number;
+  lyrics?: string;
+  likeCount?: number;
+  featuredArtists?: Artist[];
+}
+
+export interface Playlist {
+  id: string;
+  title: string;
+  trackIds: string[];
+}
+
+export interface TrackRow {
+  id: string;
+  title: string;
+  artist_id?: string | null;
+  artist?: { name?: string } | null;
+  artist_name?: string | null;
+  album_id?: string | null;
+  album?: { title?: string; cover_url?: string | null } | null;
+  album_title?: string | null;
+  duration?: number | null;
+  cover_url?: string | null;
+  audio_url: string;
+  genres?: string[] | string | null;
+  release_date?: string | null;
+  created_at?: string;
+  play_count?: number | null;
+  track_number?: number | null;
+  like_count?: number | null;
+  description?: string | null;
+  lyrics?: string | null;
+}
+
+interface UserProfile {
+  id: string;
+  username: string;
+  avatar_url?: string | null;
+}
+
+export interface AlbumResult {
+  id: string;
+  title: string;
+  artist?: string;
+  coverUrl: string;
+}
+
+export interface PlaylistResult {
+  id: string;
+  title: string;
+  coverUrl: string;
+}
 
 interface MusicContextType {
   currentTrack: Track | null;
@@ -55,8 +114,15 @@ interface MusicContextType {
     albums: AlbumResult[];
     playlists: PlaylistResult[];
     artists: Artist[];
-    users: UserResult[];
+    users: UserProfile[];
   }>;
+  // Library-related state & actions
+  likedSongIds: string[];
+  playlists: Playlist[];
+  createPlaylist: (title: string) => Promise<Playlist | null>;
+  toggleLike: (trackId: string) => Promise<void>;
+  addToPlaylist: (playlistId: string, track: Track) => Promise<void>;
+  removeFromPlaylist: (playlistId: string, trackId: string) => Promise<void>;
   setVolume: (value: number) => void;
   addToQueue: (track: Track) => void;
   removeFromQueue: (trackId: string) => void;
@@ -69,7 +135,6 @@ const MusicContext = createContext<MusicContextType | null>(null);
 export function MusicProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const { refreshStats } = useUserStats();
-  const { likedSongIds, playlists, toggleLike, addToPlaylist, removeFromPlaylist, createPlaylist } = useLibrary();
   const soundRef = useRef<Audio.Sound | null>(null);
   const statusSubRef = useRef<(() => void) | null>(null);
   const originalQueueRef = useRef<Track[]>([]);
@@ -89,6 +154,10 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Library-related state
+  const [likedSongIds, setLikedSongIds] = useState<string[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+
   const logPlay = useCallback(
     (duration: number) => {
       if (user && currentTrack) {
@@ -105,6 +174,41 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     [user, currentTrack, refreshStats],
   );
 
+  const mapTrack = (
+    t: TrackRow,
+    liked = false,
+    likedIds: string[] = likedSongIds,
+  ): Track => ({
+    id: t.id,
+    title: t.title,
+    artist: t.artist?.name || t.artist_name || 'Unknown Artist',
+    artistId: t.artist_id || undefined,
+    album: t.album?.title || t.album_title || 'Single',
+    albumId: t.album_id || undefined,
+    duration: t.duration ?? 0,
+    coverUrl: apiService.getPublicUrl(
+      'images',
+      t.cover_url || t.album?.cover_url || '',
+    ),
+    audioUrl: apiService.getPublicUrl('audio-files', t.audio_url),
+    isLiked: liked || likedIds.includes(t.id),
+    genre: Array.isArray(t.genres) ? t.genres[0] : (t.genres as string) || '',
+    genres: Array.isArray(t.genres)
+      ? (t.genres as string[])
+      : typeof t.genres === 'string'
+        ? [t.genres]
+        : [],
+    releaseDate: t.release_date || t.created_at || '',
+    year: t.release_date
+      ? new Date(t.release_date).getFullYear().toString()
+      : undefined,
+    description: t.description || '',
+    playCount: t.play_count || undefined,
+    trackNumber: t.track_number || undefined,
+    lyrics: t.lyrics || undefined,
+    likeCount: t.like_count || undefined,
+  });
+
   const shuffleArray = (arr: Track[]) => {
     const copy = [...arr];
     for (let i = copy.length - 1; i > 0; i--) {
@@ -114,16 +218,76 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
     return copy;
   };
 
-  // Update track liked status when library changes
-  useEffect(() => {
-    const updateTrack = (t: Track) => ({ ...t, isLiked: likedSongIds.includes(t.id) });
-    
-    setQueue((prev) => prev.map(updateTrack));
-    setTrendingTracks((prev) => prev.map(updateTrack));
-    setNewReleases((prev) => prev.map(updateTrack));
-    setRecentlyPlayed((prev) => prev.map(updateTrack));
-    setCurrentTrack((ct) => ct ? updateTrack(ct) : ct);
-  }, [likedSongIds]);
+  const createPlaylist = async (title: string): Promise<Playlist | null> => {
+    if (!user) return null;
+    try {
+      const data = await apiService.createPlaylist(user.id, title);
+      const newPL: Playlist = { id: data.id, title: data.title, trackIds: [] };
+      setPlaylists((prev) => [newPL, ...prev]);
+      return newPL;
+    } catch (err) {
+      console.error('createPlaylist error', err);
+      return null;
+    }
+  };
+
+  const toggleLike = async (trackId: string) => {
+    if (!user) return;
+    const already = likedSongIds.includes(trackId);
+    try {
+      await apiService.toggleLike(user.id, trackId, already);
+      setLikedSongIds((prev) =>
+        already ? prev.filter((id) => id !== trackId) : [...prev, trackId],
+      );
+
+      const updateTrack = (t: Track) =>
+        t.id === trackId ? { ...t, isLiked: !already } : t;
+
+      setQueue((prev) => prev.map(updateTrack));
+      setTrendingTracks((prev) => prev.map(updateTrack));
+      setNewReleases((prev) => prev.map(updateTrack));
+      setRecentlyPlayed((prev) => prev.map(updateTrack));
+      setCurrentTrack((ct) =>
+        ct && ct.id === trackId ? { ...ct, isLiked: !already } : ct,
+      );
+    } catch (err) {
+      console.error('toggleLike error', err);
+    }
+  };
+
+  const addToPlaylist = async (playlistId: string, track: Track) => {
+    if (!user) return;
+    const pl = playlists.find((p) => p.id === playlistId);
+    const position = pl ? pl.trackIds.length : 0;
+    try {
+      await apiService.addTrackToPlaylist(playlistId, track.id, position);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId
+            ? { ...p, trackIds: [...p.trackIds, track.id] }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('addToPlaylist error', err);
+    }
+  };
+
+  const removeFromPlaylist = async (playlistId: string, trackId: string) => {
+    if (!user) return;
+    try {
+      await apiService.removeTrackFromPlaylist(playlistId, trackId);
+      setPlaylists((prev) =>
+        prev.map((p) =>
+          p.id === playlistId
+            ? { ...p, trackIds: p.trackIds.filter((id) => id !== trackId) }
+            : p,
+        ),
+      );
+    } catch (err) {
+      console.error('removeFromPlaylist error', err);
+    }
+  };
 
   const addToQueue = (track: Track) => {
     setQueue((prev) => {
@@ -384,20 +548,28 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         .order('created_at', { ascending: false })
         .limit(20);
 
-      const [trendingRes, newRes] = await Promise.all([
+      const [trendingRes, newRes, library] = await Promise.all([
         trendingQuery,
         newQuery,
+        user ? apiService.getUserLibrary(user.id) : Promise.resolve(null),
       ]);
+
+      const libraryData = (library as {
+        likedSongIds: string[];
+        playlists: Playlist[];
+      }) || { likedSongIds: [], playlists: [] };
+      setLikedSongIds(libraryData.likedSongIds);
+      setPlaylists(libraryData.playlists);
 
       const trendingData =
         (trendingRes as { data?: TrackRow[] | null })?.data ?? [];
       setTrendingTracks(
-        trendingData.map((t) => transformTrack(t, likedSongIds)),
+        trendingData.map((t) => mapTrack(t, false, libraryData.likedSongIds)),
       );
 
       const newData = (newRes as { data?: TrackRow[] | null })?.data ?? [];
       setNewReleases(
-        newData.map((t) => transformTrack(t, likedSongIds)),
+        newData.map((t) => mapTrack(t, false, libraryData.likedSongIds)),
       );
     } catch (err) {
       setError((err as Error).message);
@@ -461,11 +633,45 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .limit(10),
       ]);
 
-      const tracks = (trackRes.data || []).map((t: TrackRow) => transformTrack(t, likedSongIds));
-      const albums = (albumRes.data || []).map(transformAlbum);
-      const playlists = (playlistRes.data || []).map(transformPlaylist);
-      const artists = (artistRes.data || []).map(transformArtist);
-      const users = (profileRes.data || []).map(transformUser);
+      const tracks = (trackRes.data || []).map((t: TrackRow) => mapTrack(t));
+      const albums = (albumRes.data || []).map(
+        (a: {
+          id: string;
+          title: string;
+          cover_url?: string | null;
+          artist?: { name?: string } | null;
+        }) => ({
+          id: a.id,
+          title: a.title,
+          artist: a.artist?.name || 'Unknown Artist',
+          coverUrl: apiService.getPublicUrl('images', a.cover_url || ''),
+        }),
+      );
+
+      const playlists = (playlistRes.data || []).map(
+        (p: { id: string; title: string; cover_url?: string | null }) => ({
+          id: p.id,
+          title: p.title,
+          coverUrl: apiService.getPublicUrl('images', p.cover_url || ''),
+        }),
+      );
+
+      const artists = (artistRes.data || []).map(
+        (a: { id: string; name: string; avatar_url?: string | null }) => ({
+          id: a.id,
+          name: a.name,
+          avatar_url: apiService.getPublicUrl('images', a.avatar_url || ''),
+        }),
+      );
+
+      const users = (profileRes.data || []).map(
+        (u: UserProfile) => ({
+          ...u,
+          avatar_url: u.avatar_url
+            ? apiService.getPublicUrl('images', u.avatar_url)
+            : null,
+        }),
+      );
 
       return {
         tracks,
@@ -512,6 +718,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
         seekTo,
         refreshData,
         searchMusic,
+        likedSongIds,
+        playlists,
+        createPlaylist,
+        toggleLike,
+        addToPlaylist,
+        removeFromPlaylist,
         setVolume,
         addToQueue,
         removeFromQueue,

@@ -11,21 +11,25 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
 import {
-  useMusic
+  useMusic,
+  Track,
+  AlbumResult,
+  PlaylistResult,
 } from '@/providers/MusicProvider';
-import { useLibrary } from '@/providers/LibraryProvider';
-import { useTracks } from '@/hooks/useTracks';
+import { supabase } from '@/services/supabase';
 import { Search } from 'lucide-react-native';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
-import { Track, Artist, AlbumResult, PlaylistResult, UserResult } from '@/types';
-import { commonStyles, spacing, colors } from '@/styles/commonStyles';
+import { Artist } from '@/services/api';
 import SearchResults, {
   SearchResultsData,
+  UserResult,
 } from '@/components/SearchResults';
+
+type SearchResults = SearchResultsData;
 
 function SearchScreen() {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResultsData>({
+  const [results, setResults] = useState<SearchResults>({
     tracks: [],
     albums: [],
     playlists: [],
@@ -38,13 +42,13 @@ function SearchScreen() {
   const [sort, setSort] = useState<'relevance' | 'recent' | 'popular'>(
     'relevance',
   );
-  const { likedSongIds } = useLibrary();
 
   const {
     currentTrack,
     isPlaying,
     playTrack,
     pauseTrack,
+    toggleLike,
     searchMusic,
   } = useMusic();
 
@@ -76,7 +80,7 @@ function SearchScreen() {
       });
       return;
     }
-    const timer = setTimeout(() => handleSearch(query), 300);
+    const timer = setTimeout(() => handleSearch(query), 200);
     return () => clearTimeout(timer);
   }, [query, sort]);
 
@@ -90,10 +94,10 @@ function SearchScreen() {
       );
       setResults({
         tracks: res.tracks,
-        albums: res.albums,
-        playlists: res.playlists,
-        artists: res.artists,
-        users: res.users,
+        albums: res.albums as AlbumResult[],
+        playlists: res.playlists as PlaylistResult[],
+        artists: res.artists as Artist[],
+        users: res.users as UserResult[],
       });
     } catch (err) {
       console.error('search error', err);
@@ -104,7 +108,6 @@ function SearchScreen() {
   };
 
   const handleTrendingPress = (term: string) => setQuery(term);
-  
   const handleTrackPress = (track: Track) => {
     if (currentTrack?.id === track.id) {
       if (isPlaying) {
@@ -116,8 +119,7 @@ function SearchScreen() {
       playTrack(track, results.tracks);
     }
   };
-  
-  const { toggleLike } = useLibrary();
+  const handleToggleLike = (trackId: string) => toggleLike(trackId);
 
   return (
     <View style={styles.container}>
@@ -195,7 +197,7 @@ function SearchScreen() {
                 currentTrack={currentTrack}
                 isPlaying={isPlaying}
                 onTrackPress={handleTrackPress}
-                onToggleLike={toggleLike}
+                onToggleLike={handleToggleLike}
                 query={query}
               />
             </Animated.View>
@@ -212,7 +214,12 @@ function SearchScreen() {
                 {trendingSearches.map((term, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.trendingItem, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
+                    style={[
+                      styles.trendingItem,
+                      styles.glassCard,
+                      styles.brutalBorder,
+                      styles.brutalShadow,
+                    ]}
                     onPress={() => handleTrendingPress(term)}
                   >
                     <Text style={styles.trendingText}>{term}</Text>
@@ -239,101 +246,197 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: spacing.xxl + spacing.sm,
-    paddingBottom: 120,
+    paddingTop: 60,
+    paddingBottom: 100, // Extra padding at bottom
   },
   searchHeader: {
-    padding: spacing.lg,
-    paddingBottom: spacing.sm,
+    padding: 20,
+    paddingBottom: 10,
   },
   title: {
     fontSize: 32,
     fontWeight: '900' as const,
-    color: colors.white,
-    marginBottom: spacing.lg,
+    color: '#ffffff',
+    marginBottom: 20,
+    // Removed textShadow as it's not supported in React Native
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 15,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
     borderWidth: 2,
-    borderColor: `${colors.primary}50`,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   searchIcon: {
-    marginRight: spacing.sm,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    color: colors.white,
+    color: '#ffffff',
     fontSize: 16,
     fontWeight: '500',
   },
   sortContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.sm,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    gap: 10,
   },
   sortButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: colors.surface,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderWidth: 1,
-    borderColor: `${colors.primary}50`,
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   sortButtonActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#8b5cf6',
+    borderColor: '#8b5cf6',
   },
   sortButtonText: {
-    color: colors.gray400,
+    color: '#94a3b8',
     fontSize: 14,
     fontWeight: '500',
   },
   sortButtonTextActive: {
-    color: colors.white,
+    color: '#ffffff',
   },
   loadingContainer: {
-    padding: spacing.xxl,
+    padding: 40,
     alignItems: 'center',
   },
   errorContainer: {
-    padding: spacing.lg,
+    padding: 20,
     alignItems: 'center',
   },
   errorText: {
-    color: colors.error,
+    color: '#ef4444',
     fontSize: 16,
     fontWeight: '500',
   },
-  section: { marginBottom: spacing.xl },
+  resultsContainer: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  section: {
+    marginBottom: 30,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.white,
-    marginBottom: spacing.md,
+    color: '#ffffff',
+    marginBottom: 15,
+  },
+  resultItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 15,
+  },
+  resultImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 15,
+  },
+  resultInfo: {
+    flex: 1,
+  },
+  resultTitle: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  resultSubtitle: {
+    color: '#94a3b8',
+    fontSize: 14,
+  },
+  likeButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  playButton: {
+    padding: 8,
+  },
+  artistItem: {
+    alignItems: 'center',
+    padding: 15,
+    marginRight: 15,
+    borderRadius: 15,
+    width: 100,
+  },
+  artistImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 10,
+  },
+  albumImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  artistName: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  noResultsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  noResultsText: {
+    color: '#ffffff',
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  noResultsSubtext: {
+    color: '#94a3b8',
+    fontSize: 14,
+    textAlign: 'center',
   },
   trendingContainer: {
-    padding: spacing.lg,
+    padding: 20,
   },
   trendingGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    gap: 10,
   },
   trendingItem: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 20,
   },
   trendingText: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: 14,
     fontWeight: '500',
+  },
+  glassCard: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 20,
+  },
+  brutalBorder: {
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  brutalShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 4, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    elevation: 8,
   },
 });
 

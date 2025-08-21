@@ -47,6 +47,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingBottom: Platform.OS === 'web' ? 0 : 180, // Account for MiniPlayer (72px) + Navigation (90px) + margin
+    paddingBottom: Platform.OS === 'web' ? 0 : 0,
   },
 });
