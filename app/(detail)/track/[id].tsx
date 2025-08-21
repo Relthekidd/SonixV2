@@ -224,21 +224,29 @@ export default function TrackDetailScreen() {
             >
               <X color="#fff" size={20} />
             </TouchableOpacity>
-            <FlatList
-              data={playlists}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.menuItem}
-                  onPress={() => {
-                    addToPlaylist(item.id, track);
-                    setShowPlaylistSelect(false);
-                  }}
-                >
-                  <Text style={styles.menuText}>{item.title}</Text>
-                </TouchableOpacity>
-              )}
-            />
+            <Text style={styles.modalTitle}>Add to Playlist</Text>
+            {playlists.length > 0 ? (
+              <FlatList
+                data={playlists}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.menuItem}
+                    onPress={() => {
+                      addToPlaylist(item.id, track);
+                      setShowPlaylistSelect(false);
+                    }}
+                  >
+                    <Text style={styles.menuText}>{item.title}</Text>
+                  </TouchableOpacity>
+                )}
+              />
+            ) : (
+              <View style={styles.emptyPlaylistState}>
+                <Text style={styles.emptyText}>No playlists found</Text>
+                <Text style={styles.emptySubtext}>Create a playlist first</Text>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -329,16 +337,20 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.8)',
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
   },
   playlistSelect: {
-    width: 260,
-    maxHeight: '70%',
+    width: '100%',
+    maxWidth: 320,
+    maxHeight: '75%',
     padding: 16,
     borderRadius: 12,
     backgroundColor: '#1e293b',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   close: {
     position: 'absolute',
@@ -346,12 +358,37 @@ const styles = StyleSheet.create({
     right: 8,
     padding: 4,
   },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: 'Inter-SemiBold',
+    color: '#fff',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
   menuItem: {
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
   menuText: {
     color: '#fff',
     fontFamily: 'Inter-SemiBold',
     fontSize: 16,
+  },
+  emptyPlaylistState: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    color: '#fff',
+    fontSize: 16,
+    fontFamily: 'Inter-SemiBold',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    color: '#94a3b8',
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    textAlign: 'center',
   },
 });

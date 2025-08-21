@@ -112,12 +112,22 @@ export default function ArtistSinglesScreen() {
         <Text style={styles.title}>Singles</Text>
         <View style={{ width: 24 }} />
       </View>
-      <TrackList
-        tracks={singles}
-        currentTrackId={currentTrack?.id}
-        isPlaying={isPlaying}
-        onPlay={handleTrackPress}
-      />
+      {singles.length > 0 ? (
+        <TrackList
+          tracks={singles}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlay={handleTrackPress}
+        />
+      ) : (
+        <View style={[commonStyles.emptyState, { marginTop: 60 }]}>
+          <Music color="#64748b" size={48} />
+          <Text style={commonStyles.emptyText}>No singles found</Text>
+          <Text style={commonStyles.emptySubtext}>
+            This artist hasn't released any singles yet
+          </Text>
+        </View>
+      )}
     </LinearGradient>
   );
 }

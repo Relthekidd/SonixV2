@@ -104,12 +104,22 @@ export default function ArtistAppearsOnScreen() {
         <Text style={styles.title}>Appears On</Text>
         <View style={{ width: 24 }} />
       </View>
-      <TrackList
-        tracks={tracks}
-        currentTrackId={currentTrack?.id}
-        isPlaying={isPlaying}
-        onPlay={handleTrackPress}
-      />
+      {tracks.length > 0 ? (
+        <TrackList
+          tracks={tracks}
+          currentTrackId={currentTrack?.id}
+          isPlaying={isPlaying}
+          onPlay={handleTrackPress}
+        />
+      ) : (
+        <View style={[commonStyles.emptyState, { marginTop: 60 }]}>
+          <Music color="#64748b" size={48} />
+          <Text style={commonStyles.emptyText}>No collaborations found</Text>
+          <Text style={commonStyles.emptySubtext}>
+            This artist hasn't appeared on other tracks yet
+          </Text>
+        </View>
+      )}
     </LinearGradient>
   );
 }

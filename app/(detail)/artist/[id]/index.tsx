@@ -390,7 +390,7 @@ export default function ArtistDetailScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
+              contentContainerStyle={[styles.horizontalScroll, { paddingHorizontal: spacing.md }]}
             >
               {topTracks.slice(0, 5).map((t) => (
                 <MiniTrackCard
@@ -418,7 +418,7 @@ export default function ArtistDetailScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
+              contentContainerStyle={[styles.horizontalScroll, { paddingHorizontal: spacing.md }]}
             >
               {singles.slice(0, 5).map((t) => (
                 <MiniTrackCard
@@ -446,7 +446,7 @@ export default function ArtistDetailScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
+              contentContainerStyle={[styles.horizontalScroll, { paddingHorizontal: spacing.md }]}
             >
               {albums.slice(0, 5).map((item) => (
                 <TouchableOpacity
@@ -488,7 +488,7 @@ export default function ArtistDetailScreen() {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScroll}
+              contentContainerStyle={[styles.horizontalScroll, { paddingHorizontal: spacing.md }]}
             >
               {appearsOn.slice(0, 5).map((t) => (
                 <MiniTrackCard
@@ -533,10 +533,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   artistName: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'Poppins-Bold',
     color: '#fff',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
   },
   artistBio: {
     fontSize: 14,
@@ -617,7 +619,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   horizontalScroll: {
-    paddingHorizontal: 16,
+    paddingRight: spacing.md,
   },
   albumCard: {
     width: 160,

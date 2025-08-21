@@ -570,7 +570,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarContainer}>
             <Image
               source={{ uri: getAvatarUrl() }}
-              style={styles.avatar}
+              contentContainerStyle={[styles.horizontalList, { paddingHorizontal: spacing.sm }]}
             />
             {editing && (
               <TouchableOpacity
@@ -1172,7 +1172,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   horizontalList: {
-    paddingHorizontal: 4,
+    paddingRight: spacing.sm,
   },
   playlistItem: {
     flexDirection: 'row',

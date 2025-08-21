@@ -425,7 +425,7 @@ export default function UserProfileScreen() {
               keyExtractor={(item) => item.id}
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalList}
+              contentContainerStyle={[styles.horizontalList, { paddingHorizontal: spacing.md }]}
             />
           </View>
         )}
@@ -544,10 +544,12 @@ const styles = StyleSheet.create({
     borderColor: '#8b5cf6',
   },
   displayName: {
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: 'Poppins-Bold',
     color: '#ffffff',
-    marginBottom: 8,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
   },
   bio: {
     fontSize: 16,
@@ -647,7 +649,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   horizontalList: {
-    paddingHorizontal: 24,
+    paddingRight: spacing.md,
   },
   topArtistItem: {
     alignItems: 'center',
