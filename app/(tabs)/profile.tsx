@@ -18,20 +18,7 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import {
-  Edit3,
-  LogOut,
-  Camera,
-  Play,
-  Pause,
-  Check,
-  X,
-  Music,
-  User,
-  List,
-  Heart,
-  Settings,
-} from 'lucide-react-native';
+import { CreditCard as Edit3, LogOut, Camera, Play, Pause, Check, X, Music, User, List, Heart, Settings } from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 
@@ -570,7 +557,7 @@ export default function ProfileScreen() {
           <View style={styles.avatarContainer}>
             <Image
               source={{ uri: getAvatarUrl() }}
-              contentContainerStyle={[styles.horizontalList, { paddingHorizontal: spacing.sm }]}
+              style={styles.avatar}
             />
             {editing && (
               <TouchableOpacity
@@ -1172,7 +1159,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   horizontalList: {
-    paddingRight: spacing.sm,
+    paddingHorizontal: 4,
   },
   playlistItem: {
     flexDirection: 'row',
