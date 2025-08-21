@@ -7,7 +7,7 @@ import {
   StyleSheet,
   FlatList,
 } from 'react-native';
-import { MoveVertical as MoreVertical, X } from 'lucide-react-native';
+import { MoreVertical, X } from 'lucide-react-native';
 import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 
 interface Props {
@@ -148,19 +148,15 @@ const styles = StyleSheet.create({
   button: { padding: 8 },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
   },
   menu: {
-    width: '100%',
-    maxWidth: 280,
+    width: 220,
     padding: 16,
     borderRadius: 12,
     backgroundColor: '#1e293b',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   close: {
     position: 'absolute',
@@ -177,14 +173,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   playlistSelect: {
-    width: '100%',
-    maxWidth: 320,
-    maxHeight: '75%',
+    width: 260,
+    maxHeight: '70%',
     padding: 16,
     borderRadius: 12,
     backgroundColor: '#1e293b',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
   },
   glassCard: {
     backgroundColor: 'rgba(255,255,255,0.05)',

@@ -59,38 +59,28 @@ export default function ArtistAlbumsScreen() {
         <View style={{ width: 24 }} />
       </View>
       <View style={styles.list}>
-        {albums.length > 0 ? (
-          albums.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[
-                styles.albumCard,
-                styles.glassCard,
-                styles.brutalBorder,
-                styles.brutalShadow,
-              ]}
-              onPress={() => router.push(`/album/${item.id}` as const)}
-            >
-              <Image source={{ uri: item.cover_url }} style={styles.cover} />
-              <View style={styles.meta}>
-                <Text style={styles.albumTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.albumDate}>
-                  {new Date(item.release_date).toLocaleDateString()}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
-        ) : (
-          <View style={[commonStyles.emptyState, { marginTop: 60 }]}>
-            <Music color="#64748b" size={48} />
-            <Text style={commonStyles.emptyText}>No albums found</Text>
-            <Text style={commonStyles.emptySubtext}>
-              This artist hasn't released any albums yet
-            </Text>
-          </View>
-        )}
+        {albums.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.albumCard,
+              styles.glassCard,
+              styles.brutalBorder,
+              styles.brutalShadow,
+            ]}
+            onPress={() => router.push(`/album/${item.id}` as const)}
+          >
+            <Image source={{ uri: item.cover_url }} style={styles.cover} />
+            <View style={styles.meta}>
+              <Text style={styles.albumTitle} numberOfLines={1}>
+                {item.title}
+              </Text>
+              <Text style={styles.albumDate}>
+                {new Date(item.release_date).toLocaleDateString()}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ))}
       </View>
     </LinearGradient>
   );

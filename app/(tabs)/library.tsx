@@ -215,53 +215,29 @@ function LibraryScreen() {
         )}
 
         {filter === 'albums' && (
-          <>
-            {savedAlbums.length > 0 ? (
-              <View style={styles.albumList}>
-                {savedAlbums.map((a) => (
-                  <TouchableOpacity
-                    key={a.id}
-                    style={[styles.albumCard, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
-                    onPress={() => router.push(`/album/${a.id}` as const)}
-                  >
-                    <Image source={{ uri: a.coverUrl }} style={styles.albumCover} />
-                    <Text style={styles.albumTitle} numberOfLines={1}>
-                      {a.title}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={commonStyles.emptyState}>
-                <Music color="#64748b" size={48} />
-                <Text style={commonStyles.emptyText}>No saved albums</Text>
-                <Text style={commonStyles.emptySubtext}>
-                  Albums you save will appear here
+          <View style={styles.albumList}>
+            {savedAlbums.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={[styles.albumCard, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
+                onPress={() => router.push(`/album/${a.id}` as const)}
+              >
+                <Image source={{ uri: a.coverUrl }} style={styles.albumCover} />
+                <Text style={styles.albumTitle} numberOfLines={1}>
+                  {a.title}
                 </Text>
-              </View>
-            )}
-          </>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         {filter === 'liked' && (
-          <>
-            {likedTracks.length > 0 ? (
-              <TrackList
-                tracks={likedTracks}
-                currentTrackId={currentTrack?.id}
-                isPlaying={isPlaying}
-                onPlay={(t) => handleTrackPress(t, likedTracks)}
-              />
-            ) : (
-              <View style={commonStyles.emptyState}>
-                <Heart color="#64748b" size={48} />
-                <Text style={commonStyles.emptyText}>No liked songs</Text>
-                <Text style={commonStyles.emptySubtext}>
-                  Songs you like will appear here
-                </Text>
-              </View>
-            )}
-          </>
+          <TrackList
+            tracks={likedTracks}
+            currentTrackId={currentTrack?.id}
+            isPlaying={isPlaying}
+            onPlay={(t) => handleTrackPress(t, likedTracks)}
+          />
         )}
 
         {filter === 'playlists' && (
@@ -283,39 +259,27 @@ function LibraryScreen() {
         )}
 
         {filter === 'artists' && (
-          <>
-            {followedArtists.length > 0 ? (
-              <View style={styles.artistList}>
-                {followedArtists.map((a) => (
-                  <TouchableOpacity
-                    key={a.id}
-                    style={[styles.artistItem, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
-                    onPress={() => router.push(`/artist/${a.id}` as const)}
-                  >
-                    {a.avatar_url ? (
-                      <Image
-                        source={{ uri: a.avatar_url }}
-                        style={styles.artistAvatar}
-                      />
-                    ) : (
-                      <User color="#8b5cf6" size={24} />
-                    )}
-                    <Text style={styles.artistName} numberOfLines={1}>
-                      {a.stage_name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <View style={commonStyles.emptyState}>
-                <User color="#64748b" size={48} />
-                <Text style={commonStyles.emptyText}>No followed artists</Text>
-                <Text style={commonStyles.emptySubtext}>
-                  Artists you follow will appear here
+          <View style={styles.artistList}>
+            {followedArtists.map((a) => (
+              <TouchableOpacity
+                key={a.id}
+                style={[styles.artistItem, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
+                onPress={() => router.push(`/artist/${a.id}` as const)}
+              >
+                {a.avatar_url ? (
+                  <Image
+                    source={{ uri: a.avatar_url }}
+                    style={styles.artistAvatar}
+                  />
+                ) : (
+                  <Heart color="#8b5cf6" size={24} />
+                )}
+                <Text style={styles.artistName} numberOfLines={1}>
+                  {a.stage_name}
                 </Text>
-              </View>
-            )}
-          </>
+              </TouchableOpacity>
+            ))}
+          </View>
         )}
 
         <View style={{ height: spacing.xxl * 2.5 }} />
@@ -456,16 +420,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
   },
   modalContent: {
-    width: '100%',
-    maxWidth: 400,
+    width: '80%',
     padding: spacing.lg,
     borderRadius: 12,
     backgroundColor: colors.backgroundSecondary,
-    borderWidth: 2,
-    borderColor: colors.border,
   },
   modalHeader: {
     flexDirection: 'row',

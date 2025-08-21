@@ -18,7 +18,20 @@ import { useAuth } from '@/providers/AuthProvider';
 import { useMusic, Track } from '@/providers/MusicProvider';
 import { supabase } from '@/services/supabase';
 import { apiService } from '@/services/api';
-import { CreditCard as Edit3, LogOut, Camera, Play, Pause, Check, X, Music, User, List, Heart, Settings } from 'lucide-react-native';
+import {
+  Edit3,
+  LogOut,
+  Camera,
+  Play,
+  Pause,
+  Check,
+  X,
+  Music,
+  User,
+  List,
+  Heart,
+  Settings,
+} from 'lucide-react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 

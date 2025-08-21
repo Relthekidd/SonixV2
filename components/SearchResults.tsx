@@ -244,7 +244,6 @@ export default function SearchResults({
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 10 }}
           />
         </View>
       )}
@@ -258,7 +257,6 @@ export default function SearchResults({
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 10 }}
           />
         </View>
       )}
@@ -272,7 +270,6 @@ export default function SearchResults({
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 10 }}
           />
         </View>
       )}
@@ -286,7 +283,6 @@ export default function SearchResults({
             keyExtractor={(item) => item.id}
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: 10 }}
           />
         </View>
       )}

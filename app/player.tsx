@@ -148,18 +148,14 @@ export default function PlayerScreen() {
         </Animated.View>
 
         <View style={styles.trackInfo}>
-          <Text style={styles.title} adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={2}>
-            {currentTrack.title}
-          </Text>
+          <Text style={styles.title}>{currentTrack.title}</Text>
           <TouchableOpacity
             onPress={() =>
               currentTrack.artistId &&
               router.push(`/artist/${currentTrack.artistId}` as const)
             }
           >
-            <Text style={styles.artist} adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1}>
-              {currentTrack.artist}
-            </Text>
+            <Text style={styles.artist}>{currentTrack.artist}</Text>
           </TouchableOpacity>
           {currentTrack.albumId && (
             <TouchableOpacity
@@ -167,9 +163,7 @@ export default function PlayerScreen() {
                 router.push(`/album/${currentTrack.albumId}` as const)
               }
             >
-              <Text style={styles.album} adjustsFontSizeToFit minimumFontScale={0.9} numberOfLines={1}>
-                {currentTrack.album}
-              </Text>
+              <Text style={styles.album}>{currentTrack.album}</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -364,15 +358,14 @@ const styles = StyleSheet.create({
   },
   trackInfo: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.md,
+    marginBottom: 40,
   },
   title: {
     fontSize: 24,
     fontFamily: 'Poppins-Bold',
     color: '#ffffff',
     textAlign: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
   },
   artist: {
     fontSize: 18,
