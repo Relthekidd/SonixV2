@@ -9,6 +9,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
+import { spacing } from '@/styles/commonStyles';
 import {
   Mail,
   ArrowLeft,
