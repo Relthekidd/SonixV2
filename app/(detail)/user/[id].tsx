@@ -26,7 +26,6 @@ import {
   Calendar,
   Globe,
 } from 'lucide-react-native';
-import { spacing } from '@/styles/commonStyles';
 
 interface UserProfile {
   id: string;

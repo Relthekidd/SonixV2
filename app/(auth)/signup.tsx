@@ -15,7 +15,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/providers/AuthProvider';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
-import { spacing } from '@/styles/commonStyles';
 import {
   Eye,
   EyeOff,

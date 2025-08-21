@@ -23,7 +23,6 @@ import {
   Pause,
 } from 'lucide-react-native';
 import MiniTrackCard from '@/components/MiniTrackCard';
-import { spacing } from '@/styles/commonStyles';
 
 interface Artist {
   id: string;

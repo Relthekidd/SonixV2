@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { Play, Pause, Heart } from 'lucide-react-native';
 import { Track, useMusic } from '@/providers/MusicProvider';
-import { useLibrary } from '@/providers/LibraryProvider';
 import TrackOptionsMenu from './TrackOptionsMenu';
 import { router } from 'expo-router';
 
@@ -27,8 +26,7 @@ export default function TrackItem({
   showLikeButton,
   showOptionsMenu = true,
 }: Props) {
-  const { toggleLike } = useMusic();
-  const { likedSongIds } = useLibrary();
+  const { toggleLike, likedSongIds } = useMusic();
   const isLiked = track.isLiked || likedSongIds.includes(track.id);
   return (
     <View style={[styles.row, isCurrent && styles.currentRow]}>

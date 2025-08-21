@@ -33,7 +33,6 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import QueueModal from '@/components/QueueModal';
-import { spacing } from '@/styles/commonStyles';
 
 const { width, height } = Dimensions.get('window');
 
