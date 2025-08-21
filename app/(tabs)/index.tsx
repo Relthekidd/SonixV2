@@ -8,9 +8,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { withAuthGuard } from '@/hoc/withAuthGuard';
-import { useMusic, Track } from '@/providers/MusicProvider';
+import { useMusic } from '@/providers/MusicProvider';
+import { useLibrary } from '@/providers/LibraryProvider';
 import { useUserStats } from '@/hooks/useUserStats';
+import { usePlaylists } from '@/hooks/usePlaylists';
 import { useFocusEffect } from 'expo-router';
+import { Track } from '@/types';
+import { commonStyles, spacing, colors } from '@/styles/commonStyles';
 import {
   Play,
   TrendingUp,
@@ -20,47 +24,18 @@ import {
   Music,
 } from 'lucide-react-native';
 import Animated, { FadeInDown, FadeIn } from 'react-native-reanimated';
-import { supabase } from '@/services/supabase';
-import { apiService } from '@/services/api';
 import TrackItem from '@/components/TrackItem';
 
-interface FeaturedPlaylist {
-  id: string;
-  title: string;
-  description: string;
-  cover: string;
-}
-
 function HomeScreen() {
-  const { playTrack, pauseTrack, currentTrack, isPlaying, trendingTracks } =
-    useMusic();
+  const { playTrack, pauseTrack, currentTrack, isPlaying, trendingTracks } = useMusic();
+  const { likedSongIds } = useLibrary();
   const { listeningTime, topSong, topArtist, playsCount, refreshStats } =
     useUserStats();
-  const [featuredPlaylists, setFeaturedPlaylists] = useState<
-    FeaturedPlaylist[]
-  >([]);
-
-  useEffect(() => {
-    const fetchFeatured = async () => {
-      const { data, error } = await supabase
-        .from('playlists')
-        .select('id,title,description,cover_url')
-        .eq('is_featured', true)
-        .eq('is_public', true);
-      if (error) {
-        console.error('fetch featured playlists', error);
-        return;
-      }
-      const mapped = (data || []).map((p) => ({
-        id: p.id,
-        title: p.title,
-        description: p.description || '',
-        cover: apiService.getPublicUrl('images', p.cover_url || ''),
-      }));
-      setFeaturedPlaylists(mapped);
-    };
-    fetchFeatured();
-  }, []);
+  const { playlists: featuredPlaylists, isLoading: playlistsLoading } = usePlaylists({
+    isFeatured: true,
+    isPublic: true,
+    limit: 6,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -94,12 +69,7 @@ function HomeScreen() {
         {/* Hero Section */}
         <Animated.View
           entering={FadeInDown.delay(100)}
-          style={[
-            styles.hero,
-            styles.glassCard,
-            styles.brutalBorder,
-            styles.brutalShadow,
-          ]}
+          style={[styles.hero, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
         >
           <Text style={styles.heroTitle}>Welcome to Sonix</Text>
           <Text style={styles.heroSubtitle}>
@@ -114,36 +84,31 @@ function HomeScreen() {
               Icon: Play,
               label: 'Tracks Played',
               value: playsCount.toString(),
-              color: '#22c55e',
+              color: colors.success,
             },
             {
               Icon: Clock,
               label: 'Hours Listened',
               value: (listeningTime / 3600).toFixed(1),
-              color: '#fb923c',
+              color: colors.warning,
             },
             {
               Icon: User,
               label: 'Top Artist',
               value: topArtist,
-              color: '#3b82f6',
+              color: colors.primary,
             },
             {
               Icon: Music,
               label: 'Top Song',
               value: topSong,
-              color: '#8b5cf6',
+              color: colors.secondary,
             },
           ].map((stat, i) => (
             <Animated.View
               entering={FadeIn.delay(i * 100)}
               key={stat.label}
-              style={[
-                styles.statCard,
-                styles.glassCard,
-                styles.brutalBorder,
-                styles.brutalShadow,
-              ]}
+              style={[styles.statCard, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
             >
               <stat.Icon color={stat.color} size={32} />
               <Text style={styles.statValue}>{stat.value}</Text>
@@ -154,48 +119,38 @@ function HomeScreen() {
 
         {/* Featured Playlists */}
         <Animated.View entering={FadeInDown.delay(200)} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Star color="#a78bfa" size={20} />
-            <Text style={styles.sectionTitle}>Featured Playlists</Text>
+          <View style={commonStyles.sectionHeader}>
+            <Star color={colors.accent} size={20} />
+            <Text style={commonStyles.sectionTitle}>Featured Playlists</Text>
           </View>
-          <View style={styles.playlistGrid}>
-            {featuredPlaylists.map((pl, index) => (
-              <Animated.View
-                entering={FadeInDown.delay(200 + index * 100)}
-                key={pl.id}
-                style={{ width: '32%' }}
-              >
-                <TouchableOpacity
-                  style={[
-                    styles.playlistCard,
-                    styles.glassCard,
-                    styles.brutalBorder,
-                    styles.brutalShadow,
-                  ]}
+          {!playlistsLoading && (
+            <View style={styles.playlistGrid}>
+              {featuredPlaylists.slice(0, 6).map((pl, index) => (
+                <Animated.View
+                  entering={FadeInDown.delay(200 + index * 100)}
+                  key={pl.id}
+                  style={{ width: '32%' }}
                 >
-                  <View style={[styles.playlistCover, styles.brutalBorder]} />
-                  <Text style={styles.playlistTitle}>{pl.title}</Text>
-                  <Text style={styles.playlistDesc}>{pl.description}</Text>
-                </TouchableOpacity>
-              </Animated.View>
-            ))}
-          </View>
+                  <TouchableOpacity
+                    style={[styles.playlistCard, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
+                    onPress={() => router.push(`/playlist/${pl.id}` as const)}
+                  >
+                    <View style={[styles.playlistCover, commonStyles.brutalBorder]} />
+                    <Text style={styles.playlistTitle}>{pl.title}</Text>
+                  </TouchableOpacity>
+                </Animated.View>
+              ))}
+            </View>
+          )}
         </Animated.View>
 
         {/* Trending Tracks */}
         <Animated.View entering={FadeInDown.delay(400)} style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <TrendingUp color="#a78bfa" size={20} />
-            <Text style={styles.sectionTitle}>Trending Now</Text>
+          <View style={commonStyles.sectionHeader}>
+            <TrendingUp color={colors.accent} size={20} />
+            <Text style={commonStyles.sectionTitle}>Trending Now</Text>
           </View>
-          <View
-            style={[
-              styles.trackList,
-              styles.glassCard,
-              styles.brutalBorder,
-              styles.brutalShadow,
-            ]}
-          >
+          <View style={[styles.trackList, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}>
             {tracks.map((track, index) => (
               <Animated.View
                 entering={FadeInDown.delay(400 + index * 50)}
@@ -212,7 +167,7 @@ function HomeScreen() {
           </View>
         </Animated.View>
 
-        <View style={{ height: 120 }} />
+        <View style={{ height: spacing.xxl * 2.5 }} />
       </ScrollView>
     </LinearGradient>
   );
@@ -220,117 +175,79 @@ function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 24, paddingBottom: 110 },
+  content: { 
+    padding: spacing.lg, 
+    paddingBottom: 110 
+  },
   hero: {
-    padding: 24,
-    marginTop: 32,
-    marginBottom: 32,
-    alignItems: 'center', // centers children horizontally
-    justifyContent: 'center', // centers children vertically
-    minHeight: 180, // 👈 add this for vertical centering
+    padding: spacing.lg,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 180,
   },
   heroTitle: {
     fontSize: 40,
     fontFamily: 'Poppins-Bold',
-    color: '#fff',
-    marginBottom: 16,
+    color: colors.white,
+    marginBottom: spacing.md,
   },
   heroSubtitle: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: 24,
-  },
-  button: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#1e1e1e',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-  },
-  buttonText: {
-    color: '#fff',
-    fontFamily: 'Inter-SemiBold',
-    fontSize: 16,
+    marginBottom: spacing.lg,
   },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 32,
+    marginBottom: spacing.xl,
   },
   statCard: {
     width: '48%',
     alignItems: 'center',
-    padding: 16,
-    marginBottom: 16,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   statValue: {
     fontSize: 24,
     fontFamily: 'Poppins-Bold',
-    color: '#fff',
-    marginTop: 8,
+    color: colors.white,
+    marginTop: spacing.sm,
   },
   statLabel: {
     fontSize: 12,
     fontFamily: 'Inter-Regular',
     color: 'rgba(255,255,255,0.7)',
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
-  section: { marginBottom: 32 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#fff',
-    marginLeft: 8,
-  },
+  section: { marginBottom: spacing.xl },
   playlistGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
+    gap: spacing.sm,
   },
   playlistCard: {
-    padding: 16,
+    padding: spacing.md,
   },
   playlistCover: {
     width: '100%',
     height: 80,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: spacing.sm,
     backgroundColor: 'rgba(255,255,255,0.1)',
   },
   playlistTitle: {
     fontSize: 16,
     fontFamily: 'Inter-SemiBold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  playlistDesc: {
-    fontSize: 12,
-    fontFamily: 'Inter-Regular',
-    color: 'rgba(255,255,255,0.7)',
+    color: colors.white,
+    textAlign: 'center',
   },
   trackList: {
     borderRadius: 16,
-  },
-  glassCard: {
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 20,
-  },
-  brutalBorder: {
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  brutalShadow: {
-    shadowColor: '#000',
-    shadowOffset: { width: 4, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 6,
-    elevation: 8,
   },
 });
 
