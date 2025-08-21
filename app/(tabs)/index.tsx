@@ -71,8 +71,10 @@ function HomeScreen() {
           entering={FadeInDown.delay(100)}
           style={[styles.hero, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
         >
-          <Text style={styles.heroTitle}>Welcome to Sonix</Text>
-          <Text style={styles.heroSubtitle}>
+          <Text style={styles.heroTitle} adjustsFontSizeToFit minimumFontScale={0.7} numberOfLines={1}>
+            Welcome to Sonix
+          </Text>
+          <Text style={styles.heroSubtitle} adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={2}>
             Fueling the Future of Independent Music.
           </Text>
         </Animated.View>
@@ -180,24 +182,26 @@ const styles = StyleSheet.create({
     paddingBottom: 110 
   },
   hero: {
-    padding: spacing.lg,
+    padding: spacing.md,
     marginTop: spacing.xl,
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 180,
+    minHeight: 140,
   },
   heroTitle: {
-    fontSize: 40,
+    fontSize: 32,
     fontFamily: 'Poppins-Bold',
     color: colors.white,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
   },
   heroSubtitle: {
     fontSize: 16,
     fontFamily: 'Inter-Regular',
     color: 'rgba(255,255,255,0.8)',
-    marginBottom: spacing.lg,
+    textAlign: 'center',
+    lineHeight: 22,
   },
   statsGrid: {
     flexDirection: 'row',

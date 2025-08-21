@@ -208,17 +208,26 @@ function SearchScreen() {
               style={styles.trendingContainer}
             >
               <Text style={styles.sectionTitle}>Trending Searches</Text>
-              <View style={styles.trendingGrid}>
-                {trendingSearches.map((term, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[styles.trendingItem, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
-                    onPress={() => handleTrendingPress(term)}
-                  >
-                    <Text style={styles.trendingText}>{term}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {trendingSearches.length > 0 ? (
+                <View style={styles.trendingGrid}>
+                  {trendingSearches.map((term, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[styles.trendingItem, commonStyles.glassCard, commonStyles.brutalBorder, commonStyles.brutalShadow]}
+                      onPress={() => handleTrendingPress(term)}
+                    >
+                      <Text style={styles.trendingText}>{term}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <View style={commonStyles.emptyState}>
+                  <Text style={commonStyles.emptyText}>No trending searches</Text>
+                  <Text style={commonStyles.emptySubtext}>
+                    Start searching to discover music
+                  </Text>
+                </View>
+              )}
             </Animated.View>
           )}
         </ScrollView>
@@ -247,10 +256,12 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: '900' as const,
     color: colors.white,
     marginBottom: spacing.lg,
+    adjustsFontSizeToFit: true,
+    minimumFontScale: 0.8,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -323,12 +334,16 @@ const styles = StyleSheet.create({
   trendingGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xs,
   },
   trendingItem: {
+    width: '48%',
+    marginBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderRadius: 20,
+    alignItems: 'center',
   },
   trendingText: {
     color: colors.white,
