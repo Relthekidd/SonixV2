@@ -116,7 +116,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
 
   // Update track liked status when library changes
   useEffect(() => {
-    const updateTrack = (t: Track) => ({ ...t, isLiked: (likedSongIds || []).includes(t.id) });
+    const updateTrack = (t: Track) => ({ ...t, isLiked: likedSongIds.includes(t.id) });
     
     setQueue((prev) => prev.map(updateTrack));
     setTrendingTracks((prev) => prev.map(updateTrack));
@@ -392,12 +392,12 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
       const trendingData =
         (trendingRes as { data?: TrackRow[] | null })?.data ?? [];
       setTrendingTracks(
-        trendingData.map((t) => transformTrack(t, likedSongIds || [])),
+        trendingData.map((t) => transformTrack(t, likedSongIds)),
       );
 
       const newData = (newRes as { data?: TrackRow[] | null })?.data ?? [];
       setNewReleases(
-        newData.map((t) => transformTrack(t, likedSongIds || [])),
+        newData.map((t) => transformTrack(t, likedSongIds)),
       );
     } catch (err) {
       setError((err as Error).message);
@@ -461,7 +461,7 @@ export function MusicProvider({ children }: { children: React.ReactNode }) {
           .limit(10),
       ]);
 
-      const tracks = (trackRes.data || []).map((t: TrackRow) => transformTrack(t, likedSongIds || []));
+      const tracks = (trackRes.data || []).map((t: TrackRow) => transformTrack(t, likedSongIds));
       const albums = (albumRes.data || []).map(transformAlbum);
       const playlists = (playlistRes.data || []).map(transformPlaylist);
       const artists = (artistRes.data || []).map(transformArtist);
