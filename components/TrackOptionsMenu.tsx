@@ -7,7 +7,7 @@ import {
   StyleSheet,
   FlatList,
 } from 'react-native';
-import { MoreVertical, X } from 'lucide-react-native';
+import { MoveVertical as MoreVertical, X } from 'lucide-react-native';
 import { useMusic, Track, Playlist } from '@/providers/MusicProvider';
 
 interface Props {
